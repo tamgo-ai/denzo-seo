@@ -68,9 +68,13 @@ def init_db():
         github_repo        TEXT,
         github_branch      TEXT DEFAULT 'main',
         github_token       TEXT,
+        github_format      TEXT DEFAULT 'html',
+        github_path_prefix TEXT DEFAULT '',
+        pages_domain       TEXT DEFAULT '',
         wp_url             TEXT,
         wp_user            TEXT,
         wp_app_password    TEXT,
+        dont_sell          TEXT DEFAULT '[]',
         FOREIGN KEY (tenant_id) REFERENCES clients(tenant_id)
     );
 
@@ -276,13 +280,16 @@ def init_db():
     CREATE INDEX IF NOT EXISTS idx_locations_tenant ON locations(tenant_id);
     """)
 
-    # Default admin user
-    existing = conn.execute("SELECT id FROM users WHERE username='denzo'").fetchone()
-    if not existing:
-        conn.execute(
-            "INSERT INTO users (username, password_hash, role) VALUES (?,?,?)",
-            ("denzo", generate_password_hash("denzo2026"), "admin")
-        )
+    # Seed admin from env vars on first install — never hardcode credentials
+    admin_user = os.getenv("DENZO_ADMIN_USER")
+    admin_pass = os.getenv("DENZO_ADMIN_PASS")
+    if admin_user and admin_pass:
+        existing = conn.execute("SELECT id FROM users WHERE username=?", (admin_user,)).fetchone()
+        if not existing:
+            conn.execute(
+                "INSERT INTO users (username, password_hash, role) VALUES (?,?,?)",
+                (admin_user, generate_password_hash(admin_pass), "admin")
+            )
 
     conn.commit()
 
@@ -294,6 +301,7 @@ def init_db():
         "ALTER TABLE clients ADD COLUMN locations_json TEXT",
         "ALTER TABLE client_context ADD COLUMN dont_sell TEXT DEFAULT '[]'",
         "ALTER TABLE client_context ADD COLUMN github_format TEXT DEFAULT 'html'",
+        "ALTER TABLE client_context ADD COLUMN github_path_prefix TEXT DEFAULT ''",
         "ALTER TABLE client_context ADD COLUMN pages_domain TEXT DEFAULT ''",
         # SaaS funnel — user subscription + client ownership
         "ALTER TABLE users ADD COLUMN email TEXT",

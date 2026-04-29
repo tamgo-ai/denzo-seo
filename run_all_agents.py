@@ -56,61 +56,61 @@ from denzo.agents.layer2_strategy.eeat_architect import EEATArchitect
 from denzo.agents.layer2_strategy.schema_engineer import SchemaEngineer
 from denzo.agents.layer3_production.programmatic_seo import ProgrammaticSEO
 
-# ── Pipeline per tenant ────────────────────────────────────────────────────────
 
-log("Starting full pipeline for all tenants...")
-log(f"Start time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
+if __name__ == "__main__":
+    log("Starting full pipeline for all tenants...")
+    log(f"Start time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
 
-# ── 1. ACG — 393 ready pages, 162 published, needs optimization + republish ──
-run_tenant('auto-collision-group', [
-    (ContentOptimizer,  "Content Optimizer"),
-    (GEOOptimizer,      "GEO Optimizer"),
-    (InternalLinker,    "Internal Linker"),
-    (WordPressPublisher,"WordPress Publisher"),
-    (RankTracker,       "Rank Tracker"),
-    (SERPIntelligence,  "SERP Intelligence"),
-    (ROIAttribution,    "ROI Attribution"),
-])
+    # ── 1. ACG ──────────────────────────────────────────────────────────────────
+    run_tenant('auto-collision-group', [
+        (ContentOptimizer,  "Content Optimizer"),
+        (GEOOptimizer,      "GEO Optimizer"),
+        (InternalLinker,    "Internal Linker"),
+        (WordPressPublisher,"WordPress Publisher"),
+        (RankTracker,       "Rank Tracker"),
+        (SERPIntelligence,  "SERP Intelligence"),
+        (ROIAttribution,    "ROI Attribution"),
+    ])
 
-# ── 2. NoHo — 484 ready pages, scores reset, full optimization ──
-run_tenant('noho-collision-center', [
-    (ContentOptimizer,  "Content Optimizer"),
-    (GEOOptimizer,      "GEO Optimizer"),
-    (InternalLinker,    "Internal Linker"),
-    (GitHubPublisher,   "GitHub Publisher"),
-    (RankTracker,       "Rank Tracker"),
-    (GEOMonitor,        "GEO Monitor"),
-])
+    # ── 2. NoHo ─────────────────────────────────────────────────────────────────
+    run_tenant('noho-collision-center', [
+        (ContentOptimizer,  "Content Optimizer"),
+        (GEOOptimizer,      "GEO Optimizer"),
+        (InternalLinker,    "Internal Linker"),
+        (GitHubPublisher,   "GitHub Publisher"),
+        (RankTracker,       "Rank Tracker"),
+        (GEOMonitor,        "GEO Monitor"),
+    ])
 
-# ── 3. BMW Ontario — 15 ready pages, good quality, new competitor data ──
-run_tenant('bmw-of-ontario', [
-    (GEOOptimizer,      "GEO Optimizer"),
-    (InternalLinker,    "Internal Linker"),
-    (RankTracker,       "Rank Tracker"),
-    (SERPIntelligence,  "SERP Intelligence"),
-    (ROIAttribution,    "ROI Attribution"),
-    (GEOMonitor,        "GEO Monitor"),
-])
+    # ── 3. BMW Ontario ──────────────────────────────────────────────────────────
+    run_tenant('bmw-of-ontario', [
+        (GEOOptimizer,      "GEO Optimizer"),
+        (InternalLinker,    "Internal Linker"),
+        (RankTracker,       "Rank Tracker"),
+        (SERPIntelligence,  "SERP Intelligence"),
+        (ROIAttribution,    "ROI Attribution"),
+        (GEOMonitor,        "GEO Monitor"),
+    ])
 
-# ── 4. Denzo Studios — 31 ready pages ──
-run_tenant('denzo-studios', [
-    (ContentOptimizer,  "Content Optimizer"),
-    (GEOOptimizer,      "GEO Optimizer"),
-    (InternalLinker,    "Internal Linker"),
-    (RankTracker,       "Rank Tracker"),
-    (GEOMonitor,        "GEO Monitor"),
-])
+    # ── 4. Denzo Studios ────────────────────────────────────────────────────────
+    run_tenant('denzo-studios', [
+        (ContentOptimizer,  "Content Optimizer"),
+        (GEOOptimizer,      "GEO Optimizer"),
+        (InternalLinker,    "Internal Linker"),
+        (RankTracker,       "Rank Tracker"),
+        (GEOMonitor,        "GEO Monitor"),
+    ])
 
-# ── 5. TAMGO AI — 16 ready pages, no publisher configured ──
-run_tenant('tamgo-ai', [
-    (ContentOptimizer,  "Content Optimizer"),
-    (GEOOptimizer,      "GEO Optimizer"),
-    (InternalLinker,    "Internal Linker"),
-    (RankTracker,       "Rank Tracker"),
-    (GEOMonitor,        "GEO Monitor"),
-])
+    # ── 5. TAMGO AI ─────────────────────────────────────────────────────────────
+    run_tenant('tamgo-ai', [
+        (ContentOptimizer,  "Content Optimizer"),
+        (GEOOptimizer,      "GEO Optimizer"),
+        (InternalLinker,    "Internal Linker"),
+        (RankTracker,       "Rank Tracker"),
+        (GEOMonitor,        "GEO Monitor"),
+    ])
 
-log("\n" + "="*60)
-log("ALL TENANTS COMPLETE")
-log(f"End time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
-log("="*60)
+    log("\n" + "="*60)
+    log("ALL TENANTS COMPLETE")
+    log(f"End time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
+    log("="*60)

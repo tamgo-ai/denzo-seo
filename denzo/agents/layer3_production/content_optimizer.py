@@ -68,7 +68,7 @@ Return JSON only:
 """
         raw = self.call_claude(score_prompt, max_tokens=400, model="claude-haiku-4-5-20251001")
         if not raw:
-            return 75, ""  # Assume passing if API fails
+            return None, ""  # API failed — caller will skip DB update
         try:
             import re as _re
             cleaned = strip_json_fences(raw)
@@ -182,6 +182,9 @@ Rules:
                 self.set_status("working", f"Scoring: {title[:50]}")
 
                 score, new_content = self._score_and_fix(page_dict, brand_voice=brand_voice)
+                if score is None:
+                    self.log(f"{title[:50]} → API failed, skipping", "warning")
+                    continue
                 self.log(f"{title[:50]} → score {score}/100")
 
                 if new_content and len(new_content.strip()) > 200:

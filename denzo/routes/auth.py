@@ -1,8 +1,15 @@
+import time
+from collections import defaultdict
 from flask import Blueprint, render_template, request, session, redirect, url_for, flash
 from denzo.auth import check_credentials
 from denzo.db import get_db
 
 bp = Blueprint("auth", __name__)
+
+# Simple in-memory brute-force protection: ip -> [timestamp, ...]
+_login_attempts: dict = defaultdict(list)
+_MAX_ATTEMPTS = 5
+_WINDOW_SECONDS = 60
 
 
 def _load_user_plan(user_id: int) -> str:
@@ -19,6 +26,14 @@ def login():
 
     error = None
     if request.method == "POST":
+        ip = request.remote_addr or "unknown"
+        now = time.time()
+        # Purge old attempts
+        _login_attempts[ip] = [t for t in _login_attempts[ip] if now - t < _WINDOW_SECONDS]
+        if len(_login_attempts[ip]) >= _MAX_ATTEMPTS:
+            error = "Too many login attempts. Please wait a minute."
+            return render_template("auth/login.html", error=error)
+
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         user_id = check_credentials(username, password)
@@ -30,7 +45,9 @@ def login():
             session["plan"] = plan
 
             next_url = request.args.get("next", "")
-            # Don't redirect back to landing or login
+            # Reject external redirects — accept relative paths only
+            if next_url and (not next_url.startswith("/") or next_url.startswith("//")):
+                next_url = ""
             if not next_url or next_url in ("/", "/login", "/landing", "/home"):
                 next_url = None
 
@@ -56,6 +73,7 @@ def login():
 
             return redirect(next_url)
         else:
+            _login_attempts[ip].append(now)
             error = "Invalid username or password."
 
     return render_template("auth/login.html", error=error)

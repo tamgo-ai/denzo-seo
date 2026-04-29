@@ -30,8 +30,8 @@ INDUSTRY      = "auto_body_shop"
 TAGLINE       = "We Fight For You. Not The Insurance Company."
 
 WP_URL          = "https://www.autoacg.com"
-WP_USER         = "Raul"
-WP_APP_PASSWORD = "RvjV8N0g0t6AIL5dVjrcGKeW"
+WP_USER         = os.getenv("ACG_WP_USER", "Raul")
+WP_APP_PASSWORD = os.getenv("ACG_WP_APP_PASSWORD", "")
 
 SERVICE_CITIES = [
     "Whittier", "Los Angeles", "Gardena", "Santa Ana", "Ontario",

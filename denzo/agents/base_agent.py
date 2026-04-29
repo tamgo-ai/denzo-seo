@@ -117,6 +117,7 @@ def _connect():
     conn = sqlite3.connect(DB_PATH, timeout=20)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA foreign_keys=ON")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -310,6 +311,7 @@ class TenantAwareBaseAgent:
             kwargs["system"] = system
 
         for attempt in range(4):
+            retry_wait = 0
             with _api_semaphore:
                 with _api_lock:
                     elapsed = time.time() - _last_api_call
@@ -320,19 +322,20 @@ class TenantAwareBaseAgent:
                     response = client.messages.create(**kwargs)
                     return response.content[0].text
                 except anthropic.RateLimitError:
-                    wait = 30 * (attempt + 1)
-                    self.log(f"Rate limit — waiting {wait}s...", "warning")
-                    time.sleep(wait)
+                    retry_wait = 30 * (attempt + 1)
+                    self.log(f"Rate limit — waiting {retry_wait}s...", "warning")
                 except anthropic.APITimeoutError:
-                    wait = 10 * (attempt + 1)
+                    retry_wait = 10 * (attempt + 1)
                     self.log(f"Timeout — retry {attempt+1}/4", "warning")
-                    time.sleep(wait)
                 except Exception as e:
                     if attempt < 3:
-                        time.sleep(8)
+                        retry_wait = 8
                     else:
                         self.log(f"API error: {str(e)[:80]}", "error")
                         return ""
+            # Sleep OUTSIDE the semaphore so other agents can proceed
+            if retry_wait:
+                time.sleep(retry_wait)
         return ""
 
     def call_claude_vision(self, image_url: str, prompt: str, max_tokens: int = 500) -> str:
@@ -377,6 +380,7 @@ class TenantAwareBaseAgent:
         }]
 
         for attempt in range(3):
+            retry_wait = 0
             with _api_semaphore:
                 with _api_lock:
                     elapsed = time.time() - _last_api_call
@@ -391,12 +395,14 @@ class TenantAwareBaseAgent:
                     )
                     return resp.content[0].text
                 except anthropic.RateLimitError:
-                    time.sleep(30 * (attempt + 1))
+                    retry_wait = 30 * (attempt + 1)
                 except Exception as e:
                     if attempt < 2:
-                        time.sleep(8)
+                        retry_wait = 8
                     else:
                         return f"__vision_error__: {str(e)[:60]}"
+            if retry_wait:
+                time.sleep(retry_wait)
         return ""
 
     def run(self):

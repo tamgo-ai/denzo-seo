@@ -79,8 +79,15 @@ def _autopilot_on(db, tenant_id):
 @bp.route("/")
 @login_required
 def index():
+    from flask import session as _sess
     db = get_db()
-    client = db.execute("SELECT tenant_id FROM clients ORDER BY name LIMIT 1").fetchone()
+    if _sess.get("role") == "admin":
+        client = db.execute("SELECT tenant_id FROM clients ORDER BY name LIMIT 1").fetchone()
+    else:
+        client = db.execute(
+            "SELECT tenant_id FROM clients WHERE owner_user_id=? ORDER BY name LIMIT 1",
+            (_sess.get("user_id"),)
+        ).fetchone()
     db.close()
     if client:
         return redirect(url_for("lite.dashboard", tenant_id=client["tenant_id"]))

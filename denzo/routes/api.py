@@ -25,6 +25,21 @@ def _is_logged_in():
     return "user_id" in session
 
 
+def _can_access_tenant(tenant_id: str) -> bool:
+    """Admins can access any tenant; client users only their own."""
+    if not _is_logged_in():
+        return False
+    if session.get("role") == "admin":
+        return True
+    db = get_db()
+    row = db.execute(
+        "SELECT id FROM clients WHERE tenant_id=? AND owner_user_id=?",
+        (tenant_id, session["user_id"])
+    ).fetchone()
+    db.close()
+    return row is not None
+
+
 # ── Agent helpers ──────────────────────────────────────────────────────────────
 
 def _mark_agent(tenant_id: str, name: str, status: str, task: str = ""):
@@ -132,6 +147,8 @@ def _finish_run(run_id, status: str):
 @login_required
 def run_pipeline(tenant_id):
     """Start the autonomous Director which orchestrates the full pipeline."""
+    if not _can_access_tenant(tenant_id):
+        return jsonify({"error": "Access denied"}), 403
     agent_name = "Pipeline Director"
     with _lock:
         threads = _agent_threads.setdefault(tenant_id, {})
@@ -157,6 +174,8 @@ def run_pipeline(tenant_id):
 @login_required
 def stop_pipeline(tenant_id):
     """Stop the autonomous Director (and let it wind down agents gracefully)."""
+    if not _can_access_tenant(tenant_id):
+        return jsonify({"error": "Access denied"}), 403
     agent_name = "Pipeline Director"
     with _lock:
         events = _stop_events.get(tenant_id, {})
@@ -175,6 +194,8 @@ def stop_pipeline(tenant_id):
 @bp.route("/<tenant_id>/agents/start/<agent_name>", methods=["POST"])
 @login_required
 def start_agent(tenant_id, agent_name):
+    if not _can_access_tenant(tenant_id):
+        return jsonify({"error": "Access denied"}), 403
     if agent_name not in AGENT_REGISTRY:
         return jsonify({"error": f"Unknown agent: {agent_name}"}), 400
 
@@ -201,6 +222,8 @@ def start_agent(tenant_id, agent_name):
 @bp.route("/<tenant_id>/agents/stop/<agent_name>", methods=["POST"])
 @login_required
 def stop_agent(tenant_id, agent_name):
+    if not _can_access_tenant(tenant_id):
+        return jsonify({"error": "Access denied"}), 403
     with _lock:
         events = _stop_events.get(tenant_id, {})
         event = events.get(agent_name)
@@ -217,6 +240,8 @@ def stop_agent(tenant_id, agent_name):
 @bp.route("/<tenant_id>/agents/status")
 @login_required
 def agents_status(tenant_id):
+    if not _can_access_tenant(tenant_id):
+        return jsonify({"error": "Access denied"}), 403
     db = get_db()
     rows = db.execute(
         "SELECT name, status, current_task, last_run_at, run_count, layer, color FROM agents WHERE tenant_id=? ORDER BY layer, name",
@@ -231,6 +256,8 @@ def agents_status(tenant_id):
 @bp.route("/<tenant_id>/stats")
 @login_required
 def stats(tenant_id):
+    if not _can_access_tenant(tenant_id):
+        return jsonify({"error": "Access denied"}), 403
     db = get_db()
     kw = db.execute(
         "SELECT COUNT(*) FROM keywords WHERE tenant_id=?", (tenant_id,)
@@ -269,77 +296,59 @@ def ws_logs(ws, tenant_id):
     Push real-time activity logs + agent statuses to the pipeline UI.
     Sends JSON every 800ms: {"logs": [...], "agents": [...], "stats": {...}}
     """
-    if not _is_logged_in():
+    if not _can_access_tenant(tenant_id):
         ws.close()
         return
 
     last_id = 0
-
-    # Seed last_id so we don't flood with old data on connect
     db = get_db()
-    seed = db.execute(
-        "SELECT MAX(id) FROM activity WHERE tenant_id=?", (tenant_id,)
-    ).fetchone()[0]
-    db.close()
-    if seed:
-        last_id = seed
+    try:
+        seed = db.execute(
+            "SELECT MAX(id) FROM activity WHERE tenant_id=?", (tenant_id,)
+        ).fetchone()[0]
+        if seed:
+            last_id = seed
+    except Exception:
+        pass
 
     while True:
         try:
-            db = get_db()
-
-            # New log rows since last_id
             new_logs = db.execute(
-                "SELECT id, agent, message, level, created_at FROM activity WHERE tenant_id=? AND id > ? ORDER BY id LIMIT 50",
+                "SELECT id, agent, message, level, created_at FROM activity "
+                "WHERE tenant_id=? AND id > ? ORDER BY id LIMIT 50",
                 (tenant_id, last_id)
             ).fetchall()
 
             if new_logs:
                 last_id = new_logs[-1]["id"]
 
-            # Agent statuses
             agents = db.execute(
-                "SELECT name, status, current_task, layer, color, last_run_at FROM agents WHERE tenant_id=? ORDER BY layer, name",
+                "SELECT name, status, current_task, layer, color, last_run_at "
+                "FROM agents WHERE tenant_id=? ORDER BY layer, name",
                 (tenant_id,)
             ).fetchall()
 
-            # Quick stats
-            kw = db.execute(
-                "SELECT COUNT(*) FROM keywords WHERE tenant_id=?", (tenant_id,)
-            ).fetchone()[0]
             pg = db.execute(
-                """SELECT
-                    COUNT(*) AS total,
-                    SUM(CASE WHEN status='published' THEN 1 ELSE 0 END) AS published
+                """SELECT COUNT(*) AS total,
+                          SUM(CASE WHEN status='published' THEN 1 ELSE 0 END) AS published,
+                          (SELECT COUNT(*) FROM keywords WHERE tenant_id=?) AS kw
                    FROM pages WHERE tenant_id=?""",
-                (tenant_id,)
+                (tenant_id, tenant_id)
             ).fetchone()
-            db.close()
 
             payload = {
                 "logs": [
-                    {
-                        "id":         r["id"],
-                        "agent":      r["agent"],
-                        "message":    r["message"],
-                        "level":      r["level"],
-                        "created_at": r["created_at"],
-                    }
+                    {"id": r["id"], "agent": r["agent"], "message": r["message"],
+                     "level": r["level"], "created_at": r["created_at"]}
                     for r in new_logs
                 ],
                 "agents": [
-                    {
-                        "name":         a["name"],
-                        "status":       a["status"],
-                        "current_task": a["current_task"],
-                        "layer":        a["layer"],
-                        "color":        a["color"],
-                        "last_run_at":  a["last_run_at"],
-                    }
+                    {"name": a["name"], "status": a["status"], "current_task": a["current_task"],
+                     "layer": a["layer"], "color": a["color"], "last_run_at": a["last_run_at"]}
                     for a in agents
                 ],
                 "stats": {
-                    "keywords":  kw,
+                    "keywords":  pg["kw"]        or 0,
                     "pages":     pg["total"]     or 0,
                     "published": pg["published"] or 0,
                 },
@@ -348,6 +357,20 @@ def ws_logs(ws, tenant_id):
             ws.send(json.dumps(payload))
             time.sleep(0.8)
 
-        except Exception:
-            # Client disconnected or DB error — exit cleanly
+        except (BrokenPipeError, OSError):
             break
+        except Exception:
+            # DB error — reopen connection and retry
+            try:
+                db.close()
+            except Exception:
+                pass
+            try:
+                db = get_db()
+            except Exception:
+                break
+
+    try:
+        db.close()
+    except Exception:
+        pass

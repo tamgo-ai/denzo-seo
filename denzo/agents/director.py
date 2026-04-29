@@ -43,40 +43,27 @@ class PipelineDirector(TenantAwareBaseAgent):
         """Build a complete picture of the pipeline state."""
         tid = self.ctx.tenant_id
 
-        kw_rows = db_execute(
-            "SELECT COUNT(*) FROM keywords WHERE tenant_id=?", (tid,)
+        # Single query for all keyword + page counts
+        counts = db_execute(
+            """SELECT
+                (SELECT COUNT(*) FROM keywords WHERE tenant_id=?)                                   AS kw_total,
+                (SELECT COUNT(*) FROM keywords WHERE tenant_id=? AND priority IN ('high','alta'))   AS kw_high,
+                (SELECT COUNT(*) FROM pages    WHERE tenant_id=?)                                   AS pg_total,
+                (SELECT COUNT(*) FROM pages    WHERE tenant_id=? AND status='published')            AS pg_pub,
+                (SELECT COUNT(*) FROM pages    WHERE tenant_id=? AND status='ready')                AS pg_ready,
+                (SELECT COUNT(*) FROM pages    WHERE tenant_id=? AND status='draft')                AS pg_draft,
+                (SELECT COUNT(*) FROM competitors WHERE tenant_id=?)                                AS comp_total
+            """,
+            (tid, tid, tid, tid, tid, tid, tid)
         )
-        kw_count = kw_rows[0][0] if kw_rows else 0
-
-        kw_high_rows = db_execute(
-            "SELECT COUNT(*) FROM keywords WHERE tenant_id=? AND priority IN ('high','alta')", (tid,)
-        )
-        kw_high = kw_high_rows[0][0] if kw_high_rows else 0
-
-        page_total_rows = db_execute(
-            "SELECT COUNT(*) FROM pages WHERE tenant_id=?", (tid,)
-        )
-        page_total = page_total_rows[0][0] if page_total_rows else 0
-
-        page_pub_rows = db_execute(
-            "SELECT COUNT(*) FROM pages WHERE tenant_id=? AND status='published'", (tid,)
-        )
-        page_pub = page_pub_rows[0][0] if page_pub_rows else 0
-
-        page_ready_rows = db_execute(
-            "SELECT COUNT(*) FROM pages WHERE tenant_id=? AND status='ready'", (tid,)
-        )
-        page_ready = page_ready_rows[0][0] if page_ready_rows else 0
-
-        page_draft_rows = db_execute(
-            "SELECT COUNT(*) FROM pages WHERE tenant_id=? AND status='draft'", (tid,)
-        )
-        page_draft = page_draft_rows[0][0] if page_draft_rows else 0
-
-        comp_rows = db_execute(
-            "SELECT COUNT(*) FROM competitors WHERE tenant_id=?", (tid,)
-        )
-        comp_count = comp_rows[0][0] if comp_rows else 0
+        c = counts[0] if counts else {}
+        kw_count   = c["kw_total"]   or 0
+        kw_high    = c["kw_high"]    or 0
+        page_total = c["pg_total"]   or 0
+        page_pub   = c["pg_pub"]     or 0
+        page_ready = c["pg_ready"]   or 0
+        page_draft = c["pg_draft"]   or 0
+        comp_count = c["comp_total"] or 0
 
         agent_rows = db_execute(
             """SELECT name, status, current_task, last_run_at, run_count, layer

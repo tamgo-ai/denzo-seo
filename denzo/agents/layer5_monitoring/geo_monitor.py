@@ -285,7 +285,15 @@ Return ONLY valid JSON. Make queries sound natural.
                 elif engine_name == "gemini":
                     result = _query_gemini(api_key, query)
                 elif engine_name == "claude":
-                    result = _query_claude_cold(query)
+                    # Use shared rate limiter — intentionally no business context
+                    _cold_system = (
+                        "You are a helpful local search assistant. "
+                        "Answer based only on your training knowledge. Be concise."
+                    )
+                    _resp = self.call_claude(query, max_tokens=400, system=_cold_system,
+                                            model="claude-haiku-4-5-20251001")
+                    result = {"success": bool(_resp), "response": _resp, "error": ""}
+
                 elif engine_name == "bing":
                     result = _query_bing(api_key, query)
                 else:

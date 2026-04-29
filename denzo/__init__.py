@@ -10,7 +10,15 @@ sock = Sock()
 
 def create_app():
     app = Flask(__name__, template_folder="templates", static_folder="../static")
-    app.secret_key = os.getenv("SECRET_KEY", "denzo-dev-secret")
+    _secret = os.getenv("SECRET_KEY")
+    if not _secret:
+        raise RuntimeError(
+            "SECRET_KEY env var not set. "
+            "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
+    if len(_secret) < 32:
+        raise RuntimeError("SECRET_KEY must be at least 32 characters long.")
+    app.secret_key = _secret
 
     sock.init_app(app)
 
@@ -33,7 +41,9 @@ def create_app():
                 {"tenant_id": r["tenant_id"], "name": r["name"], "active_agent": r["active_agent_name"]}
                 for r in rows
             ]
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error("sidebar clients error: %s", e)
             clients = []
         # Detect active_tenant from URL path: /clients/<tenant_id>/...
         active_tenant = None
@@ -72,10 +82,8 @@ def create_app():
 
 
 def _reset_stale_agents():
-    """
-    On startup, any agent left in 'working' status is orphaned (server restarted
-    while it was running). Reset them to 'idle' so they can be relaunched.
-    """
+    """Reset agents stuck in 'working' from a previous server crash."""
+    import logging
     try:
         from denzo.db import get_db
         db = get_db()
@@ -88,10 +96,9 @@ def _reset_stale_agents():
                 "INSERT INTO activity (tenant_id, type, message, agent, level) "
                 "SELECT tenant_id, 'system', "
                 "'Agent reset to idle after server restart (was stuck in working).', "
-                "name, 'warning' FROM agents WHERE status='idle' AND last_run_at IS NOT NULL "
-                "LIMIT 0"  # no-op — just commit the update above
+                "name, 'warning' FROM agents WHERE status='idle' AND last_run_at IS NOT NULL"
             )
         db.commit()
         db.close()
-    except Exception:
-        pass
+    except Exception as e:
+        logging.getLogger(__name__).error("stale agent reset error: %s", e)

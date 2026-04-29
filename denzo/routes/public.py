@@ -346,23 +346,16 @@ def _analyze_website(url: str) -> dict:
     except Exception:
         pass
 
-    # ── Sitemap check (quick HEAD request) ────────────────────────────────────
+    # ── Sitemap check ─────────────────────────────────────────────────────────
     try:
-        sm = requests.head(
-            _normalize_url(domain.replace("www.", "") + ".com").rsplit(".com", 1)[0]
-            + ("https://" + domain + "/sitemap.xml"),
-            timeout=4
+        clean_domain = domain.lstrip("https://").lstrip("http://").strip("/")
+        sm = requests.get(
+            f"https://{clean_domain}/sitemap.xml",
+            timeout=4, headers={"User-Agent": "DenzoSEOBot/1.0"}
         )
         result["has_sitemap"] = sm.status_code < 400
     except Exception as e:
-        logger.warning("Error: %s", e)
-    # Simpler sitemap check
-    try:
-        sm2 = requests.get(f"https://{domain}/sitemap.xml", timeout=4,
-                           headers={"User-Agent": "DenzoSEOBot/1.0"})
-        result["has_sitemap"] = sm2.status_code < 400
-    except Exception as e:
-        logger.warning("Error: %s", e)
+        logger.warning("sitemap check error: %s", e)
 
     industry = result["industry_guess"]
     city     = result["city"] or "your city"
@@ -505,6 +498,18 @@ def wizard_start():
         flash("Please enter your website URL.", "error")
         return redirect(url_for("public.landing"))
     url = _normalize_url(url_raw)
+    # SSRF guard — reject private/internal IPs
+    try:
+        import ipaddress, socket as _sock
+        from urllib.parse import urlparse as _up
+        _host = _up(url).hostname or ""
+        _ip = _sock.gethostbyname(_host)
+        _addr = ipaddress.ip_address(_ip)
+        if _addr.is_private or _addr.is_loopback or _addr.is_link_local or _addr.is_reserved:
+            flash("That URL is not allowed.", "error")
+            return redirect(url_for("public.landing"))
+    except Exception:
+        pass
     # Run analysis and store in session — loading page is just cosmetic delay
     data = _analyze_website(url)
     session["wizard_analysis"] = data
@@ -637,70 +642,73 @@ def wizard_complete():
     services  = json.dumps(s2.get("services",  analysis["services"]))
     dont_sell = json.dumps(s2.get("dont_sell", analysis["dont_sell"]))
 
-    # Create user
-    db.execute(
-        "INSERT INTO users (username, email, password_hash, role, plan) VALUES (?,?,?,?,?)",
-        (email, email, generate_password_hash(password), "client", "free")
-    )
-    db.commit()
-    user_id = db.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()["id"]
-
-    # Create tenant
-    base_slug = slugify(biz_name)
-    tenant_id = base_slug
-    suffix = 1
-    while db.execute("SELECT id FROM clients WHERE tenant_id=?", (tenant_id,)).fetchone():
-        tenant_id = f"{base_slug}-{suffix}"
-        suffix += 1
-
-    db.execute("""
-        INSERT INTO clients
-          (tenant_id, name, business_type, website_url, city, state,
-           publisher_type, status, owner_user_id, created_at, updated_at)
-        VALUES (?,?,?,?,?,?,'wordpress','active',?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
-    """, (tenant_id, biz_name, industry, website, city, state, user_id))
-
-    db.execute("""
-        INSERT INTO client_context
-          (tenant_id, domain, industry_vertical, service_cities, primary_city,
-           certifications, services, differentiators, competitors,
-           insurance_partners, dont_sell)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?)
-    """, (
-        tenant_id,
-        urlparse(_normalize_url(website)).netloc if website else "",
-        industry,
-        json.dumps([city] if city else []),
-        city,
-        "[]",
-        services,
-        "[]",
-        json.dumps(s3.get("competitors", analysis["competitors"])),
-        "[]",
-        dont_sell,
-    ))
-
-    # Seed agents
-    for name, layer, color in [
-        ("Keyword Strategist",       1, "blue"),
-        ("Competitor Intel",         1, "purple"),
-        ("Technical Auditor",        1, "yellow"),
-        ("E-E-A-T Architect",        2, "green"),
-        ("Schema Engineer",          2, "cyan"),
-        ("Programmatic SEO",         2, "orange"),
-        ("Content Optimizer",        3, "pink"),
-        ("Internal Linker",          3, "teal"),
-        ("Publisher",                3, "indigo"),
-        ("Rank Tracker",             3, "red"),
-        ("Reviews Intelligence",     2, "violet"),
-        ("Visual Content Optimizer", 2, "amber"),
-    ]:
+    try:
+        # All inserts in a single transaction — rollback if anything fails
         db.execute(
-            "INSERT OR IGNORE INTO agents (tenant_id,name,layer,color,status) VALUES (?,?,?,?,'idle')",
-            (tenant_id, name, layer, color)
+            "INSERT INTO users (username, email, password_hash, role, plan) VALUES (?,?,?,?,?)",
+            (email, email, generate_password_hash(password), "client", "free")
         )
+        user_id = db.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()["id"]
 
-    db.commit()
+        base_slug = slugify(biz_name)
+        tenant_id = base_slug
+        suffix = 1
+        while db.execute("SELECT id FROM clients WHERE tenant_id=?", (tenant_id,)).fetchone():
+            tenant_id = f"{base_slug}-{suffix}"
+            suffix += 1
+
+        db.execute("""
+            INSERT INTO clients
+              (tenant_id, name, business_type, website_url, city, state,
+               publisher_type, status, owner_user_id, created_at, updated_at)
+            VALUES (?,?,?,?,?,?,'wordpress','active',?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+        """, (tenant_id, biz_name, industry, website, city, state, user_id))
+
+        db.execute("""
+            INSERT INTO client_context
+              (tenant_id, domain, industry_vertical, service_cities, primary_city,
+               certifications, services, differentiators, competitors,
+               insurance_partners, dont_sell)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            tenant_id,
+            urlparse(_normalize_url(website)).netloc if website else "",
+            industry,
+            json.dumps([city] if city else []),
+            city,
+            "[]",
+            services,
+            "[]",
+            json.dumps(s3.get("competitors", analysis["competitors"])),
+            "[]",
+            dont_sell,
+        ))
+
+        for name, layer, color in [
+            ("Keyword Strategist",       1, "blue"),
+            ("Competitor Intel",         1, "purple"),
+            ("Technical Auditor",        1, "yellow"),
+            ("E-E-A-T Architect",        2, "green"),
+            ("Schema Engineer",          2, "cyan"),
+            ("Programmatic SEO",         2, "orange"),
+            ("Content Optimizer",        3, "pink"),
+            ("Internal Linker",          3, "teal"),
+            ("Publisher",                3, "indigo"),
+            ("Rank Tracker",             3, "red"),
+            ("Reviews Intelligence",     2, "violet"),
+            ("Visual Content Optimizer", 2, "amber"),
+        ]:
+            db.execute(
+                "INSERT OR IGNORE INTO agents (tenant_id,name,layer,color,status) VALUES (?,?,?,?,'idle')",
+                (tenant_id, name, layer, color)
+            )
+
+        db.commit()
+    except Exception:
+        db.rollback()
+        db.close()
+        flash("Account creation failed. Please try again.", "error")
+        return redirect(url_for("public.wizard_step", step=1))
     db.close()
 
     # Log in

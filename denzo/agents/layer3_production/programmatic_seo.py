@@ -26,7 +26,7 @@ class ProgrammaticSEO(TenantAwareBaseAgent):
             "SELECT value FROM settings WHERE tenant_id=? AND key='schema_faq'",
             (ctx.tenant_id,)
         )
-        faq_block = faq_schema[0][0] if faq_schema else ""
+        faq_block = faq_schema[0]["value"] if faq_schema else ""
 
         # Build Brand Voice DNA block
         brand_voice_block = ""
@@ -244,8 +244,7 @@ WRITING RULES:
             self.set_status("idle", "Waiting for Layer 2 agents")
             return
 
-        # Get all draft pages — cap at 50 to avoid unbounded runs
-        MAX_PAGES = 50
+        MAX_PAGES = 500
         pages = db_execute(
             "SELECT id, title, slug, type, location, target_keyword, notes FROM pages WHERE tenant_id=? AND status='draft' ORDER BY id LIMIT ?",
             (self.ctx.tenant_id, MAX_PAGES)
@@ -268,7 +267,7 @@ WRITING RULES:
         )
         if style_row:
             try:
-                style_guide = json.loads(style_row[0][0])
+                style_guide = json.loads(style_row[0]["value"])
                 self.log("Site style guide loaded.", "info")
             except Exception:
                 pass

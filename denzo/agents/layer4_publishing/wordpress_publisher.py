@@ -14,20 +14,29 @@ class WordPressPublisher(TenantAwareBaseAgent):
     def __init__(self, ctx: ClientContext):
         super().__init__("WordPress Publisher", ctx, layer=5, color="sky")
 
-    def _find_wp_page_by_slug(self, api_base: str, auth: tuple, slug: str) -> dict | None:
-        """Return the WP page dict if a page with this slug already exists, else None."""
+    # Sentinel returned when the lookup fails due to a network/server error
+    _LOOKUP_ERROR = object()
+
+    def _find_wp_page_by_slug(self, api_base: str, auth: tuple, slug: str):
+        """
+        Return the WP page dict if a page with this slug exists.
+        Returns None if not found (404/empty list).
+        Returns _LOOKUP_ERROR if the request fails — callers must NOT create on error
+        to avoid duplicating pages on transient network failures.
+        """
         try:
             r = requests.get(
                 f"{api_base}/pages",
                 auth=auth, timeout=15,
                 params={"slug": slug, "per_page": 1, "status": "any"}
             )
+            r.raise_for_status()
             data = r.json()
             if isinstance(data, list) and data:
                 return data[0]
+            return None
         except Exception:
-            pass
-        return None
+            return self._LOOKUP_ERROR
 
     def run(self):
         self.log("WordPress Publisher starting...")
@@ -134,7 +143,11 @@ class WordPressPublisher(TenantAwareBaseAgent):
                 # Check if page already exists by slug
                 existing = self._find_wp_page_by_slug(api_base, auth, slug)
 
-                if existing:
+                if existing is self._LOOKUP_ERROR:
+                    self.log(f"✗ Lookup error for '{slug}' — skipping to avoid duplicates", "error")
+                    failed += 1
+                    continue
+                elif existing:
                     # UPDATE existing page
                     wp_id = existing["id"]
                     r = requests.post(f"{api_base}/pages/{wp_id}", auth=auth, json=payload, timeout=30)

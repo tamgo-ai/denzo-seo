@@ -1,6 +1,8 @@
+import ipaddress
 import json
 import os
 import re
+import socket
 import anthropic
 import requests as http_requests
 from bs4 import BeautifulSoup
@@ -9,6 +11,28 @@ from denzo.auth import login_required
 from denzo.db import get_db, slugify
 from denzo.agents.registry import DEFAULT_AGENTS, AGENT_REGISTRY
 from denzo.agents.utils.stealth_fetch import fetch_html
+
+_SAFE_TABLE_NAMES = frozenset([
+    "activity", "agents", "keywords", "pages", "competitors",
+    "geo_queries", "site_images", "pipeline_runs", "settings",
+    "client_context", "locations", "cannibalization_risks",
+    "geo_query_bank",
+])
+
+
+def _is_safe_url(url: str) -> bool:
+    """Return False if the URL resolves to a private/internal IP (SSRF guard)."""
+    try:
+        parsed = __import__("urllib.parse", fromlist=["urlparse"]).urlparse(url)
+        host = parsed.hostname
+        if not host:
+            return False
+        ip = socket.gethostbyname(host)
+        addr = ipaddress.ip_address(ip)
+        return not (addr.is_private or addr.is_loopback or addr.is_link_local
+                    or addr.is_reserved or addr.is_multicast)
+    except Exception:
+        return False
 
 bp = Blueprint("clients", __name__, url_prefix="/clients")
 
@@ -69,6 +93,8 @@ def analyze_website():
         return jsonify({"error": "No URL provided"}), 400
     if not url.startswith("http"):
         url = "https://" + url
+    if not _is_safe_url(url):
+        return jsonify({"error": "URL not allowed"}), 400
 
     # ── 1. Scrape ──────────────────────────────────────────────────────────────
     try:
@@ -646,6 +672,8 @@ def delete_client(tenant_id):
     for table in ["activity", "agents", "keywords", "pages", "competitors",
                   "geo_queries", "site_images", "pipeline_runs", "settings", "client_context",
                   "locations"]:
+        if table not in _SAFE_TABLE_NAMES:
+            continue
         db.execute(f"DELETE FROM {table} WHERE tenant_id=?", (tenant_id,))
     db.execute("DELETE FROM clients WHERE tenant_id=?", (tenant_id,))
     db.commit()
