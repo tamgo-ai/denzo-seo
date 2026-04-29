@@ -1,0 +1,173 @@
+{% extends "lite/base.html" %}
+{% block title %}Dashboard — Denzo SEO Lite{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-5" x-data="{
+  autopilot: {{ 'true' if autopilot_on else 'false' }},
+  toggleAutopilot() {
+    this.autopilot = !this.autopilot;
+    fetch('{{ url_for('lite.toggle_autopilot', tenant_id=tenant_id) }}', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({enabled: this.autopilot})
+    });
+  }
+}">
+
+  <!-- ── Stats ──────────────────────────────────────────────────────────── -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="lite-card p-5">
+      <p class="text-xs text-gray-400 font-medium uppercase tracking-wide">Published</p>
+      <p class="text-3xl font-bold text-gray-900 mt-1">{{ stats.published }}</p>
+      <p class="text-xs text-gray-400 mt-1">{{ stats.ready }} ready to publish</p>
+    </div>
+    <div class="lite-card p-5">
+      <p class="text-xs text-gray-400 font-medium uppercase tracking-wide">Keywords</p>
+      <p class="text-3xl font-bold text-gray-900 mt-1">{{ stats.keywords }}</p>
+      <p class="text-xs text-gray-400 mt-1">Tracked keywords</p>
+    </div>
+    <div class="lite-card p-5">
+      <p class="text-xs text-gray-400 font-medium uppercase tracking-wide">Review Queue</p>
+      <p class="text-3xl font-bold {% if stats.draft > 0 %}text-orange-500{% else %}text-gray-900{% endif %} mt-1">{{ stats.draft }}</p>
+      <p class="text-xs text-gray-400 mt-1">Articles awaiting review</p>
+    </div>
+    <div class="lite-card p-5">
+      <p class="text-xs text-gray-400 font-medium uppercase tracking-wide">GEO Citations</p>
+      <p class="text-3xl font-bold text-gray-900 mt-1">{{ stats.geo_citations }}%</p>
+      <p class="text-xs text-gray-400 mt-1">AI citation rate</p>
+    </div>
+  </div>
+
+  <!-- ── Pipeline Autopilot ──────────────────────────────────────────────── -->
+  <div class="lite-card p-5 flex items-center justify-between gap-4">
+    <div class="flex items-center gap-4">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center shrink-0">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+      </div>
+      <div>
+        <p class="font-semibold text-gray-900 text-sm">Pipeline Autopilot</p>
+        <p class="text-xs text-gray-400 mt-0.5">
+          <span x-show="autopilot">Publishing 1 article per day. Next: <strong class="text-gray-700">{{ next_run or 'Tomorrow 9am' }}</strong></span>
+          <span x-show="!autopilot" x-cloak>Paused — no articles will publish until you turn it on.</span>
+        </p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3 shrink-0">
+      <span class="text-sm font-semibold" :class="autopilot ? 'text-green-600' : 'text-gray-400'" x-text="autopilot ? 'ON' : 'OFF'"></span>
+      <button type="button" @click="toggleAutopilot()"
+              class="relative w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none"
+              :class="autopilot ? 'bg-green-500' : 'bg-gray-200'">
+        <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+              :class="autopilot ? 'translate-x-6' : 'translate-x-0'"></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Active agent banner ──────────────────────────────────────────────── -->
+  {% if active_agent %}
+  <div class="lite-card p-4 flex items-center gap-3 border-orange-200 bg-orange-50">
+    <div class="w-2 h-2 rounded-full bg-orange-500 animate-pulse shrink-0"></div>
+    <div class="flex-1 min-w-0">
+      <p class="text-sm font-semibold text-orange-800">{{ active_agent.name }} running…</p>
+      <p class="text-xs text-orange-600 truncate">{{ active_agent.current_task or 'Working…' }}</p>
+    </div>
+    <a href="/clients/{{ tenant_id }}/pipeline"
+       class="text-xs text-orange-600 font-semibold hover:text-orange-800 shrink-0">View Pipeline →</a>
+  </div>
+  {% endif %}
+
+  <!-- ── Content Queue ──────────────────────────────────────────────────── -->
+  <div class="lite-card overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+      <div>
+        <h2 class="text-sm font-bold text-gray-900">Content Queue</h2>
+        <p class="text-xs text-gray-400 mt-0.5">Articles ready for your review</p>
+      </div>
+      <a href="{{ url_for('lite.content', tenant_id=tenant_id) }}"
+         class="text-xs text-orange-500 hover:text-orange-700 font-semibold">View all →</a>
+    </div>
+
+    {% if recent_drafts %}
+    <div class="divide-y divide-gray-50">
+      {% for p in recent_drafts %}
+      <div class="flex items-center px-5 py-3.5 hover:bg-gray-50 transition-colors gap-4">
+        <div class="w-2 h-2 rounded-full bg-amber-400 shrink-0"></div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-semibold text-gray-900 truncate">{{ p.title or 'Untitled' }}</p>
+          <p class="text-xs text-gray-400 truncate">
+            {% if p.type %}{{ p.type }}{% endif %}
+            {% if p.target_keyword %} · 🎯 {{ p.target_keyword }}{% endif %}
+          </p>
+        </div>
+        {% if p.quality_score %}
+        <span class="text-xs font-bold shrink-0 {% if p.quality_score >= 80 %}text-green-600{% elif p.quality_score >= 60 %}text-yellow-600{% else %}text-red-500{% endif %}">
+          {{ p.quality_score }}/100
+        </span>
+        {% endif %}
+        <a href="{{ url_for('pages.review', tenant_id=tenant_id, page_id=p.id) }}"
+           class="text-xs text-white bg-orange-500 hover:bg-orange-600 font-semibold px-3 py-1.5 rounded-lg transition-colors shrink-0">
+          Review →
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+    {% if stats.draft > 3 %}
+    <div class="px-5 py-3 border-t border-gray-50 bg-gray-50">
+      <a href="{{ url_for('lite.content', tenant_id=tenant_id, status='draft') }}"
+         class="text-xs text-orange-500 hover:text-orange-700 font-semibold">
+        + {{ stats.draft - 3 }} more articles waiting →
+      </a>
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="p-10 text-center">
+      <div class="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+        <svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+      </div>
+      {% if stats.published > 0 or stats.ready > 0 %}
+      <p class="text-sm font-medium text-gray-500">All caught up!</p>
+      <p class="text-xs text-gray-400 mt-1">{{ stats.published }} published · {{ stats.ready }} ready to publish</p>
+      {% else %}
+      <p class="text-sm font-medium text-gray-500">No articles yet</p>
+      <p class="text-xs text-gray-400 mt-1">Turn on Autopilot above to start generating content automatically.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ── Quick links ──────────────────────────────────────────────────── -->
+  <div class="grid grid-cols-2 gap-4">
+    <a href="{{ url_for('lite.rankings', tenant_id=tenant_id) }}"
+       class="lite-card p-5 flex items-center gap-4 hover:border-green-300 hover:shadow-sm transition-all group">
+      <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center shrink-0 group-hover:bg-green-500 transition-colors">
+        <svg class="w-5 h-5 text-green-500 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+        </svg>
+      </div>
+      <div>
+        <p class="text-sm font-semibold text-gray-900">Rankings</p>
+        <p class="text-xs text-gray-400">{{ stats.keywords }} keywords tracked</p>
+      </div>
+    </a>
+    <a href="{{ url_for('lite.settings_view', tenant_id=tenant_id) }}"
+       class="lite-card p-5 flex items-center gap-4 hover:border-gray-300 hover:shadow-sm transition-all group">
+      <div class="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center shrink-0 group-hover:bg-gray-700 transition-colors">
+        <svg class="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+      </div>
+      <div>
+        <p class="text-sm font-semibold text-gray-900">Settings</p>
+        <p class="text-xs text-gray-400">Publishing & business info</p>
+      </div>
+    </a>
+  </div>
+
+</div>
+{% endblock %}

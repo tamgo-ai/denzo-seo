@@ -1,0 +1,63 @@
+{% extends "lite/base.html" %}
+{% block title %}Rankings — Denzo SEO Lite{% endblock %}
+{% block page_title %}Rankings{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+
+  {% if keywords %}
+  <div class="lite-card overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+      <p class="text-sm font-bold text-gray-900">Tracked Keywords <span class="text-gray-400 font-normal">({{ keywords|length }})</span></p>
+    </div>
+    <div class="divide-y divide-gray-50">
+      {% for kw in keywords %}
+      {% set diff = (kw.difficulty | string | replace('None','0') | int) %}
+      <div class="flex items-center px-5 py-3.5 hover:bg-gray-50 transition-colors">
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-gray-900 truncate">{{ kw.keyword }}</p>
+          {% if kw.location %}
+          <p class="text-xs text-gray-400 mt-0.5">📍 {{ kw.location }}</p>
+          {% endif %}
+        </div>
+        <div class="flex items-center gap-4 shrink-0">
+          {% if kw.volume %}
+          <div class="text-right">
+            <p class="text-xs text-gray-400">Volume</p>
+            <p class="text-sm font-semibold text-gray-700">{{ kw.volume }}</p>
+          </div>
+          {% endif %}
+          <div class="text-right w-16">
+            <p class="text-xs text-gray-400">Difficulty</p>
+            {% if kw.difficulty %}
+            <p class="text-sm font-bold {% if diff <= 30 %}text-green-600{% elif diff <= 60 %}text-yellow-600{% else %}text-red-500{% endif %}">
+              {{ kw.difficulty }}
+            </p>
+            {% else %}
+            <p class="text-sm text-gray-300">—</p>
+            {% endif %}
+          </div>
+          {% if kw.priority %}
+          <div class="w-6 h-6 rounded-full flex items-center justify-center shrink-0 {% if kw.priority == 1 %}bg-orange-100{% else %}bg-gray-100{% endif %}">
+            <span class="text-xs font-bold {% if kw.priority == 1 %}text-orange-600{% else %}text-gray-400{% endif %}">{{ kw.priority }}</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div class="lite-card p-16 text-center">
+    <div class="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+      <svg class="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+      </svg>
+    </div>
+    <p class="text-sm font-medium text-gray-500">No keywords tracked yet</p>
+    <p class="text-xs text-gray-400 mt-1">The Keyword Strategist agent will find and track your keywords automatically.</p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

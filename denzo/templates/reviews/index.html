@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% block title %}Reviews Intelligence — {{ client.name }}{% endblock %}
+
+{% block breadcrumb %}
+<div class="flex items-center gap-2 text-sm text-gray-500">
+  <a href="/" class="hover:text-gray-700">Overview</a>
+  <span>/</span>
+  <a href="/clients/{{ tenant_id }}/pipeline" class="hover:text-gray-700">{{ client.name }}</a>
+  <span>/</span>
+  <span class="text-gray-900 font-semibold">Reviews Intelligence</span>
+</div>
+{% endblock %}
+
+{% block topbar_actions %}
+<a href="/clients/{{ tenant_id }}/pipeline"
+   class="text-sm text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors">
+  ← Pipeline
+</a>
+<a href="/clients/{{ tenant_id }}/data-intel"
+   class="text-sm text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors">
+  Data Intel
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- Header -->
+  <div class="bg-gradient-to-r from-orange-500 to-red-600 rounded-2xl p-6 text-white">
+    <div class="flex items-start justify-between">
+      <div>
+        <div class="flex items-center gap-3 mb-2">
+          <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-xl font-bold">Reviews Intelligence</h1>
+            <p class="text-orange-100 text-sm">Competitive insights from real Google Maps reviews</p>
+          </div>
+        </div>
+      </div>
+      {% if has_report %}
+      <div class="text-right">
+        <div class="text-3xl font-bold">{{ total_reviews }}</div>
+        <div class="text-orange-100 text-sm">reviews analyzed</div>
+        <div class="text-orange-200 text-xs mt-1">{{ competitors_analyzed }} competitors · {{ report_date }}</div>
+        {% if source == 'apify_real' %}
+        <span class="mt-2 inline-block bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">● Real data</span>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if not has_report %}
+  <!-- No data state -->
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
+    {% if agent_status and agent_status.status == 'working' %}
+    <div class="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+      <svg class="w-8 h-8 text-orange-400 animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+      </svg>
+    </div>
+    <h3 class="text-lg font-semibold text-gray-900 mb-2">Scraping competitor reviews…</h3>
+    <p class="text-gray-500 text-sm">{{ agent_status.current_task }}</p>
+    <p class="text-gray-400 text-xs mt-2">This takes 3–5 minutes. Refresh to see results.</p>
+    {% elif agent_status and agent_status.status == 'idle' %}
+    <div class="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+      <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+      </svg>
+    </div>
+    <h3 class="text-lg font-semibold text-gray-900 mb-2">No analysis yet</h3>
+    <p class="text-gray-500 text-sm mb-1">{{ agent_status.current_task or "Reviews Intelligence has not run yet." }}</p>
+    <p class="text-gray-400 text-xs">Requires: Apify API key in Platform Settings + competitors in DB.</p>
+    {% else %}
+    <div class="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+      <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+      </svg>
+    </div>
+    <h3 class="text-lg font-semibold text-gray-900 mb-2">Run Reviews Intelligence</h3>
+    <p class="text-gray-500 text-sm">Start the agent from the Pipeline view to scrape competitor Google Maps reviews.</p>
+    {% endif %}
+    <a href="/clients/{{ tenant_id }}/pipeline"
+       class="mt-6 inline-flex items-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors">
+      ← Go to Pipeline
+    </a>
+  </div>
+
+  {% else %}
+
+  <!-- Top themes -->
+  {% if review_themes %}
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <h2 class="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+      <svg class="w-4 h-4 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
+        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+      </svg>
+      Top Review Themes
+    </h2>
+    <div class="flex flex-wrap gap-2">
+      {% for theme in review_themes %}
+      <span class="bg-orange-50 text-orange-700 text-sm px-3 py-1.5 rounded-full border border-orange-100">{{ theme }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Pain Points -->
+  {% if pain_points %}
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <h2 class="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+      <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+      </svg>
+      Competitor Pain Points
+      <span class="ml-auto text-xs text-gray-400 font-normal">what customers complain about at competitors</span>
+    </h2>
+    <div class="space-y-3">
+      {% for pp in pain_points %}
+      {% set freq_color = 'red' if pp.frequency == 'high' else ('yellow' if pp.frequency == 'medium' else 'gray') %}
+      <div class="flex gap-3 p-3 rounded-xl bg-gray-50 hover:bg-red-50 transition-colors">
+        <span class="shrink-0 mt-0.5 px-2 py-0.5 rounded-full text-xs font-medium
+          {% if pp.frequency == 'high' %}bg-red-100 text-red-700
+          {% elif pp.frequency == 'medium' %}bg-yellow-100 text-yellow-700
+          {% else %}bg-gray-100 text-gray-600{% endif %}">
+          {{ pp.frequency | upper }}
+        </span>
+        <div class="min-w-0">
+          <p class="text-sm font-medium text-gray-900">{{ pp.issue }}</p>
+          {% if pp.quote_example %}
+          <p class="text-xs text-gray-500 mt-1 italic">"{{ pp.quote_example }}"</p>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Content Opportunities -->
+  {% if content_opps %}
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <h2 class="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+      <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M13 10V3L4 14h7v7l9-11h-7z"/>
+      </svg>
+      Content Opportunities
+      <span class="ml-auto text-xs text-gray-400 font-normal">SEO pages that convert competitor pain into your advantage</span>
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {% for opp in content_opps %}
+      <div class="border border-gray-100 rounded-xl p-4 hover:border-green-200 hover:bg-green-50 transition-colors">
+        <div class="flex items-start gap-2 mb-2">
+          <svg class="w-4 h-4 text-green-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          <p class="text-sm font-semibold text-gray-900 leading-snug">{{ opp.suggested_title }}</p>
+        </div>
+        {% if opp.angle %}
+        <p class="text-xs text-gray-500 leading-relaxed">{{ opp.angle[:120] }}{% if opp.angle|length > 120 %}…{% endif %}</p>
+        {% endif %}
+        {% if opp.topic %}
+        <span class="mt-2 inline-block text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{{ opp.topic[:50] }}</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <p class="text-xs text-gray-400 mt-3">
+      ✓ These titles have been added as high-priority keywords to your keyword bank.
+    </p>
+  </div>
+  {% endif %}
+
+  <!-- Citation Paragraphs -->
+  {% if citation_paragraphs %}
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <h2 class="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+      <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+      </svg>
+      Citation-Ready Paragraphs
+      <span class="ml-auto text-xs text-gray-400 font-normal">ready to paste into pages and blog posts</span>
+    </h2>
+    <div class="space-y-3">
+      {% for para in citation_paragraphs %}
+      <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
+        <p class="text-sm text-gray-700 leading-relaxed italic">"{{ para }}"</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Two-column: Competitor Strengths + Emotional Triggers -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+    {% if strengths %}
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <h2 class="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+        <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        Competitor Strengths
+      </h2>
+      <div class="space-y-2">
+        {% for s in strengths %}
+        <div class="flex items-start gap-2">
+          <span class="shrink-0 mt-0.5 px-1.5 py-0.5 rounded text-xs font-medium
+            {% if s.frequency == 'high' %}bg-blue-100 text-blue-700
+            {% elif s.frequency == 'medium' %}bg-blue-50 text-blue-600
+            {% else %}bg-gray-50 text-gray-500{% endif %}">
+            {{ s.frequency | upper }}
+          </span>
+          <p class="text-sm text-gray-700">{{ s.strength }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if emotional_triggers %}
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <h2 class="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+        <svg class="w-4 h-4 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+        </svg>
+        Emotional Triggers
+      </h2>
+      <div class="flex flex-wrap gap-2">
+        {% for trigger in emotional_triggers %}
+        <span class="bg-pink-50 text-pink-700 text-xs px-2.5 py-1.5 rounded-full border border-pink-100">{{ trigger }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  {% endif %}
+
+</div>
+{% endblock %}

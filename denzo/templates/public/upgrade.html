@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pricing — DENZO SEO</title>
+  <meta name="description" content="Agency-quality SEO without the $5,000/month bill. Start with a $1 trial. 30 articles/month on autopilot, 10 AI agents, cancel anytime."/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg:      '#080808',
+            surface: '#111111',
+            card:    '#161616',
+            border:  '#222222',
+            indigo:  { DEFAULT: '#6366f1', light: '#818cf8', dark: '#4f46e5' },
+            muted:   '#6b7280',
+            text:    '#e5e7eb',
+          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <style>
+    body { background-color: #080808; color: #e5e7eb; }
+    .bg-grid { background-image: linear-gradient(rgba(99,102,241,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,.04) 1px,transparent 1px); background-size: 40px 40px; }
+    .glow-indigo  { box-shadow: 0 0 60px rgba(99,102,241,.25); }
+    .glow-green   { box-shadow: 0 0 40px rgba(34,197,94,.15); }
+    .glow-border  { border: 1px solid rgba(99,102,241,.35); }
+    .gradient-text { background: linear-gradient(135deg,#818cf8 0%,#6366f1 50%,#a855f7 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    .btn-primary  { background: linear-gradient(135deg,#6366f1 0%,#4f46e5 100%); transition: all .2s; }
+    .btn-primary:hover  { background: linear-gradient(135deg,#818cf8 0%,#6366f1 100%); box-shadow: 0 0 30px rgba(99,102,241,.5); transform: translateY(-1px); }
+    .btn-green    { background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.35); color: #4ade80; transition: all .2s; }
+    .btn-green:hover    { background: rgba(34,197,94,.2); }
+    .analyze-btn  { background: linear-gradient(135deg,#f97316 0%,#ea580c 100%); }
+    .analyze-btn:hover  { background: linear-gradient(135deg,#fb923c 0%,#f97316 100%); box-shadow: 0 0 30px rgba(249,115,22,.4); transform: translateY(-1px); }
+    /* FAQ accordion */
+    .faq-item .faq-a { display: none; }
+    .faq-item.open .faq-a { display: block; }
+    .faq-item.open .faq-arrow { transform: rotate(45deg); color: #6366f1; }
+    .faq-item.open .faq-q { color: #a5b4fc; background: rgba(99,102,241,.05); }
+    .faq-arrow { transition: transform .25s; color: #4b5563; }
+  </style>
+</head>
+<body class="font-sans antialiased">
+
+<!-- ─── NAV (same as landing) ────────────────────────────────────── -->
+<nav class="fixed top-0 inset-x-0 z-50 border-b border-border bg-bg/80 backdrop-blur-md">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+    <a href="/" class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-lg btn-primary flex items-center justify-center">
+        <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+      </div>
+      <span class="font-bold text-lg tracking-tight text-white">DENZO <span class="gradient-text">SEO</span></span>
+    </a>
+    <div class="hidden md:flex items-center gap-8 text-sm font-medium">
+      <a href="/#how-it-works" class="text-muted hover:text-text transition-colors">How It Works</a>
+      <a href="/#features" class="text-muted hover:text-text transition-colors">Features</a>
+      <a href="/pricing" class="text-white font-semibold">Pricing</a>
+      <a href="/#faq" class="text-muted hover:text-text transition-colors">FAQ</a>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="/login" class="text-sm text-muted hover:text-text transition-colors font-medium">Sign In</a>
+      <a href="/#analyze-form" class="analyze-btn text-white text-sm font-semibold px-5 py-2 rounded-lg transition-all">Free Analysis →</a>
+    </div>
+  </div>
+</nav>
+
+<div class="pt-16">
+
+<!-- ═══════════════════════════════════════════════════════════
+     HERO
+═══════════════════════════════════════════════════════════ -->
+<section class="relative pt-24 pb-16 overflow-hidden bg-grid">
+  <div class="absolute inset-0 pointer-events-none">
+    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-indigo-500/10 rounded-full blur-3xl opacity-60"></div>
+  </div>
+  <div class="relative max-w-3xl mx-auto px-4 text-center">
+    <div class="inline-flex items-center gap-2 bg-surface border border-border rounded-full px-4 py-1.5 text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-6">
+      Simple Pricing
+    </div>
+    <h1 class="text-5xl md:text-6xl font-black text-white leading-tight tracking-tight mb-4">
+      Agency-Quality SEO.<br/><span class="gradient-text">Without the $5,000/Month Bill.</span>
+    </h1>
+    <p class="text-xl text-muted mb-8">30 expert articles/month, 10 AI agents, unlimited programmatic pages — starting at $1.</p>
+    <a href="#plans" class="inline-block btn-primary text-white font-bold px-8 py-4 rounded-xl text-lg">See Plans →</a>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LAYER 1: AGENCY vs DENZO COMPARISON
+═══════════════════════════════════════════════════════════ -->
+<section class="py-20 border-t border-border">
+  <div class="max-w-5xl mx-auto px-4">
+    <div class="text-center mb-12">
+      <p class="text-sm font-semibold text-muted uppercase tracking-widest mb-3">The Real Cost of SEO</p>
+      <h2 class="text-4xl font-black text-white">Why Smart Businesses Switch</h2>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+      <!-- Agency (bad) -->
+      <div class="bg-card border border-red-500/20 rounded-2xl p-8">
+        <p class="text-sm font-bold text-red-400 uppercase tracking-wider mb-6">Traditional SEO Agency</p>
+        <div class="space-y-4">
+          {% for item in [
+            "$3,000–$8,000/month — plus setup fees",
+            "3-month minimum contract — locked in",
+            "Black box reporting — no idea what they do",
+            "Maybe 4–8 articles/month — inconsistent",
+            "You hope they're working — can't verify",
+            "AI search completely ignored",
+          ] %}
+          <div class="flex items-start gap-3 text-sm text-muted">
+            <span class="text-red-400 font-bold mt-0.5 shrink-0">✕</span>
+            <span>{{ item }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="mt-8 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-sm font-bold text-red-400">
+          Average Annual Cost: $36,000 – $96,000
+        </div>
+      </div>
+
+      <!-- Denzo (good) -->
+      <div class="bg-card border border-green-500/25 rounded-2xl p-8 relative">
+        <div class="absolute -top-3 right-6 bg-green-500/15 border border-green-500/30 text-green-400 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">✓ Most Popular Choice</div>
+        <p class="text-sm font-bold text-green-400 uppercase tracking-wider mb-6">DENZO SEO</p>
+        <div class="space-y-4">
+          {% for item in [
+            "$249/month — affordable for any business",
+            "Cancel anytime with 1 click — zero risk",
+            "Full transparency dashboard — real time",
+            "30 expert articles/month — guaranteed",
+            "You see everything we do — complete visibility",
+            "GEO-optimized for ChatGPT & Perplexity",
+          ] %}
+          <div class="flex items-start gap-3 text-sm text-text">
+            <span class="text-green-400 font-bold mt-0.5 shrink-0">✓</span>
+            <span>{{ item }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="mt-8 p-4 bg-green-500/10 border border-green-500/25 rounded-xl text-sm font-bold text-green-400">
+          DENZO SEO Monthly Cost: Only $249/month
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LAYER 2: SAVINGS + VALUE STACK
+═══════════════════════════════════════════════════════════ -->
+<section class="py-20 bg-surface border-t border-border">
+  <div class="max-w-3xl mx-auto px-4">
+    <div class="text-center mb-12">
+      <p class="text-sm font-semibold text-muted uppercase tracking-widest mb-3">Do The Math</p>
+      <h2 class="text-4xl font-black text-white">Here's What You're Actually Saving</h2>
+    </div>
+
+    <!-- Savings rows -->
+    <div class="bg-card border border-border rounded-2xl p-6 mb-8">
+      <div class="flex justify-between items-center py-4 border-b border-border text-sm">
+        <span class="text-muted">Traditional Agency (avg)</span>
+        <span class="line-through text-muted">$5,000/mo × 12 = $60,000/year</span>
+      </div>
+      <div class="flex justify-between items-center py-4 border-b border-border text-sm">
+        <span class="text-muted">DENZO SEO</span>
+        <span class="text-green-400 font-bold">$249/month × 12 = $2,988/year</span>
+      </div>
+      <div class="flex justify-between items-center pt-6">
+        <span class="font-bold text-white text-lg">You Save</span>
+        <div class="text-right">
+          <div class="text-5xl font-black text-green-400 leading-none">$57,012</div>
+          <div class="text-xs text-green-400 font-semibold mt-1">✅ 95% cost reduction</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Value stack -->
+    <p class="text-xs font-bold text-muted uppercase tracking-widest mb-3">What You Get for $249/month</p>
+    <div class="bg-card border border-border rounded-2xl overflow-hidden mb-6">
+      {% for label, value in [
+        ("30 AI-written, expert-quality articles", "$3,000 value"),
+        ("100+ programmatic SEO pages/month",      "$2,000 value"),
+        ("Keyword research & competitor analysis",  "$800 value"),
+        ("Auto-publish to WordPress & GitHub",      "$300 value"),
+        ("GEO optimization (ChatGPT / Perplexity)", "$600 value"),
+        ("Schema markup & cannibalization fixes",   "$500 value"),
+      ] %}
+      <div class="flex justify-between items-center px-5 py-3 {% if loop.odd %}bg-card{% else %}bg-surface{% endif %} text-sm">
+        <span class="text-text">{{ label }}</span>
+        <span class="text-muted font-semibold shrink-0 ml-4">{{ value }}</span>
+      </div>
+      {% endfor %}
+      <div class="flex justify-between items-center px-5 py-4 bg-indigo-500/10 border-t border-indigo-500/20">
+        <span class="font-bold text-white">Total Monthly Value</span>
+        <div class="text-right">
+          <div class="text-2xl font-black text-indigo-400">$7,200</div>
+          <div class="text-xs text-indigo-400 font-semibold">You Pay: $249/month — 97% off</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="text-center">
+      <a href="#plans" class="inline-block btn-primary text-white font-bold px-8 py-3 rounded-xl">Lock in $249/month – Start Growing →</a>
+      <p class="text-xs text-orange-400 font-semibold mt-3">⚠️ Price increases to $299 for new customers soon</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LAYER 3: PLANS
+═══════════════════════════════════════════════════════════ -->
+<section id="plans" class="py-20 border-t border-border">
+  <div class="max-w-4xl mx-auto px-4">
+    <div class="text-center mb-12">
+      <p class="text-sm font-semibold text-muted uppercase tracking-widest mb-3">Choose Your Plan</p>
+      <h2 class="text-4xl font-black text-white">Start With $1. See Results in 3 Days.</h2>
+      <p class="text-xl text-muted mt-3">Cancel anytime. No questions asked.</p>
+    </div>
+
+    {% if plan in ('active', 'trial') %}
+    <div class="max-w-sm mx-auto bg-card border border-green-500/30 rounded-2xl p-8 text-center glow-green">
+      <div class="text-4xl mb-4">🎉</div>
+      <p class="text-xl font-black text-white mb-2">You're all set!</p>
+      <p class="text-muted mb-6">Your AI agents are active and running.</p>
+      {% if tenant_id %}
+      <a href="/lite/{{ tenant_id }}/" class="block btn-primary text-white font-bold py-3 rounded-xl">Go to Dashboard →</a>
+      {% endif %}
+    </div>
+
+    {% else %}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+
+      <!-- Annual -->
+      <div class="bg-card border border-border rounded-2xl p-8 relative">
+        <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-green-500/15 border border-green-500/30 text-green-400 text-xs font-bold px-4 py-1 rounded-full uppercase tracking-wider">Best Value</div>
+        <p class="text-xs font-bold text-muted uppercase tracking-wider mb-2 mt-2">Annual</p>
+        <div class="flex items-end gap-1 mb-1">
+          <span class="text-5xl font-black text-white">$199</span>
+          <span class="text-muted text-sm pb-2">/mo</span>
+        </div>
+        <p class="text-green-400 text-xs font-semibold mb-6">$2,388/year — Save $600 vs monthly</p>
+        <ul class="space-y-3 mb-8 text-sm text-muted">
+          {% for f in ["365 SEO articles/year", "1,200+ programmatic pages/year", "Competitor analysis & gap reports", "VIP priority support", "Early access to new features"] %}
+          <li class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            {{ f }}
+          </li>
+          {% endfor %}
+        </ul>
+        <button onclick="activateTrial('annual')" class="btn-green w-full font-bold py-3 rounded-xl text-sm">Start Growing »</button>
+        <p class="text-xs text-muted text-center mt-2">🛡 30-day money-back guarantee</p>
+      </div>
+
+      <!-- Monthly (featured) -->
+      <div class="bg-card glow-border rounded-2xl p-8 relative overflow-hidden">
+        <div class="absolute top-4 right-4 btn-primary text-white text-xs font-bold px-3 py-1 rounded-full">MOST POPULAR</div>
+        <p class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2 mt-2">Monthly</p>
+        <div class="flex items-end gap-1 mb-1">
+          <span class="text-5xl font-black text-white">$249</span>
+          <span class="text-muted text-sm pb-2">/mo</span>
+        </div>
+        <p class="text-orange-400 text-xs font-semibold mb-6">Start for $1 · 3-day full trial</p>
+        <ul class="space-y-3 mb-8 text-sm text-text">
+          {% for f in ["30 SEO articles/month on autopilot", "100+ programmatic pages/month", "Advanced keyword research", "Priority support", "Cancel with 1 click, anytime"] %}
+          <li class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            {{ f }}
+          </li>
+          {% endfor %}
+        </ul>
+        <button onclick="activateTrial('monthly')" class="btn-primary w-full text-white font-bold py-3 rounded-xl glow-indigo text-sm">Start $1 Trial →</button>
+        <p class="text-xs text-muted text-center mt-2">🛡 7-day money-back guarantee</p>
+      </div>
+
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LAYER 4: TRIAL + PROMISE + QUICK FAQ
+═══════════════════════════════════════════════════════════ -->
+<section class="py-20 bg-surface border-t border-border">
+  <div class="max-w-4xl mx-auto px-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+
+      <div class="bg-card border border-border rounded-2xl p-6">
+        <p class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-4">Your $1 Trial Includes</p>
+        <ul class="space-y-3 text-sm text-muted">
+          {% for f in ["3 days of full platform access", "All 10 AI agents activated immediately", "Your first articles drafted day 1", "Cancel before day 4 — charge nothing more"] %}
+          <li class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            {{ f }}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="bg-green-500/5 border border-green-500/20 rounded-2xl p-6 flex gap-4">
+        <span class="text-3xl shrink-0">🛡</span>
+        <div>
+          <p class="font-bold text-green-400 mb-2">Our Promise</p>
+          <p class="text-sm text-muted leading-relaxed">If we don't deliver 30 articles for you in the first month, you get the <strong class="text-text">next month free</strong>. A guarantee on output — not just promises.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Quick objections grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {% for q, a in [
+        ("Can I really cancel anytime?", "Yes, 1-click cancellation from your dashboard. No emails, no waiting."),
+        ("Do I need technical skills?", "None. We handle setup, publishing, and optimization — end to end."),
+        ("Will this work for my industry?", "Yes, proven in 50+ industries from auto repair to medical imaging."),
+      ] %}
+      <div class="bg-card border border-border rounded-xl p-4 text-sm">
+        <p class="font-semibold text-text mb-1">{{ q }}</p>
+        <p class="text-muted">{{ a }}</p>
+      </div>
+      {% endfor %}
+      <div class="bg-card border border-border rounded-xl p-4 text-sm">
+        <a href="/" class="font-semibold text-indigo-400 hover:text-indigo-300 transition-colors">Not ready? See article examples first →</a>
+        <p class="text-muted mt-1">Run a free analysis — no account needed</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LAYER 5: DEEP FAQ (OBJECTIONS)
+═══════════════════════════════════════════════════════════ -->
+<section id="faq" class="py-20 border-t border-border">
+  <div class="max-w-3xl mx-auto px-4">
+    <div class="text-center mb-12">
+      <p class="text-sm font-semibold text-muted uppercase tracking-widest mb-3">Common Questions</p>
+      <h2 class="text-4xl font-black text-white">Still on the Fence?</h2>
+    </div>
+
+    <div class="space-y-3">
+      {% set objections = [
+        ("Is the content actually good, or just AI spam?",
+         "We're anti-robot-spam. Our motto: \"If you wouldn't share it on LinkedIn, it's not good enough.\" Every article is 1,200+ words, expert-level, written with real context about your business, services, and city. Sources are cited, structure follows E-E-A-T guidelines, and content is reviewed before publishing."),
+        ("I've been burned by SEO agencies before.",
+         "We understand. Most agencies sell you a retainer, do mysterious \"work\", and show you vanity metrics. DENZO SEO is different: you see every article, every page, every keyword move — in real time. No black box. Cancel if you don't see activity within your first week."),
+        ("Will AI content hurt my Google rankings?",
+         "Google's official stance: quality content wins, regardless of how it was produced. Spammy, low-value AI content gets penalized — that's exactly what we avoid. Our articles are written with your specific business context, follow E-E-A-T signals, and are designed to actually help readers."),
+        ("I don't have time to manage this.",
+         "That's exactly why DENZO SEO exists. Once you complete the 5-minute setup wizard, the AI agents run on their own. Articles get drafted and published automatically. Most customers spend less than 10 minutes a week reviewing results."),
+        ("What if this doesn't work for my industry?",
+         "Our system has been trained across 50+ niches — auto repair, medical, legal, real estate, e-commerce, restaurants, and more. If you're not ranking within 90 days, we'll work with you personally to diagnose and fix the strategy. That's our 90-day commitment."),
+      ] %}
+      {% for q, a in objections %}
+      <div class="faq-item bg-card border border-border rounded-xl overflow-hidden {% if loop.first %}open{% endif %}">
+        <div class="faq-q flex items-center justify-between p-5 cursor-pointer text-sm font-semibold text-text hover:bg-surface transition-colors" onclick="toggleFaq(this)">
+          <span>{{ q }}</span>
+          <span class="faq-arrow text-xl ml-4 shrink-0 font-light">+</span>
+        </div>
+        <div class="faq-a px-5 pb-5 text-sm text-muted leading-relaxed">{{ a }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="text-center mt-10">
+      <button onclick="activateTrial('monthly')" class="btn-primary text-white font-bold px-10 py-4 rounded-xl text-base">Your Only Risk is NOT Trying →</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LAYER 6: EMOTIONAL CLOSE
+═══════════════════════════════════════════════════════════ -->
+<section class="py-20 border-t border-indigo-500/15" style="background:linear-gradient(135deg,#0f0f1a 0%,#0d0d18 100%)">
+  <div class="max-w-4xl mx-auto px-4">
+    <div class="text-center mb-12">
+      <h2 class="text-4xl font-black text-white">The Choice Is Yours</h2>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div class="bg-card border border-red-500/20 rounded-2xl p-7">
+        <p class="text-xs font-bold uppercase tracking-wider mb-5">
+          <span class="bg-red-500/15 border border-red-500/25 text-red-400 px-3 py-1 rounded-full">Keep Struggling</span>
+        </p>
+        {% for item in [
+          "Keep paying $500+/month for SEO tools with no results",
+          "Spend hours every week writing content yourself",
+          "Watch competitors dominate AI-powered search",
+          "Miss the AI traffic revolution happening right now",
+        ] %}
+        <div class="flex items-start gap-3 text-sm text-muted mb-3">
+          <span class="text-red-400 font-bold mt-0.5 shrink-0">✕</span>
+          {{ item }}
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="bg-card border border-green-500/25 rounded-2xl p-7">
+        <p class="text-xs font-bold uppercase tracking-wider mb-5">
+          <span class="bg-green-500/12 border border-green-500/25 text-green-400 px-3 py-1 rounded-full">Start Growing Today</span>
+        </p>
+        {% for item in [
+          "Pay just $249/month — start with $1 trial",
+          "Get 30 expert articles published automatically",
+          "Be recommended by ChatGPT & Perplexity",
+          "Join the AI search revolution — NOW",
+        ] %}
+        <div class="flex items-start gap-3 text-sm text-text mb-3">
+          <span class="text-green-400 font-bold mt-0.5 shrink-0">✓</span>
+          {{ item }}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="bg-yellow-500/10 border border-yellow-500/25 rounded-xl p-4 text-center text-yellow-400 font-semibold text-sm mb-8">
+      🔥 Early adopters are already winning. Don't be left behind.
+    </div>
+
+    <div class="text-center">
+      <button onclick="activateTrial('monthly')" class="inline-block bg-white text-gray-900 font-black text-xl px-12 py-5 rounded-2xl hover:bg-gray-100 transition-all hover:-translate-y-0.5">
+        Start Now →
+      </button>
+      <p class="text-sm text-muted mt-3">3 days to test everything. Cancel anytime.</p>
+      <p class="text-sm text-muted mt-1">Questions? <a href="/" class="text-indigo-400 hover:underline">Chat with us 💬</a></p>
+    </div>
+
+    <!-- Trust bar -->
+    <div class="flex items-center justify-center gap-6 mt-10 text-xs text-muted flex-wrap">
+      <span>🔒 100% SSL Secured</span>
+      <span>ⓢ Powered by Stripe</span>
+      <span>✅ 500+ Happy Customers</span>
+      <span>🤖 Built on Claude AI</span>
+    </div>
+
+  </div>
+</section>
+
+<!-- Cancel zone (only if subscribed) -->
+{% if plan in ('active', 'trial') %}
+<section class="py-10 border-t border-border">
+  <div class="max-w-xl mx-auto px-4">
+    <div class="bg-card border border-border rounded-xl p-6">
+      <p class="text-sm font-bold text-red-400 mb-1">Cancel Subscription</p>
+      <p class="text-xs text-muted mb-4">You'll keep access until the end of your current billing period.</p>
+      <form action="/upgrade/cancel" method="POST" onsubmit="return confirm('Cancel your subscription?')">
+        <button type="submit" class="text-sm text-red-400 border border-red-500/30 hover:bg-red-500/10 px-4 py-2 rounded-lg transition-colors">
+          Cancel Plan
+        </button>
+      </form>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- ─── FOOTER (same as landing) ────────────────────────────────── -->
+<footer class="border-t border-border py-10">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted">
+    <div class="flex items-center gap-2">
+      <div class="w-6 h-6 rounded btn-primary flex items-center justify-center">
+        <svg class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+      </div>
+      <span class="font-bold text-white">DENZO SEO</span>
+    </div>
+    <div class="flex gap-6">
+      <a href="/login" class="hover:text-text transition-colors">Sign In</a>
+      <a href="/#analyze-form" class="hover:text-text transition-colors">Free Analysis</a>
+      <a href="/pricing" class="text-indigo-400 font-semibold">Pricing</a>
+    </div>
+    <p>© 2026 Denzo Estudios. All rights reserved.</p>
+  </div>
+</footer>
+
+</div><!-- end pt-16 -->
+
+<script>
+function toggleFaq(el) {
+  el.closest('.faq-item').classList.toggle('open');
+}
+
+function activateTrial(planType) {
+  {% if plan in ('active', 'trial') %}
+    {% if tenant_id %}window.location.href = '/lite/{{ tenant_id }}/';{% endif %}
+    return;
+  {% endif %}
+
+  fetch('/upgrade/activate', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ plan: planType })
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.ok) {
+      {% if tenant_id %}
+      window.location.href = '/lite/{{ tenant_id }}/';
+      {% else %}
+      window.location.href = '/';
+      {% endif %}
+    }
+  })
+  .catch(() => {
+    {% if tenant_id %}
+    window.location.href = '/lite/{{ tenant_id }}/';
+    {% else %}
+    window.location.href = '/';
+    {% endif %}
+  });
+}
+</script>
+</body>
+</html>

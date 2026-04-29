@@ -1,0 +1,502 @@
+{% extends "base.html" %}
+
+{% block title %}Pipeline — {{ client.name }}{% endblock %}
+
+{% block breadcrumb %}
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+  <a href="/" style="color:var(--muted);text-decoration:none;">Overview</a>
+  <span style="color:var(--muted2)">/</span>
+  <a href="/clients" style="color:var(--muted);text-decoration:none;">Clients</a>
+  <span style="color:var(--muted2)">/</span>
+  <span style="color:var(--text);font-weight:600;">{{ client.name }}</span>
+</div>
+{% endblock %}
+
+{% block topbar_actions %}
+<a href="/clients/{{ tenant_id }}/pipeline"
+   style="font-size:12px;color:var(--text);font-weight:600;text-decoration:none;padding:6px 10px;border-radius:6px;border-bottom:2px solid #6366f1;">Dashboard</a>
+<a href="/clients/{{ tenant_id }}/agents"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Agents</a>
+<a href="/clients/{{ tenant_id }}/keywords"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Keywords</a>
+<a href="/clients/{{ tenant_id }}/competitors"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Competitors</a>
+<a href="/clients/{{ tenant_id }}/pages"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Pages</a>
+<a href="/clients/{{ tenant_id }}/audit"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Audit</a>
+<a href="/clients/{{ tenant_id }}/images"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Images</a>
+<a href="/clients/{{ tenant_id }}/brand-voice/"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Brand Voice</a>
+<a href="/clients/{{ tenant_id }}/data-intel"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Data Intel</a>
+<a href="/clients/{{ tenant_id }}/edit"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Settings</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ── Intelligence panels ─────────────────────────────────────────────── */
+.intel-panel {
+  background: #111111;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 24px;
+}
+.intel-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.4);
+  margin: 0 0 16px;
+}
+.intel-bar-row {
+  margin-bottom: 10px;
+}
+.intel-bar-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+.intel-bar-name {
+  font-size: 12px;
+  color: rgba(255,255,255,0.6);
+  text-transform: capitalize;
+}
+.intel-bar-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.87);
+}
+.intel-bar-track {
+  height: 3px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.intel-divider {
+  height: 1px;
+  background: rgba(255,255,255,0.05);
+  margin: 16px 0;
+}
+
+/* ── KPI Hero tiles ────────────────────────────────────────────────────── */
+.kpi-tile {
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+}
+.kpi-number {
+  font-size: 40px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: rgba(255,255,255,0.87);
+}
+.kpi-sublabel {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+
+@keyframes pulse-anim {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- A. HERO HEADER — Client identity + 6-tile KPI grid                    -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div style="margin-bottom:24px;">
+
+    <!-- Client name -->
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;gap:16px;">
+      <div>
+        <h1 style="font-size:32px;font-weight:300;letter-spacing:-0.03em;color:rgba(255,255,255,0.93);margin:0 0 6px;line-height:1.1;">{{ client.name }}</h1>
+        <p style="font-size:13px;color:rgba(255,255,255,0.35);margin:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span>{{ client.business_type | replace('_',' ') | title }}</span>
+          <span style="color:rgba(255,255,255,0.15);">·</span>
+          <span>{{ client.city or '' }}{% if client.state %}, {{ client.state }}{% endif %}</span>
+          {% if client.website_url %}
+          <span style="color:rgba(255,255,255,0.15);">·</span>
+          <a href="{{ client.website_url }}" target="_blank" style="color:#818cf8;text-decoration:none;transition:color 0.15s;"
+             onmouseover="this.style.color='#a5b4fc'" onmouseout="this.style.color='#818cf8'">{{ client.website_url }}</a>
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <!-- Pipeline Control Room CTA banner -->
+    <a href="/clients/{{ tenant_id }}/agents" style="display:flex;align-items:center;justify-content:space-between;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:12px;padding:16px 20px;text-decoration:none;margin-bottom:24px;transition:border-color 0.2s;" onmouseover="this.style.borderColor='rgba(99,102,241,0.35)'" onmouseout="this.style.borderColor='rgba(99,102,241,0.15)'">
+      <div>
+        <p style="font-size:13px;font-weight:600;color:#818cf8;margin:0 0 2px;">Pipeline Control Room</p>
+        <p style="font-size:12px;color:rgba(255,255,255,0.35);margin:0;">Start agents, monitor live activity, control the Director</p>
+      </div>
+      <svg style="width:16px;height:16px;color:#818cf8;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+      </svg>
+    </a>
+
+    <!-- 6-tile KPI grid -->
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;">
+
+      <!-- Keywords -->
+      <div class="kpi-tile" style="background:rgba(255,255,255,0.03);">
+        <div class="kpi-number">{{ kw_count }}</div>
+        <div class="kpi-sublabel" style="color:rgba(255,255,255,0.35);">Keywords</div>
+      </div>
+
+      <!-- Pages Total -->
+      <div class="kpi-tile" style="background:rgba(255,255,255,0.03);">
+        <div class="kpi-number">{{ page_counts.total or 0 }}</div>
+        <div class="kpi-sublabel" style="color:rgba(255,255,255,0.35);">Pages</div>
+      </div>
+
+      <!-- Published -->
+      <div class="kpi-tile" style="background:rgba(74,222,128,0.04);border:1px solid rgba(74,222,128,0.08);">
+        <div class="kpi-number" style="color:#4ade80;">{{ page_counts.published or 0 }}</div>
+        <div class="kpi-sublabel" style="color:rgba(74,222,128,0.5);">Published</div>
+      </div>
+
+      <!-- Competitors -->
+      <div class="kpi-tile" style="background:rgba(255,255,255,0.03);">
+        <div class="kpi-number">{{ (comp_stats.values() | sum) if comp_stats else 0 }}</div>
+        <div class="kpi-sublabel" style="color:rgba(255,255,255,0.35);">Competitors</div>
+      </div>
+
+      <!-- Tier-1 Threats -->
+      <div class="kpi-tile" style="background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.08);">
+        <div class="kpi-number" style="color:#f87171;">{{ comp_stats.get(1, 0) }}</div>
+        <div class="kpi-sublabel" style="color:rgba(248,113,113,0.5);">Tier-1 Threats</div>
+      </div>
+
+      <!-- Cannibalization -->
+      <div class="kpi-tile" style="background:rgba(251,146,60,0.04);border:1px solid rgba(251,146,60,{% if cannibal_count > 0 %}0.12{% else %}0.04{% endif %});">
+        <div class="kpi-number" style="color:{% if cannibal_count > 0 %}#fb923c{% else %}rgba(255,255,255,0.2){% endif %};">{{ cannibal_count }}</div>
+        <div class="kpi-sublabel" style="color:rgba(251,146,60,0.5);">Cannibaliz.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- B. INTELLIGENCE ROW — Keyword / Pages / Competitors                   -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:32px;">
+
+    <!-- Panel 1: Keyword Intelligence -->
+    <div class="intel-panel">
+      <p class="intel-label">Keyword Intelligence</p>
+
+      <!-- Priority breakdown -->
+      {% set total_kw = kw_count or 1 %}
+      <div style="margin-bottom:4px;">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.25);margin-bottom:10px;">Priority</div>
+        {% for pri_label, pri_color in [('alta', '#fb923c'), ('high', '#fb923c'), ('media', '#fbbf24'), ('medium', '#fbbf24'), ('baja', 'rgba(255,255,255,0.3)'), ('low', 'rgba(255,255,255,0.3)')] %}
+        {% set cnt = kw_by_priority.get(pri_label, 0) %}
+        {% if cnt > 0 %}
+        <div class="intel-bar-row">
+          <div class="intel-bar-header">
+            <span class="intel-bar-name">{{ pri_label | title }}</span>
+            <span class="intel-bar-count">{{ cnt }}</span>
+          </div>
+          <div class="intel-bar-track">
+            <div style="height:3px;background:{{ pri_color }};border-radius:99px;width:{{ [(cnt / total_kw * 100)|round|int, 100]|min }}%;"></div>
+          </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+
+      <div class="intel-divider"></div>
+
+      <!-- Top categories -->
+      <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.25);margin-bottom:10px;">Top Categories</div>
+      {% for cat, cnt in kw_by_category.items() %}
+      {% if loop.index <= 5 %}
+      <div class="intel-bar-row">
+        <div class="intel-bar-header">
+          <span class="intel-bar-name">{{ cat | replace('_',' ') | truncate(22, true, '…') }}</span>
+          <span class="intel-bar-count">{{ cnt }}</span>
+        </div>
+        <div class="intel-bar-track">
+          <div style="height:3px;background:#6366f1;border-radius:99px;width:{{ [(cnt / total_kw * 100)|round|int, 100]|min }}%;"></div>
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+      {% if not kw_by_category %}
+      <p style="font-size:12px;color:rgba(255,255,255,0.25);margin:0;">No keyword data yet.</p>
+      {% endif %}
+
+      <div class="intel-divider"></div>
+
+      <!-- Gap keywords -->
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:12px;color:rgba(255,255,255,0.5);">Competitor gap keywords</span>
+        <span style="font-size:13px;font-weight:700;color:{% if gap_kw_count > 0 %}#818cf8{% else %}rgba(255,255,255,0.3){% endif %};">{{ gap_kw_count }}</span>
+      </div>
+    </div>
+
+    <!-- Panel 2: Pages Intelligence -->
+    <div class="intel-panel">
+      <p class="intel-label">Pages Intelligence</p>
+
+      <!-- Publication progress bar -->
+      {% set total_pages = page_counts.total or 0 %}
+      {% set pub_pages = page_counts.published or 0 %}
+      {% set pub_pct = ((pub_pages / total_pages * 100)|round|int) if total_pages > 0 else 0 %}
+      <div style="margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-size:12px;color:rgba(255,255,255,0.5);">Publication progress</span>
+          <span style="font-size:12px;font-weight:700;color:#4ade80;">{{ pub_pct }}%</span>
+        </div>
+        <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden;">
+          <div style="height:6px;background:linear-gradient(90deg,#4ade80,#22c55e);border-radius:99px;width:{{ pub_pct }}%;transition:width 0.5s;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:5px;">
+          <span style="font-size:11px;color:rgba(255,255,255,0.25);">{{ pub_pages }} published</span>
+          <span style="font-size:11px;color:rgba(255,255,255,0.25);">{{ total_pages }} total</span>
+        </div>
+      </div>
+
+      <div class="intel-divider"></div>
+
+      <!-- Status breakdown -->
+      <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.25);margin-bottom:10px;">By Status</div>
+      {% for status_key, status_color in [('published', '#4ade80'), ('ready', '#818cf8'), ('draft', 'rgba(255,255,255,0.3)')] %}
+      {% set cnt = pages_by_status.get(status_key, 0) %}
+      <div class="intel-bar-row">
+        <div class="intel-bar-header">
+          <span class="intel-bar-name" style="color:{{ status_color }};">{{ status_key | title }}</span>
+          <span class="intel-bar-count">{{ cnt }}</span>
+        </div>
+        <div class="intel-bar-track">
+          <div style="height:3px;background:{{ status_color }};border-radius:99px;width:{{ [(cnt / (total_pages or 1) * 100)|round|int, 100]|min }}%;"></div>
+        </div>
+      </div>
+      {% endfor %}
+
+      <div class="intel-divider"></div>
+
+      <!-- Type breakdown -->
+      <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.25);margin-bottom:10px;">By Type</div>
+      {% for ptype, cnt in pages_by_type.items() %}
+      {% if loop.index <= 4 %}
+      <div class="intel-bar-row">
+        <div class="intel-bar-header">
+          <span class="intel-bar-name">{{ ptype | replace('_',' ') | truncate(22, true, '…') }}</span>
+          <span class="intel-bar-count">{{ cnt }}</span>
+        </div>
+        <div class="intel-bar-track">
+          <div style="height:3px;background:#6366f1;border-radius:99px;width:{{ [(cnt / (total_pages or 1) * 100)|round|int, 100]|min }}%;"></div>
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+      {% if not pages_by_type %}
+      <p style="font-size:12px;color:rgba(255,255,255,0.25);margin:0;">No pages yet.</p>
+      {% endif %}
+
+      <div class="intel-divider"></div>
+
+      <!-- Avg quality score -->
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:12px;color:rgba(255,255,255,0.5);">Avg. quality score</span>
+        <span style="font-size:20px;font-weight:300;letter-spacing:-0.02em;color:{% if avg_quality >= 80 %}#4ade80{% elif avg_quality >= 60 %}#fbbf24{% elif avg_quality > 0 %}#f87171{% else %}rgba(255,255,255,0.2){% endif %};">
+          {% if avg_quality %}{{ avg_quality }}{% else %}—{% endif %}
+        </span>
+      </div>
+    </div>
+
+    <!-- Panel 3: Competitive Landscape -->
+    <div class="intel-panel">
+      <p class="intel-label">Competitive Landscape</p>
+
+      <!-- Tier summary -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+        {% for tier_num, tier_color, tier_bg, tier_label in [(1, '#f87171', 'rgba(239,68,68,0.08)', 'Tier 1'), (2, '#fb923c', 'rgba(251,146,60,0.08)', 'Tier 2'), (3, 'rgba(255,255,255,0.5)', 'rgba(255,255,255,0.04)', 'Tier 3')] %}
+        <div style="background:{{ tier_bg }};border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:22px;font-weight:300;letter-spacing:-0.02em;color:{{ tier_color }};">{{ comp_stats.get(tier_num, 0) }}</div>
+          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:{{ tier_color }};opacity:0.7;margin-top:2px;">{{ tier_label }}</div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Tier 1 threat names -->
+      {% if tier1_names %}
+      <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.25);margin-bottom:10px;">Tier-1 Threats</div>
+      {% for name in tier1_names %}
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+        <div style="width:6px;height:6px;border-radius:50%;background:#f87171;flex-shrink:0;"></div>
+        <span style="font-size:13px;color:rgba(255,255,255,0.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ name }}</span>
+      </div>
+      {% endfor %}
+      {% else %}
+      <p style="font-size:12px;color:rgba(255,255,255,0.25);margin:0 0 16px;">No competitors analyzed yet.</p>
+      {% endif %}
+
+      <div class="intel-divider"></div>
+
+      <!-- Gap keywords -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <span style="font-size:12px;color:rgba(255,255,255,0.5);">Gap opportunities</span>
+        <span style="font-size:13px;font-weight:700;color:{% if gap_kw_count > 0 %}#818cf8{% else %}rgba(255,255,255,0.25){% endif %};">{{ gap_kw_count }}</span>
+      </div>
+
+      <!-- Link -->
+      <a href="/clients/{{ tenant_id }}/competitors"
+         style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#818cf8;text-decoration:none;"
+         onmouseover="this.style.color='#a5b4fc'" onmouseout="this.style.color='#818cf8'">
+        View full competitor analysis
+        <svg style="width:12px;height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+      </a>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- C. TOP KEYWORDS TABLE                                                  -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  {% if top_keywords %}
+  <div style="background:#111111;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:24px;margin-bottom:32px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <p class="intel-label" style="margin:0;">Top Keywords by Volume</p>
+      <a href="/clients/{{ tenant_id }}/keywords"
+         style="font-size:12px;color:#818cf8;text-decoration:none;"
+         onmouseover="this.style.color='#a5b4fc'" onmouseout="this.style.color='#818cf8'">View all {{ kw_count }} &rarr;</a>
+    </div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead>
+        <tr style="background:rgba(255,255,255,0.03);">
+          <th style="text-align:left;padding:10px 12px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);border-radius:6px 0 0 6px;">Keyword</th>
+          <th style="text-align:right;padding:10px 12px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);">Volume</th>
+          <th style="text-align:left;padding:10px 12px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);">Priority</th>
+          <th style="text-align:left;padding:10px 12px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);border-radius:0 6px 6px 0;">Category</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for kw in top_keywords %}
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.04);"
+            onmouseover="this.style.background='rgba(255,255,255,0.02)'"
+            onmouseout="this.style.background=''">
+          <td style="padding:11px 12px;font-size:13px;color:rgba(255,255,255,0.87);">{{ kw.keyword }}</td>
+          <td style="padding:11px 12px;font-size:13px;color:rgba(255,255,255,0.93);font-weight:600;text-align:right;font-variant-numeric:tabular-nums;">{{ kw.volume }}</td>
+          <td style="padding:11px 12px;">
+            {% set pri = (kw.priority or '') | lower %}
+            {% if pri in ['alta', 'high'] %}
+            <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 9px;border-radius:9999px;background:rgba(251,146,60,0.12);color:#fb923c;">{{ kw.priority }}</span>
+            {% elif pri in ['media', 'medium'] %}
+            <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 9px;border-radius:9999px;background:rgba(250,204,21,0.12);color:#fbbf24;">{{ kw.priority }}</span>
+            {% elif pri in ['baja', 'low'] %}
+            <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 9px;border-radius:9999px;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.35);">{{ kw.priority }}</span>
+            {% else %}
+            <span style="font-size:12px;color:rgba(255,255,255,0.3);">{{ kw.priority or '—' }}</span>
+            {% endif %}
+          </td>
+          <td style="padding:11px 12px;font-size:12px;color:rgba(255,255,255,0.4);">{{ kw.category | replace('_',' ') if kw.category else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- D. DIRECTOR'S LAST DECISIONS — Static from DB                         -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div style="background:#0a0a0f;border:1px solid rgba(99,102,241,0.2);border-radius:16px;overflow:hidden;margin-bottom:24px;">
+
+    <!-- Top bar -->
+    <div style="padding:16px 24px;border-bottom:1px solid rgba(99,102,241,0.12);display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:36px;height:36px;border-radius:10px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);display:flex;align-items:center;justify-content:center;">
+          <svg style="width:18px;height:18px;color:#818cf8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+          </svg>
+        </div>
+        <div>
+          <p style="font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#818cf8;margin:0;">Pipeline Director</p>
+          <p style="font-size:11px;color:rgba(255,255,255,0.35);margin:0;">Last Decisions</p>
+        </div>
+      </div>
+      <a href="/clients/{{ tenant_id }}/agents"
+         style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#818cf8;text-decoration:none;padding:6px 12px;border:1px solid rgba(99,102,241,0.2);border-radius:8px;"
+         onmouseover="this.style.borderColor='rgba(99,102,241,0.4)'" onmouseout="this.style.borderColor='rgba(99,102,241,0.2)'">
+        Open Control Room
+        <svg style="width:12px;height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+      </a>
+    </div>
+
+    <!-- Static director log from DB -->
+    <div style="padding:16px 24px;">
+      {% if director_log %}
+        {% for entry in director_log %}
+        <div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+          <span style="font-size:11px;color:rgba(255,255,255,0.2);white-space:nowrap;font-variant-numeric:tabular-nums;min-width:45px;">{{ entry.created_at[11:16] if entry.created_at else '' }}</span>
+          <span style="font-size:10px;font-weight:600;letter-spacing:0.04em;flex-shrink:0;
+            {% if entry.level == 'success' %}color:#4ade80;
+            {% elif entry.level == 'error' %}color:#ef4444;
+            {% elif entry.level == 'warning' %}color:#f59e0b;
+            {% else %}color:#818cf8;{% endif %}">
+            {% if entry.level == 'success' %}✓{% elif entry.level == 'error' %}✗{% elif entry.level == 'warning' %}⚠{% else %}ℹ{% endif %}
+          </span>
+          <span style="font-size:12px;color:rgba(255,255,255,0.55);">{{ entry.message }}</span>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p style="font-size:12px;color:rgba(255,255,255,0.2);margin:0;font-style:italic;">Director hasn't run yet — go to the Control Room to activate the pipeline.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- E. PIPELINE RUN HISTORY                                                -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  {% if last_runs %}
+  <div style="background:#111111;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:24px;margin-bottom:24px;">
+    <p class="intel-label" style="margin-bottom:16px;">Pipeline Run History <span style="font-weight:400;color:rgba(255,255,255,0.2);text-transform:none;letter-spacing:0;">({{ total_runs }} total)</span></p>
+    {% for run in last_runs %}
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;
+          {% if run.status == 'completed' %}background:#4ade80;
+          {% elif run.status == 'error' %}background:#f87171;
+          {% elif run.status == 'running' %}background:#818cf8;animation:pulse-anim 2s ease-in-out infinite;
+          {% else %}background:rgba(255,255,255,0.25);{% endif %}"></div>
+        <span style="font-size:13px;color:rgba(255,255,255,0.7);font-weight:500;">{{ run.status | title if run.status else '—' }}</span>
+        {% if run.agents_run is defined and run.agents_run %}
+        <span style="font-size:11px;color:rgba(255,255,255,0.25);">{{ run.agents_run }} agents</span>
+        {% endif %}
+      </div>
+      <span style="font-size:12px;color:rgba(255,255,255,0.25);font-variant-numeric:tabular-nums;">{{ run.started_at[:16] if run.started_at else '—' }}</span>
+    </div>
+    {% endfor %}
+    {% if last_runs | length == 0 %}
+    <p style="font-size:12px;color:rgba(255,255,255,0.25);margin:0;">No pipeline runs recorded yet.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+{% endblock %}

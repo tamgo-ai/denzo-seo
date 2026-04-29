@@ -1,0 +1,723 @@
+{% extends "base.html" %}
+
+{% block title %}Agents — {{ client.name }}{% endblock %}
+
+{% block breadcrumb %}
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+  <a href="/" style="color:var(--muted);text-decoration:none;">Overview</a>
+  <span style="color:var(--muted2)">/</span>
+  <span style="color:var(--muted);text-decoration:none;">{{ client.name }}</span>
+  <span style="color:var(--muted2)">/</span>
+  <span style="color:var(--text);font-weight:600;">Agents</span>
+</div>
+{% endblock %}
+
+{% block topbar_actions %}
+<a href="/clients/{{ tenant_id }}/pipeline"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Dashboard</a>
+<a href="/clients/{{ tenant_id }}/agents"
+   style="font-size:12px;color:var(--text);font-weight:600;text-decoration:none;padding:6px 10px;border-radius:6px;border-bottom:2px solid #6366f1;">Agents</a>
+<a href="/clients/{{ tenant_id }}/keywords"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Keywords</a>
+<a href="/clients/{{ tenant_id }}/competitors"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Competitors</a>
+<a href="/clients/{{ tenant_id }}/pages"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Pages</a>
+<a href="/clients/{{ tenant_id }}/audit"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Audit</a>
+<a href="/clients/{{ tenant_id }}/images"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Images</a>
+<a href="/clients/{{ tenant_id }}/brand-voice/"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Brand Voice</a>
+<a href="/clients/{{ tenant_id }}/data-intel"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Data Intel</a>
+<a href="/clients/{{ tenant_id }}/edit"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Settings</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ── Global micro-transitions ─────────────────────────────────────────── */
+* {
+  transition-property: color, background-color, border-color, opacity, transform;
+  transition-duration: 150ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Director flow animations ─────────────────────────────────────────── */
+.flow-line-track {
+  position: relative;
+  height: 2px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.flow-line-particle {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    transparent 30%,
+    rgba(99,102,241,0.9) 50%,
+    transparent 70%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-position: -100% center;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.flow-line-particle.active {
+  opacity: 1;
+  animation: flow-sweep 1.6s ease-in-out infinite;
+}
+.flow-line-particle.done {
+  opacity: 0.4;
+  background: linear-gradient(90deg, transparent 0%, rgba(34,197,94,0.8) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: flow-sweep 3s ease-in-out infinite;
+}
+@keyframes flow-sweep {
+  0%   { background-position: -150% center; }
+  100% { background-position: 250% center; }
+}
+.layer-node-pulse {
+  animation: layer-glow-white 1.8s ease-in-out infinite;
+}
+@keyframes layer-glow-white {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0); }
+  50%       { box-shadow: 0 0 16px 4px rgba(99,102,241,0.3); }
+}
+.thought-cursor::after {
+  content: '▋';
+  animation: blink 1s step-end infinite;
+  color: #f97316;
+  margin-left: 1px;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ── Layer accordion ─────────────────────────────────────────────────── */
+.layer-section {
+  margin-bottom: 8px;
+}
+.layer-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+  cursor: pointer;
+  user-select: none;
+}
+.layer-header:hover {
+  border-color: var(--border2) !important;
+}
+.layer-header.has-activity {
+  border-left: 2px solid #6366f1;
+  padding-left: 16px;
+}
+.layer-chevron {
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.layer-chevron.open {
+  transform: rotate(180deg);
+}
+.layer-agents-panel {
+  padding: 10px 0 4px 0;
+}
+
+/* ── Agent cards ─────────────────────────────────────────────────────── */
+.agent-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  transition: border-color 150ms, transform 150ms;
+}
+.agent-card:hover {
+  border-color: var(--border2) !important;
+  transform: translateY(-1px);
+}
+.agent-btn-start {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: #000;
+  color: #fff;
+  border: 1px solid var(--border2);
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 10px;
+  height: 28px;
+  cursor: pointer;
+  letter-spacing: -0.01em;
+}
+.agent-btn-start:hover { background: #222; }
+.agent-btn-start:disabled { opacity: 0.35; cursor: not-allowed; background: #111; }
+.agent-btn-stop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--red);
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 10px;
+  height: 28px;
+  cursor: pointer;
+}
+.agent-btn-stop:hover { background: rgba(239,68,68,0.08); }
+.agent-btn-stop:disabled { opacity: 0.25; cursor: not-allowed; }
+
+/* ── Activity log ──────────────────────────────────────────────────────── */
+.log-area {
+  background: rgba(255,255,255,0.02);
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.06);
+  max-height: 300px;
+  overflow-y: auto;
+  position: relative;
+}
+.log-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  font-family: 'SF Mono', 'Fira Code', 'Fira Mono', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.log-row:last-child { border-bottom: none; }
+.log-row.success { border-left: 2px solid #4ade80; }
+.log-row.error   { border-left: 2px solid #ef4444; }
+.log-row.warning { border-left: 2px solid #f59e0b; }
+.log-row.info    { border-left: 2px solid #3b82f6; }
+.log-row:hover   { background: rgba(255,255,255,0.03); }
+.log-time { font-size: 12px; color: rgba(255,255,255,0.3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.log-agent-name { font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="{
+  logs: [],
+  agents: {},
+  stats: { keywords: {{ kw_count }}, pages: {{ page_counts.total or 0 }}, published: {{ page_counts.published or 0 }} },
+  ws: null,
+  wsConnected: false,
+  pipelineRunning: false,
+  init() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    this.ws = new WebSocket(proto + '//' + location.host + '/ws/{{ tenant_id }}/logs');
+    this.ws.onopen = () => { this.wsConnected = true; };
+    this.ws.onclose = () => { this.wsConnected = false; };
+    this.ws.onerror = () => { this.wsConnected = false; };
+    this.ws.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      if (data.logs && data.logs.length > 0) {
+        this.logs = [...this.logs.slice(-300), ...data.logs];
+        this.$nextTick(() => {
+          const el = this.$refs.logPanel;
+          if (el) el.scrollTop = el.scrollHeight;
+        });
+      }
+      if (data.agents) {
+        data.agents.forEach(a => { this.agents[a.name] = a; });
+      }
+      if (data.stats) {
+        this.stats = data.stats;
+      }
+    };
+  },
+  getAgent(name) {
+    return this.agents[name] || { name: name, status: 'idle', current_task: '' };
+  },
+  isSkipped(agent) {
+    return agent.status === 'idle' && agent.last_run_at && agent.current_task &&
+      (agent.current_task.toLowerCase().includes('no ') || agent.current_task.toLowerCase().includes('run '));
+  },
+  statusColor(status, agent) {
+    if (agent && this.isSkipped(agent)) return 'bg-amber-400';
+    const map = {
+      idle: 'bg-gray-600',
+      working: 'bg-indigo-400 agent-pulse',
+      done: 'bg-green-400',
+      error: 'bg-red-500'
+    };
+    return map[status] || 'bg-gray-600';
+  },
+  statusTextColor(status, agent) {
+    if (agent && this.isSkipped(agent)) return '#d97706';
+    const map = {
+      idle: 'rgba(255,255,255,0.4)',
+      working: '#818cf8',
+      done: '#4ade80',
+      error: '#ef4444'
+    };
+    return map[status] || 'rgba(255,255,255,0.4)';
+  },
+  levelBorder(level) {
+    const map = {
+      success: 'success',
+      error: 'error',
+      warning: 'warning',
+      info: 'info'
+    };
+    return map[level] || '';
+  },
+  levelIcon(level) {
+    const map = { success: '✓', error: '✗', warning: '⚠', info: 'ℹ' };
+    return map[level] || '·';
+  },
+  levelIconColor(level) {
+    const map = { success: '#22c55e', error: '#ef4444', warning: '#f59e0b', info: '#3b82f6' };
+    return map[level] || '#555555';
+  },
+  startAgent(name) {
+    fetch('/api/{{ tenant_id }}/agents/start/' + encodeURIComponent(name), { method: 'POST' })
+      .then(r => r.json())
+      .then(d => { if (d.error) alert(d.error); });
+  },
+  stopAgent(name) {
+    fetch('/api/{{ tenant_id }}/agents/stop/' + encodeURIComponent(name), { method: 'POST' });
+  },
+  runAllAgents() {
+    fetch('/api/{{ tenant_id }}/pipeline/run', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { alert(d.error); return; }
+        this.pipelineRunning = true;
+      });
+  },
+  stopAllAgents() {
+    Object.keys(this.agents).forEach(name => {
+      if (this.agents[name].status === 'working') this.stopAgent(name);
+    });
+  },
+  layerStatus(n) {
+    var arr = Object.values(this.agents).filter(function(a){ return parseInt(a.layer) === n; });
+    if (!arr.length) return 'idle';
+    if (arr.some(function(a){ return a.status === 'error'; })) return 'error';
+    if (arr.some(function(a){ return a.status === 'working'; })) return 'working';
+    if (arr.every(function(a){ return a.status === 'done'; })) return 'done';
+    return 'idle';
+  },
+  layerHasActivity(n) {
+    return Object.values(this.agents).some(function(a){ return parseInt(a.layer) === n && (a.status === 'working' || a.status === 'done'); });
+  },
+  layerSummary(n) {
+    var arr = Object.values(this.agents).filter(function(a){ return parseInt(a.layer) === n; });
+    var working = arr.filter(function(a){ return a.status === 'working'; }).length;
+    var done = arr.filter(function(a){ return a.status === 'done'; }).length;
+    var error = arr.filter(function(a){ return a.status === 'error'; }).length;
+    var parts = [arr.length + ' agent' + (arr.length !== 1 ? 's' : '')];
+    if (working) parts.push(working + ' running');
+    if (done) parts.push(done + ' done');
+    if (error) parts.push(error + ' error');
+    return parts.join(' · ');
+  },
+  layerNodeClass(n) {
+    var s = this.layerStatus(n);
+    if (s === 'working') return 'layer-node-pulse';
+    return '';
+  },
+  layerNodeStyle(n) {
+    var s = this.layerStatus(n);
+    if (s === 'working') return 'border: 2px solid #6366f1; background: rgba(99,102,241,0.12); transform: scale(1.05);';
+    if (s === 'done')    return 'border: 1px solid rgba(74,222,128,0.3); background: rgba(74,222,128,0.15);';
+    if (s === 'error')   return 'border: 2px solid #ef4444; background: rgba(239,68,68,0.08);';
+    return 'border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.05);';
+  },
+  layerIconClass(n) {
+    var s = this.layerStatus(n);
+    if (s === 'working') return 'opacity-100';
+    if (s === 'done')    return 'opacity-80';
+    return 'opacity-40';
+  },
+  layerLabelStyle(n) {
+    var s = this.layerStatus(n);
+    if (s === 'working') return 'color:#818cf8;';
+    if (s === 'done')    return 'color:#4ade80;';
+    if (s === 'error')   return 'color:#ef4444;';
+    return 'color:rgba(255,255,255,0.35);';
+  },
+  layerAgentDot(layerNum, idx) {
+    var arr = Object.values(this.agents)
+      .filter(function(a){ return parseInt(a.layer) === layerNum; })
+      .sort(function(a,b){ return a.name.localeCompare(b.name); });
+    var agent = arr[idx - 1];
+    if (!agent) return 'background:rgba(255,255,255,0.12)';
+    if (agent.status === 'working') return 'background:#818cf8';
+    if (agent.status === 'done')    return 'background:#4ade80';
+    if (agent.status === 'error')   return 'background:#ef4444';
+    return 'background:rgba(255,255,255,0.2)';
+  },
+  connectorClass(fromLayer) {
+    var from = this.layerStatus(fromLayer);
+    var to   = this.layerStatus(fromLayer + 1);
+    if (from === 'working' || to === 'working') return 'active';
+    if (from === 'done' && (to === 'working' || to === 'done')) return 'done';
+    return '';
+  },
+  connectorArrowStyle(fromLayer) {
+    var from = this.layerStatus(fromLayer);
+    var to   = this.layerStatus(fromLayer + 1);
+    if (from === 'done' || to === 'working' || to === 'done') return 'color:#6366f1';
+    return 'color:rgba(255,255,255,0.15)';
+  },
+  get directorThought() {
+    var working = Object.values(this.agents).filter(function(a){ return a.status === 'working'; });
+    var done    = Object.values(this.agents).filter(function(a){ return a.status === 'done'; });
+    var errors  = Object.values(this.agents).filter(function(a){ return a.status === 'error'; });
+    if (!working.length && !done.length && !errors.length) {
+      return 'All systems ready. Awaiting pipeline activation — run individual agents or launch the full sequence.';
+    }
+    if (!working.length && errors.length) {
+      return errors[0].name + ' reported an issue. Check the activity log. Other agents can run independently.';
+    }
+    if (!working.length && done.length) {
+      return 'Pipeline sequence complete — ' + done.length + ' agent' + (done.length > 1 ? 's' : '') + ' finished. Review keywords, pages and competitor intelligence.';
+    }
+    var agent = working[0];
+    var task  = (agent.current_task || '').substring(0, 90);
+    var layerLabels = { 1: 'Intelligence', 2: 'Strategy', 3: 'Generation', 4: 'Optimization', 5: 'Publishing', 6: 'Analytics' };
+    var layerLabel  = layerLabels[parseInt(agent.layer)] || 'Layer ' + agent.layer;
+    var prefix = layerLabel + ' phase active';
+    if (working.length > 1) {
+      var names = working.map(function(a){ return a.name; }).join(' · ');
+      return prefix + ' — ' + working.length + ' agents running in parallel: ' + names;
+    }
+    return prefix + ' — ' + agent.name + (task ? ': ' + task : '');
+  }
+}" x-init="init()">
+
+  <!-- Back to Dashboard link -->
+  <a href="/clients/{{ tenant_id }}/pipeline" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,0.35);text-decoration:none;margin-bottom:20px;"
+     onmouseover="this.style.color='rgba(255,255,255,0.6)'" onmouseout="this.style.color='rgba(255,255,255,0.35)'">
+    <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+    </svg>
+    Back to Dashboard
+  </a>
+
+  <!-- Page header + action buttons -->
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;gap:16px;">
+    <div>
+      <h1 style="font-size:28px;font-weight:300;letter-spacing:-0.03em;color:rgba(255,255,255,0.93);margin:0 0 6px;line-height:1.1;">Pipeline Control Room</h1>
+      <p style="font-size:13px;color:rgba(255,255,255,0.35);margin:0;">{{ client.name }} — Start agents, monitor live activity, control the Director</p>
+    </div>
+    <!-- Controls -->
+    <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;margin-top:4px;">
+      <!-- Controls cluster -->
+      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+
+        <!-- Live indicator pill -->
+        <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:0.04em;transition:all 0.3s;"
+             :style="wsConnected
+               ? 'border:1px solid rgba(74,222,128,0.25);background:rgba(74,222,128,0.06);color:#4ade80;'
+               : 'border:1px solid rgba(255,255,255,0.07);background:rgba(255,255,255,0.03);color:rgba(255,255,255,0.25);'">
+          <span style="width:6px;height:6px;border-radius:50%;flex-shrink:0;transition:all 0.3s;"
+                :style="wsConnected ? 'background:#4ade80;box-shadow:0 0 6px #4ade80;' : 'background:rgba(255,255,255,0.2);'"></span>
+          <span x-text="wsConnected ? 'LIVE' : 'CONNECTING'"></span>
+        </div>
+
+        <!-- Divider -->
+        <div style="width:1px;height:20px;background:rgba(255,255,255,0.07);"></div>
+
+        <!-- Stop All — only visible/active when running -->
+        <button @click="stopAllAgents()" :disabled="!pipelineRunning"
+                style="display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:8px;font-size:12px;font-weight:600;letter-spacing:0.03em;cursor:pointer;transition:all 0.2s;font-family:inherit;"
+                :style="pipelineRunning
+                  ? 'background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);color:#f87171;'
+                  : 'background:transparent;border:1px solid rgba(255,255,255,0.06);color:rgba(255,255,255,0.2);cursor:default;'">
+          <!-- Square stop icon -->
+          <svg style="width:11px;height:11px;flex-shrink:0;" fill="currentColor" viewBox="0 0 16 16">
+            <rect x="3" y="3" width="10" height="10" rx="2"/>
+          </svg>
+          Stop
+        </button>
+
+        <!-- Run Full Pipeline — the primary CTA -->
+        <button @click="pipelineRunning ? (pipelineRunning=false, stopAllAgents()) : runAllAgents()"
+                style="display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 18px;border-radius:8px;font-size:13px;font-weight:600;letter-spacing:-0.01em;cursor:pointer;border:none;transition:all 0.25s;font-family:inherit;"
+                :style="pipelineRunning
+                  ? 'background:rgba(99,102,241,0.12);color:#818cf8;border:1px solid rgba(99,102,241,0.25);'
+                  : 'background:linear-gradient(135deg,#6366f1 0%,#818cf8 100%);color:#fff;box-shadow:0 0 20px rgba(99,102,241,0.3),0 2px 8px rgba(0,0,0,0.4);'">
+          <!-- Spinner when running -->
+          <svg x-show="pipelineRunning" style="width:13px;height:13px;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+               :style="pipelineRunning ? 'animation:spin 1s linear infinite;' : ''">
+            <path stroke-linecap="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          <!-- Lightning when idle -->
+          <svg x-show="!pipelineRunning" style="width:13px;height:13px;flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+          <span x-text="pipelineRunning ? 'Running…' : 'Run Full Pipeline'"></span>
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- D. DIRECTOR PANEL — Mission Control Brain                              -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div style="background:#0a0a0f;border:1px solid rgba(99,102,241,0.2);border-radius:16px;overflow:hidden;margin-bottom:20px;">
+
+    <!-- Top bar: Director identity + status -->
+    <div style="padding:16px 24px;border-bottom:1px solid rgba(99,102,241,0.12);display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <!-- Animated brain icon -->
+        <div style="width:36px;height:36px;border-radius:10px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);display:flex;align-items:center;justify-content:center;"
+             :style="Object.values(agents).some(a => a.status==='working') ? 'background:rgba(99,102,241,0.2);border-color:rgba(99,102,241,0.5);box-shadow:0 0 20px rgba(99,102,241,0.2)' : ''">
+          <svg style="width:18px;height:18px;color:#818cf8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+          </svg>
+        </div>
+        <div>
+          <p style="font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#818cf8;margin:0;">Pipeline Director</p>
+          <p style="font-size:11px;color:rgba(255,255,255,0.35);margin:0;">Autonomous SEO Orchestration</p>
+        </div>
+      </div>
+      <!-- Status badge -->
+      <div :style="Object.values(agents).some(a => a.name==='Pipeline Director' && a.status==='working')
+        ? 'display:flex;align-items:center;gap:6px;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.25);border-radius:999px;padding:5px 12px;'
+        : 'display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:999px;padding:5px 12px;'">
+        <div style="width:6px;height:6px;border-radius:50%;"
+             :style="Object.values(agents).some(a => a.name==='Pipeline Director' && a.status==='working') ? 'background:#818cf8;box-shadow:0 0 6px #818cf8;animation:pulse 2s infinite;' : 'background:rgba(255,255,255,0.2);'"></div>
+        <span style="font-size:11px;font-weight:600;letter-spacing:0.05em;"
+              :style="Object.values(agents).some(a => a.name==='Pipeline Director' && a.status==='working') ? 'color:#818cf8;' : 'color:rgba(255,255,255,0.35);'">
+          <span x-text="Object.values(agents).some(a => a.name==='Pipeline Director' && a.status==='working') ? 'ACTIVE' : 'STANDBY'"></span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Layer pipeline: horizontal minimal nodes -->
+    <div style="padding:20px 24px;display:flex;align-items:center;gap:0;">
+      {% set layer_config = [
+        (1, 'Research', 'L1'),
+        (2, 'Strategy', 'L2'),
+        (3, 'Production', 'L3'),
+        (4, 'Publishing', 'L4'),
+        (5, 'Monitoring', 'L5'),
+      ] %}
+      {% for layer_num, layer_label, layer_code in layer_config %}
+      <!-- Node -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0;">
+        <div style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;transition:all 0.3s;"
+             :style="layerNodeStyle({{ layer_num }})">
+          <span style="font-size:10px;font-weight:700;letter-spacing:0.05em;" :style="layerLabelStyle({{ layer_num }})">{{ layer_code }}</span>
+        </div>
+        <span style="font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;white-space:nowrap;" :style="layerLabelStyle({{ layer_num }})">{{ layer_label }}</span>
+      </div>
+      <!-- Connector (not after last) -->
+      {% if not loop.last %}
+      <div style="flex:1;height:1px;margin:0 4px;margin-bottom:20px;position:relative;min-width:20px;">
+        <div style="width:100%;height:1px;" :style="layerStatus({{ layer_num }}) === 'done' ? 'background:rgba(74,222,128,0.4);' : 'background:rgba(255,255,255,0.08);border-top:1px dashed rgba(255,255,255,0.12);'"></div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+
+    <!-- Director live reasoning (real-time from WebSocket) -->
+    <div style="border-top:1px solid rgba(99,102,241,0.1);padding:16px 24px;">
+      <p style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:rgba(99,102,241,0.6);margin:0 0 10px;">Director Reasoning</p>
+      <p class="thought-cursor" style="font-size:13px;color:rgba(255,255,255,0.6);margin:0;line-height:1.6;" x-text="directorThought"></p>
+
+      <!-- Live Director log entries from WebSocket -->
+      <template x-if="logs.filter(l => l.agent === 'Pipeline Director').length > 0">
+        <div style="margin-top:12px;">
+          <template x-for="entry in logs.filter(l => l.agent === 'Pipeline Director').slice(-3).reverse()" :key="entry.id">
+            <div style="display:flex;gap:10px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+              <span style="font-size:11px;color:rgba(255,255,255,0.2);white-space:nowrap;font-variant-numeric:tabular-nums;" x-text="entry.created_at ? entry.created_at.slice(11,16) : ''"></span>
+              <span style="font-size:12px;color:rgba(255,255,255,0.55);" x-text="entry.message"></span>
+            </div>
+          </template>
+        </div>
+      </template>
+      <template x-if="logs.filter(l => l.agent === 'Pipeline Director').length === 0">
+        <p style="font-size:12px;color:rgba(255,255,255,0.2);margin:8px 0 0;font-style:italic;">Director hasn't run yet — click Run Full Pipeline to activate.</p>
+      </template>
+    </div>
+  </div>
+  <!-- END DIRECTOR -->
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- F. AGENT LAYERS — ACCORDION                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div style="margin-bottom:20px;">
+
+    {% for layer_num, layer_data in layers.items() %}
+    <div class="layer-section" x-data="{ open: layerHasActivity({{ layer_num }}) }">
+
+      <!-- Layer header -->
+      <div class="layer-header"
+           :class="layerHasActivity({{ layer_num }}) ? 'has-activity' : ''"
+           @click="open = !open">
+
+        <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+          <span style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;
+            {% if layer_num == 1 %}background:rgba(59,130,246,0.12);color:#60a5fa;
+            {% elif layer_num == 2 %}background:rgba(168,85,247,0.12);color:#c084fc;
+            {% elif layer_num == 3 %}background:rgba(249,115,22,0.12);color:#fb923c;
+            {% elif layer_num == 4 %}background:rgba(20,184,166,0.12);color:#2dd4bf;
+            {% elif layer_num == 5 %}background:rgba(100,116,139,0.12);color:#94a3b8;
+            {% else %}background:rgba(16,185,129,0.12);color:#34d399;{% endif %}">
+            {{ layer_num }}
+          </span>
+          <div style="min-width:0;">
+            <span style="font-size:14px;font-weight:600;color:rgba(255,255,255,0.87);">Layer {{ layer_num }}: {{ layer_data.label }}</span>
+          </div>
+        </div>
+
+        <div style="flex-shrink:0;">
+          <span style="font-size:12px;color:rgba(255,255,255,0.4);" x-text="layerSummary({{ layer_num }})"></span>
+        </div>
+
+        <svg class="layer-chevron" :class="open ? 'open' : ''"
+             style="width:16px;height:16px;flex-shrink:0;color:rgba(255,255,255,0.3);"
+             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </div>
+
+      <!-- Collapsible agent cards -->
+      <div x-show="open"
+           style="overflow:hidden;"
+           x-transition:enter="transition-all duration-200"
+           x-transition:enter-start="opacity-0"
+           x-transition:enter-end="opacity-100"
+           x-transition:leave="transition-all duration-150"
+           x-transition:leave-end="opacity-0">
+        <div class="layer-agents-panel">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;">
+
+            {% for agent in layer_data.agents %}
+            <div class="agent-card" data-agent-name="{{ agent.name }}">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;"
+                      :class="statusColor(getAgent('{{ agent.name }}').status, getAgent('{{ agent.name }}'))"></span>
+                <p style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.87);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ agent.name }}</p>
+              </div>
+              <p style="font-size:11px;margin:0 0 10px;min-height:2.4em;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;"
+                 :style="'color:' + statusTextColor(getAgent('{{ agent.name }}').status, getAgent('{{ agent.name }}'))">
+                <span x-text="getAgent('{{ agent.name }}').current_task
+                  ? getAgent('{{ agent.name }}').current_task.substring(0, 80) + (getAgent('{{ agent.name }}').current_task.length > 80 ? '…' : '')
+                  : (getAgent('{{ agent.name }}').status === 'done' ? 'Completed' : getAgent('{{ agent.name }}').status === 'error' ? 'Error occurred' : 'Ready to run')">
+                </span>
+              </p>
+              <div style="display:flex;gap:6px;">
+                <button class="agent-btn-start"
+                        style="flex:1;"
+                        @click="startAgent('{{ agent.name }}')"
+                        :disabled="getAgent('{{ agent.name }}').status === 'working'">
+                  <svg style="width:11px;height:11px;" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/>
+                  </svg>
+                  Start
+                </button>
+                <button class="agent-btn-stop"
+                        @click="stopAgent('{{ agent.name }}')"
+                        :disabled="getAgent('{{ agent.name }}').status !== 'working'">
+                  <svg style="width:11px;height:11px;" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            {% endfor %}
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+    {% endfor %}
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- G. LIVE ACTIVITY LOG                                                   -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div style="margin-top:8px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;"
+              :class="wsConnected ? 'bg-green-500' : 'bg-gray-600'"></span>
+        <span style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.87);">Live Activity</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:12px;color:rgba(255,255,255,0.3);" x-text="logs.length + {{ activity | length }} + ' entries'"></span>
+        <button @click="logs = []"
+                style="font-size:11px;color:rgba(255,255,255,0.3);background:transparent;border:none;cursor:pointer;padding:0;">
+          Clear
+        </button>
+      </div>
+    </div>
+
+    <div class="log-area" x-ref="logPanel">
+
+      {% for entry in activity | reverse %}
+      <div class="log-row {{ entry.level }}">
+        <span style="flex-shrink:0;width:14px;text-align:center;
+          {% if entry.level == 'success' %}color:#22c55e;
+          {% elif entry.level == 'error' %}color:#ef4444;
+          {% elif entry.level == 'warning' %}color:#f59e0b;
+          {% else %}color:#3b82f6;{% endif %}">
+          {% if entry.level == 'success' %}✓{% elif entry.level == 'error' %}✗{% elif entry.level == 'warning' %}⚠{% else %}·{% endif %}
+        </span>
+        <span class="log-time" style="flex-shrink:0;min-width:90px;">{{ entry.created_at[5:16] if entry.created_at else '' }}</span>
+        {% if entry.agent %}
+        <span class="log-agent-name" style="color:#818cf8;flex-shrink:0;font-weight:600;font-size:10px;">{{ entry.agent[:18] }}</span>
+        {% endif %}
+        <span style="color:rgba(255,255,255,0.6);word-break:break-all;">{{ entry.message or '' }}</span>
+      </div>
+      {% endfor %}
+
+      <template x-for="entry in logs" :key="entry.id">
+        <div class="log-row" :class="levelBorder(entry.level)">
+          <span style="flex-shrink:0;width:14px;text-align:center;" :style="'color:' + levelIconColor(entry.level)" x-text="levelIcon(entry.level)"></span>
+          <span class="log-time" style="flex-shrink:0;min-width:90px;" x-text="entry.created_at ? entry.created_at.substring(5, 16) : ''"></span>
+          <span class="log-agent-name" style="color:#818cf8;flex-shrink:0;font-weight:600;font-size:10px;" x-text="entry.agent || ''" x-show="entry.agent"></span>
+          <span style="color:rgba(255,255,255,0.6);word-break:break-all;" x-text="entry.message || ''"></span>
+        </div>
+      </template>
+
+      <div x-show="logs.length === 0 && {{ activity | length }} === 0"
+           style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;">
+        <p style="color:rgba(255,255,255,0.3);font-size:13px;margin:0;">No activity yet.</p>
+        <p style="color:rgba(255,255,255,0.2);font-size:11px;margin:4px 0 0;opacity:0.6;">Start an agent to see real-time logs here.</p>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}

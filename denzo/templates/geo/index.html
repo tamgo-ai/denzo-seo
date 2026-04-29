@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+{% block title %}GEO Monitor — {{ client.name }}{% endblock %}
+
+{% block breadcrumb %}
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+  <a href="/" style="color:rgba(255,255,255,0.4);text-decoration:none;">Overview</a>
+  <span style="color:rgba(255,255,255,0.2)">/</span>
+  <a href="/clients/{{ tenant_id }}/pipeline" style="color:rgba(255,255,255,0.4);text-decoration:none;">{{ client.name }}</a>
+  <span style="color:rgba(255,255,255,0.2)">/</span>
+  <span style="color:rgba(255,255,255,0.87);font-weight:600;">GEO Monitor</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;flex-direction:column;gap:32px;">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;">
+    <div>
+      <h1 style="font-size:15px;font-weight:600;color:rgba(255,255,255,0.87);margin:0 0 4px;">GEO Monitor</h1>
+      <p style="font-size:13px;color:rgba(255,255,255,0.4);margin:0;">Track when AI systems (Perplexity, ChatGPT, Gemini) mention {{ client.name }}</p>
+    </div>
+    <a href="/clients/{{ tenant_id }}/pipeline"
+       style="display:inline-flex;align-items:center;gap:7px;background:#6366f1;border:none;color:white;border-radius:8px;font-weight:600;font-size:13px;padding:10px 20px;text-decoration:none;transition:background 0.15s;"
+       onmouseover="this.style.background='#4f52d9'" onmouseout="this.style.background='#6366f1'">
+      ▶ Run GEO Monitor
+    </a>
+  </div>
+
+  {% set has_data = stats.total_checks and stats.total_checks > 0 %}
+
+  {% if has_data %}
+  <!-- Stats — only show when data exists -->
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;">
+    <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:24px 28px;">
+      <p style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin:0 0 8px;">Queries Monitored</p>
+      <p style="font-size:48px;font-weight:300;letter-spacing:-0.02em;color:#ffffff;line-height:1;margin:0;">{{ queries | selectattr('active', 'equalto', 1) | list | length }}</p>
+      <p style="font-size:12px;color:rgba(255,255,255,0.3);margin:8px 0 0;">{{ queries | length }} total in bank</p>
+    </div>
+    <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:24px 28px;">
+      <p style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin:0 0 8px;">Total Checks</p>
+      <p style="font-size:48px;font-weight:300;letter-spacing:-0.02em;color:#ffffff;line-height:1;margin:0;">{{ stats.total_checks or 0 }}</p>
+      <p style="font-size:12px;color:rgba(255,255,255,0.3);margin:8px 0 0;">{{ stats.engines_checked or 0 }} AI engines</p>
+    </div>
+    <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:24px 28px;">
+      <p style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin:0 0 8px;">Times Cited</p>
+      <p style="font-size:48px;font-weight:300;letter-spacing:-0.02em;color:#4ade80;line-height:1;margin:0;">{{ stats.total_cited or 0 }}</p>
+      <p style="font-size:12px;color:rgba(255,255,255,0.3);margin:8px 0 0;">out of {{ stats.total_checks or 0 }}</p>
+    </div>
+    <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:24px 28px;">
+      <p style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin:0 0 8px;">Citation Rate</p>
+      {% set rate = ((stats.total_cited or 0) / (stats.total_checks or 1) * 100) | round | int %}
+      <p style="font-size:48px;font-weight:300;letter-spacing:-0.02em;line-height:1;margin:0;color:{% if rate >= 50 %}#4ade80{% elif rate >= 25 %}#fb923c{% else %}#f87171{% endif %};">{{ rate }}%</p>
+      <p style="font-size:12px;color:rgba(255,255,255,0.3);margin:8px 0 0;">overall average</p>
+    </div>
+  </div>
+  {% else %}
+  <!-- Zero state hero -->
+  <div style="text-align:center;padding:80px 32px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:16px;">
+    <svg style="width:48px;height:48px;color:rgba(255,255,255,0.2);margin:0 auto 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+    </svg>
+    <h3 style="font-size:18px;font-weight:600;color:rgba(255,255,255,0.87);margin:0 0 8px;">Start monitoring AI citations</h3>
+    <p style="color:rgba(255,255,255,0.4);margin:0 0 24px;font-size:14px;">Run GEO Monitor to discover how AI engines mention {{ client.name }}</p>
+    <a href="/clients/{{ tenant_id }}/pipeline"
+       style="display:inline-flex;align-items:center;gap:7px;background:#6366f1;border:none;color:white;border-radius:8px;font-weight:600;font-size:13px;padding:10px 20px;text-decoration:none;transition:background 0.15s;"
+       onmouseover="this.style.background='#4f52d9'" onmouseout="this.style.background='#6366f1'">
+      Run First Scan
+    </a>
+  </div>
+  {% endif %}
+
+  <!-- Trend chart (last 14 days) — only when data exists -->
+  {% if trend_data %}
+  <div style="background:#111111;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:24px 28px;">
+    <h2 style="font-size:15px;font-weight:600;color:rgba(255,255,255,0.87);margin:0 0 16px;">Citation Rate — Last 14 Days</h2>
+    <div style="display:flex;align-items:flex-end;gap:8px;height:96px;">
+      {% for day in trend_data %}
+      {% set bar_h = [day.rate, 100] | min %}
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;" title="{{ day.day }}: {{ day.rate }}%">
+        <span style="font-size:10px;color:rgba(255,255,255,0.3);">{{ day.rate }}%</span>
+        <div style="width:100%;border-radius:3px 3px 0 0;height:{{ [bar_h, 8] | max }}px;background:{% if day.rate >= 50 %}rgba(74,222,128,0.6){% elif day.rate >= 25 %}rgba(251,146,60,0.6){% else %}rgba(248,113,113,0.6){% endif %};"></div>
+        <span style="font-size:9px;color:rgba(255,255,255,0.3);">{{ day.day[5:] }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Two-column: results + query bank — only when has_data OR queries exist -->
+  {% if has_data or queries %}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+    <!-- Query results -->
+    <div style="background:#111111;border:1px solid rgba(255,255,255,0.06);border-radius:12px;overflow:hidden;">
+      <div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,0.06);">
+        <h2 style="font-size:15px;font-weight:600;color:rgba(255,255,255,0.87);margin:0 0 2px;">Latest Results per Query</h2>
+        <p style="font-size:12px;color:rgba(255,255,255,0.35);margin:0;">Most recent check for each query × engine</p>
+      </div>
+      {% if query_summary %}
+      <div>
+        {% for qs in query_summary %}
+        <div style="padding:12px 24px;border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.15s;"
+             onmouseover="this.style.background='rgba(255,255,255,0.03)'"
+             onmouseout="this.style.background='transparent'">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <p style="font-size:13px;color:rgba(255,255,255,0.87);font-weight:500;margin:0;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ qs.query }}</p>
+            {% if qs.cited_count > 0 %}
+            <span style="font-size:11px;font-weight:600;background:rgba(74,222,128,0.12);color:#4ade80;padding:2px 10px;border-radius:9999px;white-space:nowrap;margin-left:8px;">✓ CITED</span>
+            {% else %}
+            <span style="font-size:11px;font-weight:600;background:rgba(239,68,68,0.12);color:#f87171;padding:2px 10px;border-radius:9999px;white-space:nowrap;margin-left:8px;">✗ NOT CITED</span>
+            {% endif %}
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:4px;">
+            <span style="font-size:12px;color:rgba(255,255,255,0.3);">{{ qs.check_count }} check{{ 's' if qs.check_count != 1 }} · last: {{ qs.last_checked[:10] if qs.last_checked else 'never' }}</span>
+            {% if qs.cited_count > 0 %}
+            <span style="font-size:12px;color:#4ade80;">{{ qs.cited_count }}/{{ qs.check_count }} cited</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="padding:48px 24px;text-align:center;">
+        <p style="font-size:32px;margin-bottom:12px;opacity:0.5;">🤖</p>
+        <p style="font-size:14px;font-weight:500;color:rgba(255,255,255,0.5);margin:0 0 4px;">No results yet</p>
+        <p style="font-size:12px;color:rgba(255,255,255,0.3);margin:0;">Run the GEO Monitor agent to start tracking citations</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Query bank management -->
+    <div style="background:#111111;border:1px solid rgba(255,255,255,0.06);border-radius:12px;overflow:hidden;">
+      <div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <h2 style="font-size:15px;font-weight:600;color:rgba(255,255,255,0.87);margin:0 0 2px;">Query Bank</h2>
+          <p style="font-size:12px;color:rgba(255,255,255,0.35);margin:0;">Queries sent to AI engines daily</p>
+        </div>
+        <span style="font-size:12px;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);padding:2px 10px;border-radius:9999px;">{{ queries | selectattr('active', 'equalto', 1) | list | length }} active</span>
+      </div>
+
+      <!-- Add query form -->
+      <form action="/clients/{{ tenant_id }}/geo/queries/add" method="POST"
+            style="padding:12px 24px;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;gap:8px;">
+        <input type="text" name="query" placeholder="Add a custom query…"
+               style="flex:1;font-size:13px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0 12px;color:rgba(255,255,255,0.7);font-family:inherit;height:38px;outline:none;"
+               onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='rgba(255,255,255,0.08)'">
+        <select name="category"
+                style="font-size:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0 10px;color:rgba(255,255,255,0.7);font-family:inherit;height:38px;outline:none;">
+          <option value="service" style="background:#1a1a1a;">Service</option>
+          <option value="branded" style="background:#1a1a1a;">Branded</option>
+          <option value="location" style="background:#1a1a1a;">Location</option>
+          <option value="problem" style="background:#1a1a1a;">Problem</option>
+          <option value="comparison" style="background:#1a1a1a;">Comparison</option>
+          <option value="certification" style="background:#1a1a1a;">Certification</option>
+        </select>
+        <button type="submit"
+                style="background:#6366f1;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;padding:0 14px;height:38px;cursor:pointer;transition:background 0.15s;"
+                onmouseover="this.style.background='#4f52d9'" onmouseout="this.style.background='#6366f1'">+</button>
+      </form>
+
+      <!-- Query list -->
+      <div style="max-height:384px;overflow-y:auto;">
+        {% if queries %}
+          {% for q in queries %}
+          <div style="padding:10px 24px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,0.04);{% if not q.active %}opacity:0.4;{% endif %}">
+            <span style="font-size:11px;padding:2px 8px;border-radius:4px;font-weight:500;white-space:nowrap;flex-shrink:0;
+              {% if q.category == 'branded' %}background:rgba(96,165,250,0.12);color:#60a5fa;
+              {% elif q.category == 'service' %}background:rgba(251,146,60,0.12);color:#fb923c;
+              {% elif q.category == 'location' %}background:rgba(167,139,250,0.12);color:#c4b5fd;
+              {% elif q.category == 'problem' %}background:rgba(248,113,113,0.12);color:#f87171;
+              {% elif q.category == 'comparison' %}background:rgba(250,204,21,0.12);color:#fbbf24;
+              {% elif q.category == 'certification' %}background:rgba(74,222,128,0.12);color:#4ade80;
+              {% else %}background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);{% endif %}">
+              {{ q.category[:4] }}
+            </span>
+            <p style="font-size:13px;color:rgba(255,255,255,0.7);flex:1;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ q.query }}</p>
+            <div style="display:flex;gap:6px;flex-shrink:0;">
+              <form action="/clients/{{ tenant_id }}/geo/queries/{{ q.id }}/toggle" method="POST">
+                <button type="submit"
+                        style="font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid;cursor:pointer;font-family:inherit;transition:all 0.15s;
+                          {% if q.active %}background:transparent;border-color:rgba(255,255,255,0.1);color:rgba(255,255,255,0.4);
+                          {% else %}background:rgba(74,222,128,0.08);border-color:rgba(74,222,128,0.2);color:#4ade80;{% endif %}">
+                  {{ '⏸' if q.active else '▶' }}
+                </button>
+              </form>
+              <form action="/clients/{{ tenant_id }}/geo/queries/{{ q.id }}/delete" method="POST"
+                    onsubmit="return confirm('Delete this query?')">
+                <button type="submit"
+                        style="font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid rgba(239,68,68,0.2);background:transparent;color:#f87171;cursor:pointer;font-family:inherit;transition:background 0.15s;"
+                        onmouseover="this.style.background='rgba(239,68,68,0.08)'" onmouseout="this.style.background='transparent'">✕</button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+        <div style="padding:40px 24px;text-align:center;">
+          <p style="font-size:13px;color:rgba(255,255,255,0.4);margin:0 0 4px;">No queries yet.</p>
+          <p style="font-size:12px;color:rgba(255,255,255,0.25);margin:0;">Run GEO Monitor once to auto-generate a query bank.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+  {% endif %}
+
+  <!-- AI Engine configuration — simplified, no API key fields -->
+  <div style="background:#111111;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:24px 28px;">
+    <h2 style="font-size:15px;font-weight:600;color:rgba(255,255,255,0.87);margin:0 0 4px;">AI Engines</h2>
+    <p style="font-size:13px;color:rgba(255,255,255,0.4);margin:0 0 20px;">
+      API keys are managed in <a href="/clients/{{ tenant_id }}/edit" style="color:#818cf8;text-decoration:none;" onmouseover="this.style.color='#a5b4fc'" onmouseout="this.style.color='#818cf8'">Settings</a>. Claude runs automatically.
+    </p>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;">
+
+      <!-- Perplexity -->
+      <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:16px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <div style="width:28px;height:28px;background:#000;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <span style="font-size:12px;font-weight:700;color:#fff;">P</span>
+          </div>
+          <p style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.87);margin:0;">Perplexity</p>
+          <span style="font-size:10px;color:#fbbf24;font-weight:700;margin-left:auto;">★#1</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.2);flex-shrink:0;"></span>
+          <span style="font-size:11px;color:rgba(255,255,255,0.35);">Not configured</span>
+        </div>
+        <a href="/clients/{{ tenant_id }}/edit" style="font-size:11px;color:#818cf8;text-decoration:none;display:block;margin-top:6px;" onmouseover="this.style.color='#a5b4fc'" onmouseout="this.style.color='#818cf8'">Configure in Settings →</a>
+      </div>
+
+      <!-- ChatGPT -->
+      <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:16px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <div style="width:28px;height:28px;background:#10a37f;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <span style="font-size:12px;font-weight:700;color:#fff;">G</span>
+          </div>
+          <p style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.87);margin:0;">ChatGPT</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.2);flex-shrink:0;"></span>
+          <span style="font-size:11px;color:rgba(255,255,255,0.35);">Not configured</span>
+        </div>
+        <a href="/clients/{{ tenant_id }}/edit" style="font-size:11px;color:#818cf8;text-decoration:none;display:block;margin-top:6px;" onmouseover="this.style.color='#a5b4fc'" onmouseout="this.style.color='#818cf8'">Configure in Settings →</a>
+      </div>
+
+      <!-- Gemini -->
+      <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:16px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <div style="width:28px;height:28px;background:#4285f4;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <span style="font-size:10px;font-weight:700;color:#fff;">Ge</span>
+          </div>
+          <p style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.87);margin:0;">Gemini</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.2);flex-shrink:0;"></span>
+          <span style="font-size:11px;color:rgba(255,255,255,0.35);">Not configured</span>
+        </div>
+        <a href="/clients/{{ tenant_id }}/edit" style="font-size:11px;color:#818cf8;text-decoration:none;display:block;margin-top:6px;" onmouseover="this.style.color='#a5b4fc'" onmouseout="this.style.color='#818cf8'">Configure in Settings →</a>
+      </div>
+
+      <!-- Bing/Copilot -->
+      <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:16px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <div style="width:28px;height:28px;background:#0078d4;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <span style="font-size:12px;font-weight:700;color:#fff;">B</span>
+          </div>
+          <p style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.87);margin:0;">Copilot</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.2);flex-shrink:0;"></span>
+          <span style="font-size:11px;color:rgba(255,255,255,0.35);">Not configured</span>
+        </div>
+        <a href="/clients/{{ tenant_id }}/edit" style="font-size:11px;color:#818cf8;text-decoration:none;display:block;margin-top:6px;" onmouseover="this.style.color='#a5b4fc'" onmouseout="this.style.color='#818cf8'">Configure in Settings →</a>
+      </div>
+
+      <!-- Claude — auto connected -->
+      <div style="background:rgba(74,222,128,0.05);border:1px solid rgba(74,222,128,0.15);border-radius:10px;padding:16px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <div style="width:28px;height:28px;background:#f97316;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <span style="font-size:12px;font-weight:700;color:#fff;">C</span>
+          </div>
+          <p style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.87);margin:0;">Claude</p>
+          <span style="font-size:10px;font-weight:700;color:#4ade80;margin-left:auto;">✓ Auto</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="width:6px;height:6px;border-radius:50%;background:#4ade80;flex-shrink:0;"></span>
+          <span style="font-size:11px;color:rgba(74,222,128,0.7);">Connected</span>
+        </div>
+        <p style="font-size:11px;color:rgba(255,255,255,0.3);margin:6px 0 0;">Uses ANTHROPIC_API_KEY</p>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}

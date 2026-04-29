@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% if step == 1 %}Your Business Profile{% elif step == 2 %}Your Services{% elif step == 3 %}Your Competitors{% elif step == 4 %}Keywords & First Articles{% else %}Create Account{% endif %} — DENZO SEO</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #080808; color: #e5e7eb; min-height: 100vh; }
+    a { text-decoration: none; }
+
+    /* Grid */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; pointer-events: none;
+      background-image: linear-gradient(rgba(99,102,241,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,.03) 1px,transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    .page-wrap {
+      position: relative; z-index: 1;
+      max-width: 680px; margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    /* ── Progress stepper ──────────────────────────────────────── */
+    .stepper {
+      display: flex; align-items: center; justify-content: center;
+      gap: 0; margin-bottom: 44px;
+    }
+    .step-dot {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      position: relative;
+    }
+    .step-dot .circle {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700;
+      border: 2px solid #2a2a2a;
+      background: #111; color: #4b5563;
+      transition: all .3s;
+    }
+    .step-dot.done .circle {
+      background: rgba(34,197,94,.15); border-color: #22c55e; color: #22c55e;
+    }
+    .step-dot.active .circle {
+      background: rgba(99,102,241,.2); border-color: #6366f1; color: #818cf8;
+      box-shadow: 0 0 16px rgba(99,102,241,.4);
+    }
+    .step-dot .label {
+      font-size: 10px; font-weight: 600; color: #4b5563;
+      text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+    }
+    .step-dot.active .label { color: #818cf8; }
+    .step-dot.done  .label { color: #22c55e; }
+    .step-connector {
+      width: 48px; height: 2px; background: #2a2a2a;
+      margin: 0 4px; margin-bottom: 22px; flex-shrink: 0;
+      transition: background .3s;
+    }
+    .step-connector.done { background: #22c55e; }
+
+    /* ── Cards ──────────────────────────────────────────────────── */
+    .card {
+      background: #111; border: 1px solid #222; border-radius: 16px;
+      padding: 28px; margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 22px; font-weight: 800; color: #fff;
+      letter-spacing: -.02em; margin-bottom: 6px;
+    }
+    .card-sub {
+      font-size: 14px; color: #6b7280; margin-bottom: 24px; line-height: 1.5;
+    }
+
+    /* ── Form elements ──────────────────────────────────────────── */
+    label { display: block; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 7px; }
+    input[type="text"], input[type="email"], input[type="password"], textarea, select {
+      width: 100%; background: #0d0d0d; border: 1px solid #2a2a2a;
+      color: #e5e7eb; border-radius: 10px; padding: 11px 14px;
+      font-size: 14px; font-family: inherit; outline: none;
+      transition: border-color .2s;
+    }
+    input:focus, textarea:focus, select:focus { border-color: #6366f1; }
+    input::placeholder, textarea::placeholder { color: #374151; }
+    textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
+    select option { background: #111; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* ── Service tags ──────────────────────────────────────────── */
+    .tag-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.3);
+      color: #86efac; border-radius: 100px; padding: 5px 12px;
+      font-size: 13px; font-weight: 500; cursor: default;
+    }
+    .tag.dont {
+      background: rgba(239,68,68,.1); border-color: rgba(239,68,68,.3); color: #fca5a5;
+    }
+    .tag-x {
+      cursor: pointer; font-size: 16px; line-height: 1; opacity: .6;
+      transition: opacity .2s;
+    }
+    .tag-x:hover { opacity: 1; }
+    .tag-add {
+      background: rgba(99,102,241,.1); border: 1px dashed rgba(99,102,241,.4);
+      color: #818cf8; cursor: pointer; transition: all .2s;
+    }
+    .tag-add:hover { background: rgba(99,102,241,.2); }
+
+    /* ── Competitor cards ──────────────────────────────────────── */
+    .comp-item {
+      display: flex; align-items: center; gap: 12px;
+      background: #0d0d0d; border: 1px solid #222; border-radius: 10px;
+      padding: 12px 14px; margin-bottom: 8px;
+    }
+    .comp-favicon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: #1a1a1a; display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: #6b7280; flex-shrink: 0;
+    }
+    .comp-remove {
+      margin-left: auto; background: rgba(239,68,68,.15); border: none;
+      color: #f87171; border-radius: 6px; padding: 4px 10px; font-size: 12px;
+      cursor: pointer; transition: background .2s; font-family: inherit;
+    }
+    .comp-remove:hover { background: rgba(239,68,68,.3); }
+
+    /* ── Keyword chips ──────────────────────────────────────────── */
+    .kw-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.3);
+      color: #a5b4fc; border-radius: 100px; padding: 6px 14px;
+      font-size: 13px; font-weight: 500;
+    }
+
+    /* ── Article titles ─────────────────────────────────────────── */
+    .article-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      background: #0d0d0d; border: 1px solid #1e1e1e; border-radius: 10px;
+      padding: 12px 14px; margin-bottom: 8px;
+    }
+    .article-icon {
+      width: 28px; height: 28px; background: rgba(99,102,241,.15);
+      border-radius: 7px; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 2px;
+    }
+    .article-title-input {
+      flex: 1; background: transparent; border: none; color: #e5e7eb;
+      font-size: 14px; font-family: inherit; outline: none; line-height: 1.4;
+    }
+    .article-title-input:focus { color: #fff; }
+
+    /* ── SEO score ──────────────────────────────────────────────── */
+    .score-ring {
+      position: relative; width: 80px; height: 80px; flex-shrink: 0;
+    }
+    .score-ring svg { transform: rotate(-90deg); }
+    .score-num {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    .score-num span:first-child {
+      font-size: 20px; font-weight: 900; line-height: 1;
+    }
+    .score-num span:last-child { font-size: 10px; color: #6b7280; }
+
+    /* ── Issue pills ──────────────────────────────────────────────── */
+    .issue-pill {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; border-radius: 8px; font-size: 13px;
+      margin-bottom: 6px;
+    }
+    .issue-pill.critical { background: rgba(239,68,68,.1); color: #fca5a5; border: 1px solid rgba(239,68,68,.2); }
+    .issue-pill.warning  { background: rgba(251,191,36,.08); color: #fde68a; border: 1px solid rgba(251,191,36,.2); }
+
+    /* ── Google mockup ──────────────────────────────────────────── */
+    .google-mockup {
+      background: #0d0d0d; border: 1px solid #222; border-radius: 12px;
+      padding: 20px; margin-bottom: 20px; text-align: center;
+    }
+    .google-bar {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: #fff; border-radius: 100px; padding: 8px 20px;
+      font-size: 14px; color: #111; font-weight: 500; margin-bottom: 12px;
+    }
+    .google-result {
+      text-align: left; background: #fff; border-radius: 8px; padding: 10px 14px;
+      font-size: 13px; color: #111;
+    }
+    .google-result .gr-url { color: #137333; font-size: 12px; margin-bottom: 2px; }
+    .google-result .gr-title { color: #1a0dab; font-size: 16px; font-weight: 600; margin-bottom: 3px; }
+    .google-result .gr-desc { color: #545454; font-size: 13px; line-height: 1.4; }
+    .google-you { display: inline-block; background: rgba(34,197,94,.15); color: #4ade80; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 100px; margin-top: 10px; }
+
+    /* ── Buttons ──────────────────────────────────────────────────── */
+    .btn-primary {
+      display: inline-flex; align-items: center; gap-8px;
+      background: linear-gradient(135deg,#6366f1,#4f46e5);
+      color: #fff; font-weight: 700; font-size: 15px;
+      border: none; border-radius: 12px; padding: 14px 28px;
+      cursor: pointer; font-family: inherit;
+      transition: all .2s; width: 100%;
+      justify-content: center;
+    }
+    .btn-primary:hover { background: linear-gradient(135deg,#818cf8,#6366f1); transform: translateY(-1px); box-shadow: 0 0 24px rgba(99,102,241,.4); }
+    .btn-back {
+      background: transparent; border: 1px solid #2a2a2a; color: #6b7280;
+      border-radius: 12px; padding: 12px 20px; font-size: 14px;
+      font-family: inherit; cursor: pointer; transition: all .2s;
+    }
+    .btn-back:hover { border-color: #444; color: #9ca3af; }
+    .btn-row { display: flex; gap: 12px; align-items: center; }
+
+    /* ── Password strength ────────────────────────────────────────── */
+    .pw-strength { display: flex; gap: 4px; margin-top: 6px; }
+    .pw-bar { flex: 1; height: 3px; background: #2a2a2a; border-radius: 2px; transition: background .3s; }
+  </style>
+</head>
+<body>
+
+<div class="page-wrap">
+
+  <!-- Logo -->
+  <div style="text-align:center;margin-bottom:32px">
+    <a href="/" style="display:inline-flex;align-items:center;gap:8px">
+      <div style="width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#4f46e5);display:flex;align-items:center;justify-content:center">
+        <svg width="16" height="16" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+      </div>
+      <span style="font-weight:800;font-size:18px;color:#fff">DENZO <span style="background:linear-gradient(135deg,#818cf8,#6366f1,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">SEO</span></span>
+    </a>
+  </div>
+
+  <!-- Stepper -->
+  {% set steps_labels = ['Business', 'Services', 'Competitors', 'Keywords', 'Account'] %}
+  <div class="stepper">
+    {% for i in range(1, 6) %}
+      <div class="step-dot {% if i < step %}done{% elif i == step %}active{% endif %}">
+        <div class="circle">
+          {% if i < step %}✓{% else %}{{ i }}{% endif %}
+        </div>
+        <span class="label">{{ steps_labels[i-1] }}</span>
+      </div>
+      {% if i < 5 %}
+        <div class="step-connector {% if i < step %}done{% endif %}"></div>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       STEP 1: BUSINESS PROFILE
+  ══════════════════════════════════════════════ -->
+  {% if step == 1 %}
+
+  <!-- SEO audit card -->
+  <div class="card" style="display:flex;align-items:flex-start;gap:20px;padding:20px 24px">
+    <!-- Score ring -->
+    {% set pct = score %}
+    {% set color = '#22c55e' if pct >= 70 else ('#eab308' if pct >= 40 else '#ef4444') %}
+    <div class="score-ring">
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="32" fill="none" stroke="#1e1e1e" stroke-width="6"/>
+        <circle cx="40" cy="40" r="32" fill="none" stroke="{{ color }}" stroke-width="6"
+                stroke-dasharray="{{ (pct / 100 * 201.06)|round }},201.06"
+                stroke-linecap="round"/>
+      </svg>
+      <div class="score-num">
+        <span style="color:{{ color }}">{{ score }}</span>
+        <span>/100</span>
+      </div>
+    </div>
+    <div style="flex:1">
+      <p style="font-size:16px;font-weight:700;color:#fff;margin-bottom:4px">SEO Score: {{ score }}/100</p>
+      <p style="font-size:13px;color:#6b7280;margin-bottom:10px">{{ issues|length }} issue{{ 's' if issues|length != 1 else '' }} found on <strong style="color:#9ca3af">{{ analysis.domain }}</strong></p>
+      {% for issue in issues[:6] %}
+      <div class="issue-pill {{ issue.sev }}">
+        <span>{{ '🔴' if issue.sev == 'critical' else '⚠️' }}</span>
+        <span>{{ issue.text }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="card-title">Your Business Profile</p>
+    <p class="card-sub">We auto-detected this from your website. Review and edit anything that's not right.</p>
+
+    <form method="POST" action="/wizard/step/1" id="s1form">
+      <div style="margin-bottom:16px">
+        <label>Business Name</label>
+        <input type="text" name="business_name" value="{{ business_name }}" required placeholder="Your Business Name"/>
+      </div>
+      <div class="form-row" style="margin-bottom:16px">
+        <div>
+          <label>City</label>
+          <input type="text" name="city" value="{{ city }}" placeholder="Los Angeles"/>
+        </div>
+        <div>
+          <label>State</label>
+          <input type="text" name="state" value="{{ state }}" placeholder="CA" maxlength="2"/>
+        </div>
+      </div>
+      <div style="margin-bottom:16px">
+        <label>Industry</label>
+        <select name="industry">
+          {% for val, label in [('general','General Business'),('auto_body','Auto Body / Collision'),('dental','Dental / Healthcare'),('medical_imaging','Medical Imaging / Radiology'),('medical','Medical / Healthcare'),('legal','Legal Services'),('real_estate','Real Estate'),('restaurant','Restaurant / Food'),('ecommerce','E-Commerce'),('saas','SaaS / Software'),('education','Education / Training'),('beauty','Beauty / Salon / Spa')] %}
+          <option value="{{ val }}" {% if industry == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="margin-bottom:24px">
+        <label>Business Description</label>
+        <textarea name="description" rows="4" placeholder="Describe your business, what you do, and who you serve…">{{ description }}</textarea>
+        <p style="font-size:11px;color:#4b5563;margin-top:4px">This will be used to personalize all your AI-generated content.</p>
+      </div>
+      <button type="submit" class="btn-primary">Continue → Step 2: Your Services</button>
+    </form>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       STEP 2: SERVICES
+  ══════════════════════════════════════════════ -->
+  {% elif step == 2 %}
+
+  <div class="card">
+    <p class="card-title">What Do You Sell?</p>
+    <p class="card-sub">We detected these from your website. Drag to prioritize — the top one gets the first article.</p>
+
+    <form method="POST" action="/wizard/step/2" id="s2form">
+
+      <!-- What you sell -->
+      <div style="margin-bottom:24px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <div style="width:20px;height:20px;background:rgba(34,197,94,.2);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px">✓</div>
+          <span style="font-size:13px;font-weight:600;color:#86efac">What You Sell</span>
+          <span style="font-size:10px;color:#4b5563;margin-left:auto">↑ Most important at top</span>
+        </div>
+        <div id="servicesList" style="display:flex;flex-direction:column;gap:6px">
+          {% for svc in services %}
+          <div class="service-row" style="display:flex;align-items:center;gap:10px;background:#0d0d0d;border:1px solid #1e1e1e;border-radius:9px;padding:10px 12px">
+            <span style="color:#374151;cursor:grab;font-size:16px">⠿</span>
+            <input type="text" name="services[]" value="{{ svc }}" style="flex:1;background:transparent;border:none;color:#e5e7eb;font-size:14px;font-family:inherit;outline:none" required/>
+            <button type="button" onclick="this.closest('.service-row').remove()" style="background:none;border:none;color:#374151;cursor:pointer;font-size:18px;line-height:1;padding:0">×</button>
+          </div>
+          {% endfor %}
+        </div>
+        <button type="button" onclick="addService()" style="margin-top:8px;background:rgba(34,197,94,.1);border:1px dashed rgba(34,197,94,.3);color:#86efac;border-radius:9px;padding:8px 16px;font-size:13px;font-family:inherit;cursor:pointer;width:100%">+ Add Service</button>
+      </div>
+
+      <!-- What you DON'T sell -->
+      <div style="margin-bottom:24px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <div style="width:20px;height:20px;background:rgba(239,68,68,.2);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px">✕</div>
+          <span style="font-size:13px;font-weight:600;color:#fca5a5">What You Don't Sell</span>
+          <span style="font-size:11px;color:#6b7280;margin-left:8px">AI will avoid these topics</span>
+        </div>
+        <div id="dontSellList" style="display:flex;flex-direction:column;gap:6px">
+          {% for ds in dont_sell %}
+          <div class="dontsell-row" style="display:flex;align-items:center;gap:10px;background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.15);border-radius:9px;padding:10px 12px">
+            <input type="text" name="dont_sell[]" value="{{ ds }}" style="flex:1;background:transparent;border:none;color:#fca5a5;font-size:14px;font-family:inherit;outline:none"/>
+            <button type="button" onclick="this.closest('.dontsell-row').remove()" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:18px;line-height:1;padding:0">×</button>
+          </div>
+          {% endfor %}
+        </div>
+        <button type="button" onclick="addDontSell()" style="margin-top:8px;background:rgba(239,68,68,.08);border:1px dashed rgba(239,68,68,.3);color:#fca5a5;border-radius:9px;padding:8px 16px;font-size:13px;font-family:inherit;cursor:pointer;width:100%">+ Add Item</button>
+      </div>
+
+      <div class="btn-row">
+        <button type="button" class="btn-back" onclick="history.back()">← Back</button>
+        <button type="submit" class="btn-primary">Continue → Step 3: Competitors</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    function addService() {
+      const row = document.createElement('div');
+      row.className = 'service-row';
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;background:#0d0d0d;border:1px solid #1e1e1e;border-radius:9px;padding:10px 12px';
+      row.innerHTML = '<span style="color:#374151;cursor:grab;font-size:16px">⠿</span><input type="text" name="services[]" style="flex:1;background:transparent;border:none;color:#e5e7eb;font-size:14px;font-family:inherit;outline:none" placeholder="New service…" required/><button type="button" onclick="this.closest(\'.service-row\').remove()" style="background:none;border:none;color:#374151;cursor:pointer;font-size:18px;line-height:1;padding:0">×</button>';
+      document.getElementById('servicesList').appendChild(row);
+      row.querySelector('input').focus();
+    }
+    function addDontSell() {
+      const row = document.createElement('div');
+      row.className = 'dontsell-row';
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.15);border-radius:9px;padding:10px 12px';
+      row.innerHTML = '<input type="text" name="dont_sell[]" style="flex:1;background:transparent;border:none;color:#fca5a5;font-size:14px;font-family:inherit;outline:none" placeholder="Service you don\'t offer…"/><button type="button" onclick="this.closest(\'.dontsell-row\').remove()" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:18px;line-height:1;padding:0">×</button>';
+      document.getElementById('dontSellList').appendChild(row);
+      row.querySelector('input').focus();
+    }
+  </script>
+
+  <!-- ══════════════════════════════════════════════
+       STEP 3: COMPETITORS
+  ══════════════════════════════════════════════ -->
+  {% elif step == 3 %}
+
+  <div class="card">
+    <p class="card-title">Your Competitors</p>
+    <p class="card-sub">We identified these businesses competing for the same customers. Remove any that don't apply, or add others.</p>
+
+    <form method="POST" action="/wizard/step/3" id="s3form">
+      <div id="compList" style="margin-bottom:16px">
+        {% for comp in competitors %}
+        <div class="comp-item" id="comp-{{ loop.index }}">
+          <div class="comp-favicon">{{ comp[0].upper() }}</div>
+          <div style="flex:1">
+            <input type="text" name="competitors[]" value="{{ comp }}" style="background:transparent;border:none;color:#e5e7eb;font-size:14px;font-family:inherit;outline:none;width:100%"/>
+          </div>
+          <button type="button" class="comp-remove" onclick="this.closest('.comp-item').remove()">Remove</button>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Add competitor -->
+      <div style="display:flex;gap:8px;margin-bottom:24px">
+        <input type="text" id="newComp" placeholder="competitor.com" style="flex:1"/>
+        <button type="button" onclick="addComp()"
+          style="background:linear-gradient(135deg,#a855f7,#6366f1);color:#fff;border:none;border-radius:10px;padding:0 20px;font-size:14px;font-family:inherit;cursor:pointer;font-weight:600">
+          Add
+        </button>
+      </div>
+
+      <div class="btn-row">
+        <button type="button" class="btn-back" onclick="history.back()">← Back</button>
+        <button type="submit" class="btn-primary">Continue → Step 4: Keywords</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    function addComp() {
+      const val = document.getElementById('newComp').value.trim();
+      if (!val) return;
+      const item = document.createElement('div');
+      item.className = 'comp-item';
+      item.innerHTML = `<div class="comp-favicon">${val[0].toUpperCase()}</div><div style="flex:1"><input type="text" name="competitors[]" value="${val}" style="background:transparent;border:none;color:#e5e7eb;font-size:14px;font-family:inherit;outline:none;width:100%"/></div><button type="button" class="comp-remove" onclick="this.closest('.comp-item').remove()">Remove</button>`;
+      document.getElementById('compList').appendChild(item);
+      document.getElementById('newComp').value = '';
+    }
+  </script>
+
+  <!-- ══════════════════════════════════════════════
+       STEP 4: KEYWORDS + FIRST ARTICLES
+  ══════════════════════════════════════════════ -->
+  {% elif step == 4 %}
+
+  <!-- Google mockup -->
+  <div class="google-mockup">
+    <div class="google-bar">
+      <svg width="14" height="14" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" fill="none" stroke="#666" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="#666" stroke-width="2" stroke-linecap="round"/></svg>
+      {{ keywords[0] if keywords else 'your service near me' }}
+    </div>
+    <div class="google-result">
+      <div class="gr-url">{{ analysis.domain }} › blog</div>
+      <div class="gr-title">{{ titles[0][:60] if titles else 'Your First Article' }}</div>
+      <div class="gr-desc">{{ description[:120] + '…' if description|length > 120 else (description or 'Your expert guide to this topic, optimized for local search.') }}</div>
+    </div>
+    <div class="google-you">✓ Your article could appear right here</div>
+  </div>
+
+  <div class="card">
+    <p class="card-title">Your Best Keywords</p>
+    <p class="card-sub">Based on your business and location. Remove any that don't fit.</p>
+
+    <form method="POST" action="/wizard/step/4" id="s4form">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:28px" id="kwList">
+        {% for kw in keywords %}
+        <span class="kw-chip" id="kw-{{ loop.index }}">
+          <span>🎯</span>
+          <span>{{ kw }}</span>
+          <input type="hidden" name="keywords[]" value="{{ kw }}" id="kw-input-{{ loop.index }}"/>
+          <span onclick="removeKw({{ loop.index }})" style="cursor:pointer;opacity:.5;font-size:16px;line-height:1;transition:opacity .2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.5">×</span>
+        </span>
+        {% endfor %}
+      </div>
+
+      <div style="border-top:1px solid #1e1e1e;padding-top:24px;margin-bottom:4px">
+        <p style="font-size:16px;font-weight:700;color:#fff;margin-bottom:4px">Your First 5 Articles</p>
+        <p style="font-size:13px;color:#6b7280;margin-bottom:16px">Click a title to edit it. Remove any you don't want.</p>
+      </div>
+
+      <div id="titlesList">
+        {% for title in titles %}
+        <div class="article-item" id="art-{{ loop.index }}">
+          <div class="article-icon">
+            <svg width="14" height="14" fill="none" stroke="#818cf8" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          </div>
+          <input class="article-title-input" type="text" name="titles[]" value="{{ title }}" required/>
+          <button type="button" onclick="removeArt({{ loop.index }})" style="background:none;border:none;color:#374151;cursor:pointer;font-size:18px;line-height:1;padding:0 0 0 8px;transition:color .2s" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#374151'">🗑</button>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="btn-row" style="margin-top:24px">
+        <button type="button" class="btn-back" onclick="history.back()">← Back</button>
+        <button type="submit" class="btn-primary">Continue → Create Account</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    function removeKw(i) { document.getElementById('kw-'+i).remove(); }
+    function removeArt(i) { document.getElementById('art-'+i).remove(); }
+  </script>
+
+  <!-- ══════════════════════════════════════════════
+       STEP 5: CREATE ACCOUNT
+  ══════════════════════════════════════════════ -->
+  {% else %}
+
+  <!-- Summary of what they built -->
+  <div class="card" style="padding:20px 24px">
+    <p style="font-size:13px;font-weight:600;color:#6b7280;margin-bottom:12px">YOUR SEO PLAN IS READY</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      {% for label, value in [('Keywords', keywords|length), ('First Articles', titles|length), ('Competitors tracked', competitors|length), ('Services', services|length)] %}
+      <div style="background:#0d0d0d;border:1px solid #1e1e1e;border-radius:9px;padding:10px 14px">
+        <p style="font-size:22px;font-weight:900;color:#818cf8">{{ value }}</p>
+        <p style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.04em">{{ label }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="card-title">Almost Done!</p>
+    <p class="card-sub">Create your free account to access your SEO dashboard. No credit card required now.</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+      <div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:16px">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="POST" action="/wizard/complete">
+      <div style="margin-bottom:16px">
+        <label>Email Address</label>
+        <input type="email" name="email" required placeholder="you@company.com" autocomplete="email"/>
+      </div>
+      <div style="margin-bottom:24px">
+        <label>Password</label>
+        <input type="password" name="password" id="pwInput" required placeholder="At least 8 characters"
+               oninput="updateStrength(this.value)" autocomplete="new-password"/>
+        <div class="pw-strength" style="margin-top:6px">
+          <div class="pw-bar" id="pb1"></div>
+          <div class="pw-bar" id="pb2"></div>
+          <div class="pw-bar" id="pb3"></div>
+          <div class="pw-bar" id="pb4"></div>
+        </div>
+      </div>
+
+      <!-- What they get -->
+      <div style="background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);border-radius:10px;padding:14px 16px;margin-bottom:20px">
+        <p style="font-size:12px;font-weight:600;color:#818cf8;margin-bottom:8px">FREE ACCOUNT INCLUDES:</p>
+        {% for f in ['Full SEO dashboard for ' + analysis.domain, 'Your ' + (titles|length)|string + '-article content plan', 'Competitor & keyword tracking', 'Start the $1 trial to activate AI agents'] %}
+        <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#9ca3af;margin-bottom:4px">
+          <span style="color:#6366f1">✓</span> {{ f }}
+        </div>
+        {% endfor %}
+      </div>
+
+      <button type="submit" class="btn-primary" style="margin-bottom:12px">
+        Create My Account & See My Dashboard →
+      </button>
+
+      <div class="btn-row" style="justify-content:center">
+        <button type="button" class="btn-back" onclick="history.back()">← Back</button>
+        <p style="font-size:12px;color:#4b5563">Already have an account? <a href="/login" style="color:#818cf8">Sign in</a></p>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    function updateStrength(val) {
+      const bars = ['pb1','pb2','pb3','pb4'];
+      const colors = ['#ef4444','#f97316','#eab308','#22c55e'];
+      let score = 0;
+      if (val.length >= 8) score++;
+      if (/[A-Z]/.test(val)) score++;
+      if (/[0-9]/.test(val)) score++;
+      if (/[^A-Za-z0-9]/.test(val)) score++;
+      bars.forEach((id, i) => {
+        document.getElementById(id).style.background = i < score ? colors[score-1] : '#2a2a2a';
+      });
+    }
+  </script>
+  {% endif %}
+
+</div>
+</body>
+</html>

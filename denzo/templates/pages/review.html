@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}Review: {{ page.title }} — Denzo SEO{% endblock %}
+{% block page_title %}Article Review{% endblock %}
+
+{% block content %}
+<div style="margin: -28px; display: flex; flex-direction: column; height: calc(100vh - 44px);">
+
+  <!-- ── Top bar ─────────────────────────────────────────────────────── -->
+  <div style="background:#111; border-bottom:1px solid rgba(255,255,255,0.07); padding:12px 24px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
+    <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+      <a href="{{ url_for('pages.index', tenant_id=tenant_id) }}"
+         style="color:rgba(255,255,255,0.35); text-decoration:none; font-size:13px; flex-shrink:0; transition:color .15s;"
+         onmouseover="this.style.color='rgba(255,255,255,0.7)'" onmouseout="this.style.color='rgba(255,255,255,0.35)'">
+        ← Pages
+      </a>
+      <span style="color:rgba(255,255,255,0.15);">/</span>
+      <span style="font-size:14px; font-weight:600; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+        {{ page.title or 'Untitled' }}
+      </span>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
+      {% set sc = {'draft':'#f59e0b','pending':'#60a5fa','ready':'#34d399','published':'#10b981'} %}
+      <span style="font-size:11px; font-weight:700; letter-spacing:.05em; padding:3px 10px; border-radius:20px; background:rgba(255,255,255,0.07); color:{{ sc.get(page.status, '#888') }};">
+        {{ (page.status or 'draft').upper().replace('_',' ') }}
+      </span>
+      {% if page.quality_score %}
+      <span style="font-size:13px; font-weight:700; color:{% if page.quality_score >= 80 %}#4ade80{% elif page.quality_score >= 60 %}#f59e0b{% else %}#f87171{% endif %};">
+        {{ page.quality_score }}/100
+      </span>
+      {% endif %}
+      <a href="{{ url_for('pages.preview', tenant_id=tenant_id, page_id=page.id) }}" target="_blank"
+         style="font-size:12px; color:rgba(255,255,255,0.4); text-decoration:none; border:1px solid rgba(255,255,255,0.12); padding:5px 12px; border-radius:6px; transition:all .15s;"
+         onmouseover="this.style.color='#fff';this.style.borderColor='rgba(255,255,255,0.3)'" onmouseout="this.style.color='rgba(255,255,255,0.4)';this.style.borderColor='rgba(255,255,255,0.12)'">
+        Open in new tab ↗
+      </a>
+    </div>
+  </div>
+
+  <!-- ── Body ──────────────────────────────────────────────────────────── -->
+  <div style="display:flex; flex:1; overflow:hidden;">
+
+    <!-- LEFT: iframe showing the EXACT same preview ─────────────────── -->
+    <div style="flex:1; overflow:hidden; background:#0d0d0d;">
+      {% if page.content %}
+      <iframe
+        src="{{ url_for('pages.preview', tenant_id=tenant_id, page_id=page.id) }}"
+        style="width:100%; height:100%; border:none; display:block;"
+        title="Page Preview">
+      </iframe>
+      {% else %}
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:rgba(255,255,255,0.3); text-align:center; gap:12px;">
+        <svg style="width:48px;height:48px;opacity:.3;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        <p style="font-size:14px;">No content yet — use Regenerate to create the article.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- RIGHT: Actions panel ─────────────────────────────────────────── -->
+    <div style="width:300px; flex-shrink:0; background:#111; border-left:1px solid rgba(255,255,255,0.07); display:flex; flex-direction:column; overflow-y:auto;"
+         x-data="{showChanges:false, showRegen:false}">
+
+      <div style="padding:20px;">
+
+        <p style="font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,0.25); margin:0 0 16px;">Review Actions</p>
+
+        <!-- APPROVE -->
+        <form method="POST" action="{{ url_for('pages.approve_page', tenant_id=tenant_id, page_id=page.id) }}" style="margin-bottom:10px;">
+          <button type="submit"
+                  style="width:100%; display:flex; align-items:center; gap:12px; padding:14px 16px; background:#16a34a; border:none; border-radius:10px; cursor:pointer; transition:background .15s;"
+                  onmouseover="this.style.background='#15803d'" onmouseout="this.style.background='#16a34a'">
+            <svg style="width:20px;height:20px;color:#fff;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+            </svg>
+            <div style="text-align:left;">
+              <p style="font-size:14px; font-weight:700; color:#fff; margin:0 0 2px;">Approve</p>
+              <p style="font-size:11px; color:rgba(255,255,255,0.65); margin:0;">Mark as ready to publish</p>
+            </div>
+          </button>
+        </form>
+
+        <!-- REQUEST CHANGES -->
+        <div style="border:1px solid rgba(255,255,255,0.08); border-radius:10px; overflow:hidden; margin-bottom:10px;">
+          <button type="button" @click="showChanges=!showChanges; showRegen=false"
+                  style="width:100%; display:flex; align-items:center; gap:12px; padding:14px 16px; background:rgba(245,158,11,0.1); border:none; cursor:pointer; transition:background .15s;"
+                  onmouseover="this.style.background='rgba(245,158,11,0.18)'" onmouseout="this.style.background='rgba(245,158,11,0.1)'">
+            <svg style="width:20px;height:20px;color:#f59e0b;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+            <div style="text-align:left; flex:1;">
+              <p style="font-size:14px; font-weight:700; color:#f59e0b; margin:0 0 2px;">Request Changes</p>
+              <p style="font-size:11px; color:rgba(255,255,255,0.4); margin:0;">Return to draft with notes</p>
+            </div>
+            <svg style="width:14px;height:14px;color:rgba(255,255,255,0.3);transition:transform .2s;" :style="showChanges?'transform:rotate(180deg)':''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          <div x-show="showChanges" x-cloak style="padding:14px 16px; border-top:1px solid rgba(255,255,255,0.06); background:#0d0d0d;">
+            <form method="POST" action="{{ url_for('pages.request_changes', tenant_id=tenant_id, page_id=page.id) }}">
+              <textarea name="note" rows="4" placeholder="What needs to change? Be specific — agents will read this…"
+                        style="width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px; font-size:13px; color:#fff; resize:vertical; margin-bottom:10px; font-family:inherit; box-sizing:border-box; outline:none;"
+                        onfocus="this.style.borderColor='rgba(245,158,11,0.5)'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'"></textarea>
+              <button type="submit"
+                      style="width:100%; padding:10px; background:#d97706; border:none; border-radius:8px; color:#fff; font-size:13px; font-weight:700; cursor:pointer; transition:background .15s;"
+                      onmouseover="this.style.background='#b45309'" onmouseout="this.style.background='#d97706'">Send Back to Draft</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- REGENERATE -->
+        <div style="border:1px solid rgba(255,255,255,0.08); border-radius:10px; overflow:hidden; margin-bottom:24px;">
+          <button type="button" @click="showRegen=!showRegen; showChanges=false"
+                  style="width:100%; display:flex; align-items:center; gap:12px; padding:14px 16px; background:rgba(139,92,246,0.1); border:none; cursor:pointer; transition:background .15s;"
+                  onmouseover="this.style.background='rgba(139,92,246,0.18)'" onmouseout="this.style.background='rgba(139,92,246,0.1)'">
+            <svg style="width:20px;height:20px;color:#a78bfa;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <div style="text-align:left; flex:1;">
+              <p style="font-size:14px; font-weight:700; color:#a78bfa; margin:0 0 2px;">Regenerate</p>
+              <p style="font-size:11px; color:rgba(255,255,255,0.4); margin:0;">Create a completely new version</p>
+            </div>
+            <svg style="width:14px;height:14px;color:rgba(255,255,255,0.3);transition:transform .2s;" :style="showRegen?'transform:rotate(180deg)':''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          <div x-show="showRegen" x-cloak style="padding:14px 16px; border-top:1px solid rgba(255,255,255,0.06); background:#0d0d0d;">
+            <form method="POST" action="{{ url_for('pages.regenerate_page', tenant_id=tenant_id, page_id=page.id) }}">
+              <textarea name="note" rows="3" placeholder="Any guidance for the new version? (optional)"
+                        style="width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px; font-size:13px; color:#fff; resize:vertical; margin-bottom:8px; font-family:inherit; box-sizing:border-box; outline:none;"
+                        onfocus="this.style.borderColor='rgba(139,92,246,0.5)'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'"></textarea>
+              <div style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.15); border-radius:6px; padding:10px 12px; margin-bottom:10px;">
+                <p style="font-size:11px; color:#f87171; margin:0;">⚠️ Current content will be erased and a new article generated from scratch.</p>
+              </div>
+              <button type="submit"
+                      style="width:100%; padding:10px; background:#7c3aed; border:none; border-radius:8px; color:#fff; font-size:13px; font-weight:700; cursor:pointer; transition:background .15s;"
+                      onmouseover="this.style.background='#6d28d9'" onmouseout="this.style.background='#7c3aed'">Regenerate Article</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Divider -->
+        <div style="border-top:1px solid rgba(255,255,255,0.07); margin-bottom:20px;"></div>
+
+        <!-- Page details -->
+        <p style="font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,0.25); margin:0 0 12px;">Page Details</p>
+        <div style="display:flex; flex-direction:column; gap:9px;">
+          {% for label, val in [
+            ('Type', page.type),
+            ('Location', page.location),
+            ('Keyword', page.target_keyword),
+            ('Slug', '/' ~ page.slug if page.slug else None),
+            ('Quality', (page.quality_score|string ~ '/100') if page.quality_score else None),
+            ('Created', (page.created_at or '')[:10]),
+          ] %}{% if val %}
+          <div style="display:flex; justify-content:space-between; align-items:start; gap:8px;">
+            <span style="font-size:12px; color:rgba(255,255,255,0.3); flex-shrink:0;">{{ label }}</span>
+            <span style="font-size:12px; color:rgba(255,255,255,0.65); text-align:right; word-break:break-all;">{{ val }}</span>
+          </div>
+          {% endif %}{% endfor %}
+          {% if page.meta_title %}
+          <div style="display:flex; flex-direction:column; gap:3px; padding:10px 12px; background:rgba(255,255,255,0.03); border-radius:7px; border:1px solid rgba(255,255,255,0.06);">
+            <span style="font-size:10px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:rgba(255,255,255,0.2);">Meta Title</span>
+            <span style="font-size:12px; color:rgba(255,255,255,0.6); line-height:1.4;">{{ page.meta_title }}</span>
+          </div>
+          {% endif %}
+          {% if page.meta_description %}
+          <div style="display:flex; flex-direction:column; gap:3px; padding:10px 12px; background:rgba(255,255,255,0.03); border-radius:7px; border:1px solid rgba(255,255,255,0.06);">
+            <span style="font-size:10px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:rgba(255,255,255,0.2);">Meta Description</span>
+            <span style="font-size:12px; color:rgba(255,255,255,0.5); line-height:1.5;">{{ page.meta_description }}</span>
+          </div>
+          {% endif %}
+          {% if page.publish_url %}
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <span style="font-size:12px; color:rgba(255,255,255,0.3);">Live URL</span>
+            <a href="{{ page.publish_url }}" target="_blank" style="font-size:12px; color:#f97316; text-decoration:none;">↗ View live</a>
+          </div>
+          {% endif %}
+        </div>
+
+        {% if page.notes %}
+        <div style="margin-top:20px; background:rgba(251,191,36,0.07); border:1px solid rgba(251,191,36,0.15); border-radius:8px; padding:12px 14px;">
+          <p style="font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#fbbf24; margin:0 0 6px;">Editor Notes</p>
+          <pre style="font-family:inherit; font-size:12px; color:rgba(255,255,255,0.5); white-space:pre-wrap; margin:0; line-height:1.5;">{{ page.notes }}</pre>
+        </div>
+        {% endif %}
+
+      </div>
+
+      <!-- Bottom nav -->
+      <div style="margin-top:auto; padding:16px 20px; border-top:1px solid rgba(255,255,255,0.07);">
+        <a href="{{ url_for('pages.index', tenant_id=tenant_id) }}"
+           style="display:flex; align-items:center; justify-content:center; padding:10px; border:1px solid rgba(255,255,255,0.1); border-radius:8px; color:rgba(255,255,255,0.4); text-decoration:none; font-size:13px; transition:all .15s;"
+           onmouseover="this.style.color='rgba(255,255,255,0.7)';this.style.borderColor='rgba(255,255,255,0.2)'" onmouseout="this.style.color='rgba(255,255,255,0.4)';this.style.borderColor='rgba(255,255,255,0.1)'">
+          ← All Pages
+        </a>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

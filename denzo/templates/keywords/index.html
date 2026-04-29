@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}Keywords — {{ client.name }}{% endblock %}
+
+{% block breadcrumb %}
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+  <a href="/" style="color:rgba(255,255,255,0.4);text-decoration:none;">Overview</a>
+  <span style="color:rgba(255,255,255,0.2)">/</span>
+  <a href="/clients/{{ tenant_id }}/pipeline" style="color:rgba(255,255,255,0.4);text-decoration:none;">{{ client.name }}</a>
+  <span style="color:rgba(255,255,255,0.2)">/</span>
+  <span style="color:rgba(255,255,255,0.87);font-weight:600;">Keywords</span>
+</div>
+{% endblock %}
+
+{% block topbar_actions %}
+<a href="/clients/{{ tenant_id }}/pipeline"
+   style="font-size:12px;color:rgba(255,255,255,0.4);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='rgba(255,255,255,0.87)'" onmouseout="this.style.color='rgba(255,255,255,0.4)'">← Pipeline</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Filter bar -->
+<form method="GET" action=""
+      style="background:#111111;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;margin-bottom:20px;">
+  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;">
+    <!-- Search -->
+    <div style="position:relative;flex:1;min-width:200px;">
+      <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:rgba(255,255,255,0.3);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+      </svg>
+      <input type="text" name="q" value="{{ filters.q }}" placeholder="Search keywords…"
+             style="width:100%;padding:9px 12px 9px 36px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:8px;color:rgba(255,255,255,0.7);font-size:13px;font-family:inherit;outline:none;height:40px;"
+             onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='rgba(255,255,255,0.08)'"
+             onchange="this.form.submit()">
+    </div>
+
+    <!-- Category filter -->
+    <select name="category"
+            style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0 12px;color:rgba(255,255,255,0.7);font-size:13px;font-family:inherit;height:40px;outline:none;min-width:140px;"
+            onchange="this.form.submit()">
+      <option value="" style="background:#1a1a1a;">All Categories</option>
+      {% for cat in categories %}
+      <option value="{{ cat }}" {% if filters.category == cat %}selected{% endif %} style="background:#1a1a1a;">{{ cat | title }}</option>
+      {% endfor %}
+    </select>
+
+    <!-- Priority filter -->
+    <select name="priority"
+            style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0 12px;color:rgba(255,255,255,0.7);font-size:13px;font-family:inherit;height:40px;outline:none;min-width:130px;"
+            onchange="this.form.submit()">
+      <option value="" style="background:#1a1a1a;">All Priorities</option>
+      <option value="alta"  {% if filters.priority == 'alta'  %}selected{% endif %} style="background:#1a1a1a;">Alta</option>
+      <option value="media" {% if filters.priority == 'media' %}selected{% endif %} style="background:#1a1a1a;">Media</option>
+      <option value="baja"  {% if filters.priority == 'baja'  %}selected{% endif %} style="background:#1a1a1a;">Baja</option>
+    </select>
+
+    <!-- Location filter -->
+    <input type="text" name="location" value="{{ filters.location }}" placeholder="Filter by location…"
+           style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0 12px;color:rgba(255,255,255,0.7);font-size:13px;font-family:inherit;height:40px;outline:none;min-width:160px;"
+           onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='rgba(255,255,255,0.08)'"
+           onchange="this.form.submit()">
+
+    {% if filters.q or filters.category or filters.priority or filters.location %}
+    <a href="/clients/{{ tenant_id }}/keywords"
+       style="font-size:13px;color:rgba(255,255,255,0.4);text-decoration:none;padding:0 12px;height:40px;display:flex;align-items:center;border-radius:8px;border:1px solid rgba(255,255,255,0.08);transition:color 0.15s;"
+       onmouseover="this.style.color='rgba(255,255,255,0.7)'" onmouseout="this.style.color='rgba(255,255,255,0.4)'">
+      Clear
+    </a>
+    {% endif %}
+  </div>
+</form>
+
+<!-- Results summary -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+  <p style="font-size:13px;color:rgba(255,255,255,0.5);">
+    <span style="font-weight:600;color:rgba(255,255,255,0.87);">{{ total }}</span> keywords
+    {% if filters.q or filters.category or filters.priority or filters.location %}
+    <span style="color:rgba(255,255,255,0.3);">(filtered)</span>
+    {% endif %}
+  </p>
+  <div style="display:flex;align-items:center;gap:12px;">
+    {% if total_pages > 1 %}
+    <p style="font-size:13px;color:rgba(255,255,255,0.4);">Page {{ page }} of {{ total_pages }}</p>
+    {% endif %}
+    <a href="/clients/{{ tenant_id }}/keywords/export.csv?q={{ filters.q }}&category={{ filters.category }}&priority={{ filters.priority }}&location={{ filters.location }}"
+       style="display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);font-size:12px;font-weight:500;padding:6px 12px;border-radius:8px;text-decoration:none;transition:color 0.15s,border-color 0.15s;"
+       onmouseover="this.style.color='rgba(255,255,255,0.87)';this.style.borderColor='rgba(255,255,255,0.2)'"
+       onmouseout="this.style.color='rgba(255,255,255,0.5)';this.style.borderColor='rgba(255,255,255,0.1)'">
+      ↓ Export CSV
+    </a>
+  </div>
+</div>
+
+{% if not keywords %}
+<div style="background:#111111;border:1px solid rgba(255,255,255,0.06);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 32px;text-align:center;">
+  <svg style="width:48px;height:48px;color:rgba(255,255,255,0.15);margin-bottom:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
+  </svg>
+  <p style="color:rgba(255,255,255,0.5);font-size:14px;font-weight:500;">No keywords found</p>
+  <p style="color:rgba(255,255,255,0.3);font-size:12px;margin-top:4px;">Run the Keyword Strategist agent to populate this list.</p>
+</div>
+{% else %}
+
+<div style="background:#111111;border:1px solid rgba(255,255,255,0.06);border-radius:12px;overflow:hidden;">
+  <table style="width:100%;border-collapse:collapse;">
+    <thead>
+      <tr style="background:rgba(255,255,255,0.03);">
+        <th style="text-align:left;padding:10px 20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);border-bottom:1px solid rgba(255,255,255,0.04);">Keyword</th>
+        <th style="text-align:left;padding:10px 20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);border-bottom:1px solid rgba(255,255,255,0.04);">Location</th>
+        <th style="text-align:right;padding:10px 20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);border-bottom:1px solid rgba(255,255,255,0.04);">Volume</th>
+        <th style="text-align:left;padding:10px 20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);border-bottom:1px solid rgba(255,255,255,0.04);">Intent</th>
+        <th style="text-align:left;padding:10px 20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);border-bottom:1px solid rgba(255,255,255,0.04);">Category</th>
+        <th style="text-align:left;padding:10px 20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);border-bottom:1px solid rgba(255,255,255,0.04);">Priority</th>
+        <th style="text-align:left;padding:10px 20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);border-bottom:1px solid rgba(255,255,255,0.04);">Status</th>
+        <th style="text-align:left;padding:10px 20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);border-bottom:1px solid rgba(255,255,255,0.04);">Added</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for kw in keywords %}
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.15s ease;"
+          onmouseover="this.style.background='rgba(255,255,255,0.03)'"
+          onmouseout="this.style.background='transparent'">
+        <td style="padding:12px 20px;">
+          <span style="font-weight:500;color:rgba(255,255,255,0.87);font-size:13px;">{{ kw.keyword }}</span>
+        </td>
+        <td style="padding:12px 20px;color:rgba(255,255,255,0.4);font-size:12px;">{{ kw.location or '—' }}</td>
+        <td style="padding:12px 20px;text-align:right;">
+          {% if kw.volume %}
+          <span style="font-weight:500;color:rgba(255,255,255,0.87);font-size:13px;">{{ kw.volume }}</span>
+          {% else %}
+          <span style="color:rgba(255,255,255,0.15);font-size:13px;" title="Data pending — run Keyword Strategist">—</span>
+          {% endif %}
+        </td>
+        <td style="padding:12px 20px;">
+          {% if kw.intent %}
+          <span style="padding:2px 10px;border-radius:9999px;font-size:12px;font-weight:500;
+            {% if kw.intent == 'transactional' %}background:rgba(74,222,128,0.12);color:#4ade80;
+            {% elif kw.intent == 'informational' %}background:rgba(96,165,250,0.12);color:#60a5fa;
+            {% elif kw.intent == 'navigational' %}background:rgba(167,139,250,0.12);color:#c4b5fd;
+            {% elif kw.intent == 'commercial' %}background:rgba(251,146,60,0.12);color:#fb923c;
+            {% else %}background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);{% endif %}">
+            {{ kw.intent | title }}
+          </span>
+          {% else %}
+          <span style="color:rgba(255,255,255,0.15);font-size:13px;" title="Data pending — run Keyword Strategist">—</span>
+          {% endif %}
+        </td>
+        <td style="padding:12px 20px;color:rgba(255,255,255,0.5);font-size:12px;">{{ kw.category or '—' }}</td>
+        <td style="padding:12px 20px;">
+          {% set prio = kw.priority | lower if kw.priority else 'media' %}
+          <span style="padding:2px 10px;border-radius:9999px;font-size:12px;font-weight:500;
+            {% if prio == 'alta' or prio == 'high' or prio == 'critical' %}background:rgba(251,146,60,0.12);color:#fb923c;
+            {% elif prio == 'media' or prio == 'medium' %}background:rgba(250,204,21,0.12);color:#fbbf24;
+            {% else %}background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);{% endif %}">
+            {{ kw.priority | title if kw.priority else 'Media' }}
+          </span>
+        </td>
+        <td style="padding:12px 20px;">
+          <span style="padding:2px 10px;border-radius:9999px;font-size:12px;font-weight:500;
+            {% if kw.status == 'targeting' %}background:rgba(251,146,60,0.12);color:#fb923c;
+            {% elif kw.status == 'page_created' %}background:rgba(99,102,241,0.12);color:#818cf8;
+            {% elif kw.status == 'published' %}background:rgba(74,222,128,0.12);color:#4ade80;
+            {% else %}background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);{% endif %}">
+            {{ kw.status | replace('_', ' ') | title if kw.status else 'Identified' }}
+          </span>
+        </td>
+        <td style="padding:12px 20px;color:rgba(255,255,255,0.3);font-size:12px;">{{ kw.created_at[:10] if kw.created_at else '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:20px;">
+  {% if page > 1 %}
+  <a href="?page={{ page - 1 }}&q={{ filters.q }}&category={{ filters.category }}&priority={{ filters.priority }}&location={{ filters.location }}"
+     style="display:flex;align-items:center;gap:4px;padding:7px 14px;font-size:13px;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:8px;text-decoration:none;transition:color 0.15s;"
+     onmouseover="this.style.color='rgba(255,255,255,0.87)'" onmouseout="this.style.color='rgba(255,255,255,0.5)'">
+    <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+    </svg>
+    Previous
+  </a>
+  {% endif %}
+
+  {% for p in range([1, page - 2] | max, [total_pages + 1, page + 3] | min) %}
+  <a href="?page={{ p }}&q={{ filters.q }}&category={{ filters.category }}&priority={{ filters.priority }}&location={{ filters.location }}"
+     style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:13px;border-radius:8px;border:1px solid;text-decoration:none;transition:all 0.15s;
+       {% if p == page %}background:#6366f1;border-color:#6366f1;color:#fff;font-weight:600;
+       {% else %}background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.08);color:rgba(255,255,255,0.5);{% endif %}">
+    {{ p }}
+  </a>
+  {% endfor %}
+
+  {% if page < total_pages %}
+  <a href="?page={{ page + 1 }}&q={{ filters.q }}&category={{ filters.category }}&priority={{ filters.priority }}&location={{ filters.location }}"
+     style="display:flex;align-items:center;gap:4px;padding:7px 14px;font-size:13px;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:8px;text-decoration:none;transition:color 0.15s;"
+     onmouseover="this.style.color='rgba(255,255,255,0.87)'" onmouseout="this.style.color='rgba(255,255,255,0.5)'">
+    Next
+    <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+    </svg>
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endif %}
+
+{% endblock %}

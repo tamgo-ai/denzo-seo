@@ -1,0 +1,62 @@
+{% extends "lite/base.html" %}
+{% block title %}GEO — Denzo SEO Lite{% endblock %}
+{% block page_title %}GEO Citations{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+
+  <!-- Citation rate card -->
+  <div class="grid grid-cols-2 gap-4">
+    <div class="lite-card p-5">
+      <p class="text-xs text-gray-400 font-medium">AI Citation Rate</p>
+      <p class="text-3xl font-bold {% if citation_rate >= 60 %}text-green-600{% elif citation_rate >= 30 %}text-yellow-600{% else %}text-gray-900{% endif %} mt-1">
+        {{ citation_rate }}%
+      </p>
+      <p class="text-xs text-gray-400 mt-1">of tracked AI queries mention you</p>
+    </div>
+    <div class="lite-card p-5">
+      <p class="text-xs text-gray-400 font-medium">Queries Tracked</p>
+      <p class="text-3xl font-bold text-gray-900 mt-1">{{ total_queries }}</p>
+      <p class="text-xs text-gray-400 mt-1">GEO query tests run</p>
+    </div>
+  </div>
+
+  {% if geo_queries %}
+  <div class="lite-card overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100">
+      <p class="text-sm font-bold text-gray-900">Recent GEO Queries</p>
+    </div>
+    <div class="divide-y divide-gray-50">
+      {% for q in geo_queries %}
+      <div class="px-5 py-3.5 hover:bg-gray-50 transition-colors">
+        <div class="flex items-start justify-between gap-4">
+          <p class="text-sm text-gray-800 flex-1">{{ q.query }}</p>
+          <span class="text-xs px-2 py-0.5 rounded-full font-medium shrink-0
+                       {% if q.client_mentioned %}badge-ready{% else %}bg-gray-100 text-gray-500{% endif %}">
+            {% if q.client_mentioned %}✓ Cited{% else %}Not cited{% endif %}
+          </span>
+        </div>
+        {% if q.response %}
+        <p class="text-xs text-gray-400 mt-1.5 line-clamp-2">{{ q.response[:200] }}</p>
+        {% endif %}
+        {% if q.ai_model %}
+        <p class="text-xs text-gray-300 mt-1">via {{ q.ai_model }}</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div class="lite-card p-16 text-center">
+    <div class="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+      <svg class="w-7 h-7 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+      </svg>
+    </div>
+    <p class="text-sm font-medium text-gray-500">No GEO data yet</p>
+    <p class="text-xs text-gray-400 mt-1">The GEO Visibility agent tests how often AI tools like ChatGPT and Perplexity mention your business.</p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

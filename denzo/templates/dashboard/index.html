@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Overview{% endblock %}
+{% block page_title %}Overview{% endblock %}
+
+{% block topbar_actions %}
+<a href="/clients/new" class="btn-primary">
+  <svg style="width:14px;height:14px" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+  </svg>
+  New Client
+</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  .client-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    transition: border-color 0.2s, transform 0.2s;
+    overflow: hidden;
+  }
+  .client-card:hover {
+    border-color: var(--border2);
+    transform: translateY(-2px);
+  }
+  .client-card-header { padding: 20px 20px 16px; }
+  .client-card-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-top: 1px solid var(--border);
+  }
+  .client-stat {
+    padding: 14px 0;
+    text-align: center;
+  }
+  .client-stat + .client-stat { border-left: 1px solid var(--border); }
+  .client-stat-value { font-size: 22px; font-weight: 700; letter-spacing: -0.03em; color: var(--text); }
+  .client-stat-value.green { color: var(--green); }
+  .client-stat-label { font-size: 10px; color: var(--muted); margin-top: 2px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .client-card-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .type-badge {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.06);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .agent-task {
+    font-size: 11px;
+    color: #fb923c;
+    background: rgba(249,115,22,0.08);
+    border: 1px solid rgba(249,115,22,0.15);
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1.4;
+  }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+  .clients-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if not clients %}
+<!-- Empty state -->
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:120px 0;text-align:center">
+  <div style="width:64px;height:64px;background:var(--surface);border:1px solid var(--border);border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:24px">
+    <svg style="width:28px;height:28px;color:var(--muted2)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+    </svg>
+  </div>
+  <h2 style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px;letter-spacing:-0.02em">No clients yet</h2>
+  <p style="font-size:14px;color:var(--muted);max-width:340px;line-height:1.6;margin-bottom:28px">
+    Add your first client to activate the AI SEO pipeline — 15 specialized agents across 5 layers.
+  </p>
+  <a href="/clients/new" class="btn-primary">
+    <svg style="width:14px;height:14px" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    Add first client
+  </a>
+</div>
+
+{% else %}
+
+<!-- Stats -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <p class="stat-label">Clients</p>
+    <p class="stat-value">{{ clients | length }}</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Keywords</p>
+    <p class="stat-value">{{ clients | sum(attribute='keyword_count') }}</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Pages Generated</p>
+    <p class="stat-value">{{ clients | sum(attribute='page_count') }}</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Published</p>
+    <p class="stat-value green">{{ clients | sum(attribute='published_count') }}</p>
+  </div>
+</div>
+
+<!-- Clients -->
+<div class="section-header">
+  <span class="section-title">Active Clients</span>
+</div>
+
+<div class="clients-grid">
+  {% for c in clients %}
+  <div class="client-card">
+    <div class="client-card-header">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+        <div style="min-width:0">
+          <h3 style="font-size:15px;font-weight:700;letter-spacing:-0.02em;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</h3>
+          <span class="type-badge" style="display:inline-block;margin-top:6px">{{ c.business_type | replace('_', ' ') | title }}</span>
+        </div>
+        <div style="flex-shrink:0">
+          {% if c.active_agent %}
+          <span class="badge badge-running">
+            <span class="pulse-dot" style="width:5px;height:5px"></span>
+            Running
+          </span>
+          {% else %}
+          <span class="badge badge-idle">Idle</span>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if c.active_agent %}
+      <div class="agent-task">
+        <svg style="width:12px;height:12px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+        <span style="font-weight:600">{{ c.active_agent.name }}</span>
+        {% if c.active_agent.current_task %}
+        <span style="color:rgba(251,146,60,0.7)">— {{ c.active_agent.current_task[:55] }}{% if c.active_agent.current_task|length > 55 %}…{% endif %}</span>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="client-card-stats">
+      <div class="client-stat">
+        <div class="client-stat-value">{{ c.keyword_count or 0 }}</div>
+        <div class="client-stat-label">Keywords</div>
+      </div>
+      <div class="client-stat">
+        <div class="client-stat-value">{{ c.page_count or 0 }}</div>
+        <div class="client-stat-label">Pages</div>
+      </div>
+      <div class="client-stat">
+        <div class="client-stat-value green">{{ c.published_count or 0 }}</div>
+        <div class="client-stat-label">Published</div>
+      </div>
+    </div>
+
+    <div class="client-card-footer">
+      <span style="font-size:11px;color:var(--muted2)">
+        {% if c.last_activity %}{{ c.last_activity[:16] }}{% else %}No activity{% endif %}
+      </span>
+      <a href="/clients/{{ c.tenant_id }}/pipeline" class="btn-secondary" style="font-size:12px;padding:6px 12px">
+        Pipeline
+        <svg style="width:12px;height:12px" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+      </a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endif %}
+{% endblock %}

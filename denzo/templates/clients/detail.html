@@ -1,0 +1,891 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ client.name }}{% endblock %}
+
+{% block breadcrumb %}
+<a href="/clients" class="breadcrumb-link">Clients</a>
+<span class="breadcrumb-sep">/</span>
+<a href="/clients/{{ client.tenant_id }}/pipeline" class="breadcrumb-link">{{ client.name }}</a>
+<span class="breadcrumb-sep">/</span>
+<span class="breadcrumb-current">Settings</span>
+{% endblock %}
+
+{% block topbar_actions %}
+<a href="/clients/{{ client.tenant_id }}/pipeline" class="btn-secondary" style="font-size:13px;padding:8px 16px;">
+  View Pipeline →
+</a>
+{% endblock %}
+
+{# ── Inject initial data as JS so Alpine never touches raw Jinja expressions ── #}
+{% block extra_head %}
+<script>
+  window._EDIT_DATA = {
+    service_cities:     {{ (context.service_cities   if context else []) | tojson }},
+    certifications:     {{ (context.certifications    if context else []) | tojson }},
+    services:           {{ (context.services          if context else []) | tojson }},
+    differentiators:    {{ (context.differentiators   if context else []) | tojson }},
+    insurance_partners: {{ (context.insurance_partners if context else []) | tojson }},
+    competitors:        {{ (context.competitors        if context else []) | tojson }},
+    competitors_tier1:  {{ (context.competitors_tier1  if context else []) | tojson }},
+    competitors_tier2:  {{ (context.competitors_tier2  if context else []) | tojson }},
+    brand_tier:         "{{ client.brand_tier or 'mid' }}",
+    is_multilocation:   {{ 'true' if client.is_multilocation else 'false' }},
+    publisher:          "{{ client.publisher_type or 'github' }}"
+  };
+</script>
+<style>
+  .edit-section {
+    background: #111111;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+  .edit-section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255,255,255,0.4);
+    margin: 0 0 16px 0;
+  }
+  .field-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 6px;
+    letter-spacing: 0.02em;
+  }
+  .field-input {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.87);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+    box-sizing: border-box;
+  }
+  .field-input:focus { border-color: #6366f1; }
+  .field-input::placeholder { color: rgba(255,255,255,0.2); }
+  .field-group { margin-bottom: 14px; }
+  .field-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .field-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+  /* Tag pill */
+  .tag-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(99,102,241,0.12);
+    border: 1px solid rgba(99,102,241,0.2);
+    color: #a5b4fc;
+    border-radius: 999px;
+    padding: 4px 10px 4px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .tag-pill button {
+    background: none;
+    border: none;
+    color: #a5b4fc;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    font-size: 15px;
+    opacity: 0.6;
+    transition: opacity 0.15s;
+    display: flex;
+    align-items: center;
+  }
+  .tag-pill button:hover { opacity: 1; }
+  .tag-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; min-height: 10px; }
+  .tag-add-row { display: flex; gap: 8px; }
+  .tag-add-input {
+    flex: 1;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.87);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+  }
+  .tag-add-input:focus { border-color: #6366f1; }
+  .tag-add-btn {
+    background: rgba(99,102,241,0.15);
+    color: #818cf8;
+    border: 1px solid rgba(99,102,241,0.25);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .tag-add-btn:hover { background: rgba(99,102,241,0.25); }
+
+  /* Competitor rows */
+  .comp-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 36px;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: center;
+  }
+  .comp-remove {
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.18);
+    color: #f87171;
+    border-radius: 8px;
+    padding: 0;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .comp-remove:hover { background: rgba(239,68,68,0.18); }
+
+  /* Publisher toggle */
+  .pub-toggle { display: flex; gap: 8px; margin-bottom: 20px; }
+  .pub-option {
+    flex: 1;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    text-align: center;
+    background: transparent;
+  }
+  .pub-option.active {
+    border-color: #6366f1;
+    background: rgba(99,102,241,0.1);
+  }
+  .pub-option-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.5);
+  }
+  .pub-option.active .pub-option-label { color: #a5b4fc; }
+  .pub-option-sub { font-size: 11px; color: rgba(255,255,255,0.25); margin-top: 2px; }
+
+  /* Right column */
+  .stats-card {
+    background: #111111;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .stat-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row-label { font-size: 12px; color: rgba(255,255,255,0.4); }
+  .stat-row-value { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.87); }
+
+  .quick-links { display: flex; flex-direction: column; gap: 4px; }
+  .quick-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border-radius: 7px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.5);
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s;
+    background: transparent;
+  }
+  .quick-link:hover { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.87); }
+  .quick-link svg { opacity: 0.5; flex-shrink: 0; }
+  .quick-link:hover svg { opacity: 1; }
+
+  .danger-zone-card {
+    background: rgba(239,68,68,0.04);
+    border: 1px solid rgba(239,68,68,0.12);
+    border-radius: 12px;
+    padding: 20px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:1100px;margin:0 auto;">
+
+  {# ── Page header ── #}
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
+    <div>
+      <h1 style="font-size:20px;font-weight:700;color:#fff;margin:0 0 4px 0;">{{ client.name }}</h1>
+      <p style="font-size:13px;color:rgba(255,255,255,0.35);margin:0;">Client settings &amp; configuration</p>
+    </div>
+    <span style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
+                 padding:4px 12px;border-radius:999px;
+                 {% if client.status == 'active' %}background:rgba(74,222,128,0.12);color:#4ade80;
+                 {% else %}background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.35);{% endif %}">
+      {{ client.status or 'active' }}
+    </span>
+  </div>
+
+  {# ── Two-column layout ── #}
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;align-items:start;">
+
+    {# ═══════════════════════════════════════════════════ #}
+    {# LEFT COLUMN — form                                 #}
+    {# ═══════════════════════════════════════════════════ #}
+    <div>
+      <form method="POST" action="/clients/{{ client.tenant_id }}/update" id="client-edit-form">
+
+        {# ── Section 1: Business Identity ── #}
+        <div class="edit-section">
+          <p class="edit-section-title">Business Identity</p>
+
+          <div class="field-group">
+            <label class="field-label">Business Name</label>
+            <input type="text" name="name" value="{{ client.name }}" required class="field-input">
+          </div>
+
+          <div class="field-grid-2" style="margin-bottom:14px;">
+            <div>
+              <label class="field-label">Business Type</label>
+              <select name="business_type" class="field-input" style="cursor:pointer;">
+                {% for btype in ['auto_body', 'restaurant', 'law_firm', 'medical', 'retail', 'education', 'real_estate', 'insurance_agency', 'home_services', 'general', 'other'] %}
+                <option value="{{ btype }}" {% if client.business_type == btype %}selected{% endif %}>
+                  {{ btype | replace('_', ' ') | title }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="field-label">Tagline</label>
+              <input type="text" name="tagline" value="{{ context.tagline if context else '' }}"
+                     placeholder="Expert service you can trust" class="field-input">
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Website URL</label>
+            <input type="url" name="website_url" value="{{ client.website_url or '' }}"
+                   placeholder="https://www.example.com" class="field-input">
+          </div>
+
+          <div class="field-grid-2" style="margin-bottom:14px;">
+            <div>
+              <label class="field-label">Phone</label>
+              <input type="text" name="phone" value="{{ client.phone or '' }}"
+                     placeholder="(555) 000-0000" class="field-input">
+            </div>
+            <div>
+              <label class="field-label">Logo URL</label>
+              <input type="url" name="logo_url" value="{{ client.logo_url or '' }}"
+                     placeholder="https://..." class="field-input">
+            </div>
+          </div>
+        </div>
+
+        {# ── Section 2: Location ── #}
+        <div class="edit-section">
+          <p class="edit-section-title">Location</p>
+
+          <div class="field-group">
+            <label class="field-label">Address</label>
+            <input type="text" name="address" value="{{ client.address or '' }}"
+                   placeholder="123 Main St" class="field-input">
+          </div>
+
+          <div class="field-grid-3">
+            <div>
+              <label class="field-label">City</label>
+              <input type="text" name="city" value="{{ client.city or '' }}"
+                     placeholder="Los Angeles" class="field-input">
+            </div>
+            <div>
+              <label class="field-label">State</label>
+              <input type="text" name="state" value="{{ client.state or 'CA' }}"
+                     placeholder="CA" class="field-input">
+            </div>
+            <div>
+              <label class="field-label">Primary City (SEO)</label>
+              <input type="text" name="primary_city" value="{{ context.primary_city if context else '' }}"
+                     placeholder="North Hollywood" class="field-input">
+            </div>
+          </div>
+        </div>
+
+        {# ── Section 3: Service Area ── #}
+        <div class="edit-section">
+          <p class="edit-section-title">Service Area</p>
+
+          <label class="field-label" style="margin-bottom:10px;">Service Cities</label>
+          <div x-data="{
+            cities: window._EDIT_DATA.service_cities,
+            newCity: '',
+            add() { if(this.newCity.trim()) { this.cities.push(this.newCity.trim()); this.newCity=''; } },
+            remove(i) { this.cities.splice(i, 1); }
+          }">
+            <div class="tag-wrap">
+              <template x-for="(city, i) in cities" :key="i">
+                <span class="tag-pill">
+                  <span x-text="city"></span>
+                  <button type="button" @click="remove(i)">×</button>
+                </span>
+              </template>
+              <span x-show="cities.length === 0" style="font-size:12px;color:rgba(255,255,255,0.2);padding:4px 0;">No cities added yet</span>
+            </div>
+            <div class="tag-add-row">
+              <input x-model="newCity" @keydown.enter.prevent="add()" type="text"
+                     placeholder="Add a city..." class="tag-add-input">
+              <button @click="add()" type="button" class="tag-add-btn">Add</button>
+            </div>
+            <input type="hidden" name="service_cities" :value="JSON.stringify(cities)">
+          </div>
+        </div>
+
+        {# ── Section 4: Services & Certifications ── #}
+        <div class="edit-section">
+          <p class="edit-section-title">Services &amp; Certifications</p>
+
+          {# Services #}
+          <div class="field-group">
+            <label class="field-label" style="margin-bottom:10px;">Services</label>
+            <div x-data="{
+              items: window._EDIT_DATA.services,
+              newItem: '',
+              add() { if(this.newItem.trim()) { this.items.push(this.newItem.trim()); this.newItem=''; } },
+              remove(i) { this.items.splice(i, 1); }
+            }">
+              <div class="tag-wrap">
+                <template x-for="(item, i) in items" :key="i">
+                  <span class="tag-pill">
+                    <span x-text="item"></span>
+                    <button type="button" @click="remove(i)">×</button>
+                  </span>
+                </template>
+                <span x-show="items.length === 0" style="font-size:12px;color:rgba(255,255,255,0.2);padding:4px 0;">No services added</span>
+              </div>
+              <div class="tag-add-row">
+                <input x-model="newItem" @keydown.enter.prevent="add()" type="text"
+                       placeholder="Add a service..." class="tag-add-input">
+                <button @click="add()" type="button" class="tag-add-btn">Add</button>
+              </div>
+              <input type="hidden" name="services" :value="JSON.stringify(items)">
+            </div>
+          </div>
+
+          {# Certifications #}
+          <div class="field-group">
+            <label class="field-label" style="margin-bottom:10px;">Certifications</label>
+            <div x-data="{
+              items: window._EDIT_DATA.certifications,
+              newItem: '',
+              add() { if(this.newItem.trim()) { this.items.push(this.newItem.trim()); this.newItem=''; } },
+              remove(i) { this.items.splice(i, 1); }
+            }">
+              <div class="tag-wrap">
+                <template x-for="(item, i) in items" :key="i">
+                  <span class="tag-pill">
+                    <span x-text="item"></span>
+                    <button type="button" @click="remove(i)">×</button>
+                  </span>
+                </template>
+                <span x-show="items.length === 0" style="font-size:12px;color:rgba(255,255,255,0.2);padding:4px 0;">No certifications added</span>
+              </div>
+              <div class="tag-add-row">
+                <input x-model="newItem" @keydown.enter.prevent="add()" type="text"
+                       placeholder="BMW, Kia, Hyundai..." class="tag-add-input">
+                <button @click="add()" type="button" class="tag-add-btn">Add</button>
+              </div>
+              <input type="hidden" name="certifications" :value="JSON.stringify(items)">
+            </div>
+          </div>
+
+          {# Insurance Partners #}
+          <div class="field-group">
+            <label class="field-label" style="margin-bottom:10px;">Insurance Partners</label>
+            <div x-data="{
+              items: window._EDIT_DATA.insurance_partners,
+              newItem: '',
+              add() { if(this.newItem.trim()) { this.items.push(this.newItem.trim()); this.newItem=''; } },
+              remove(i) { this.items.splice(i, 1); }
+            }">
+              <div class="tag-wrap">
+                <template x-for="(item, i) in items" :key="i">
+                  <span class="tag-pill">
+                    <span x-text="item"></span>
+                    <button type="button" @click="remove(i)">×</button>
+                  </span>
+                </template>
+                <span x-show="items.length === 0" style="font-size:12px;color:rgba(255,255,255,0.2);padding:4px 0;">No partners added</span>
+              </div>
+              <div class="tag-add-row">
+                <input x-model="newItem" @keydown.enter.prevent="add()" type="text"
+                       placeholder="State Farm, Geico..." class="tag-add-input">
+                <button @click="add()" type="button" class="tag-add-btn">Add</button>
+              </div>
+              <input type="hidden" name="insurance_partners" :value="JSON.stringify(items)">
+            </div>
+          </div>
+
+          {# Differentiators #}
+          <div>
+            <label class="field-label" style="margin-bottom:10px;">Differentiators</label>
+            <div x-data="{
+              items: window._EDIT_DATA.differentiators,
+              newItem: '',
+              add() { if(this.newItem.trim()) { this.items.push(this.newItem.trim()); this.newItem=''; } },
+              remove(i) { this.items.splice(i, 1); }
+            }">
+              <div class="tag-wrap">
+                <template x-for="(item, i) in items" :key="i">
+                  <span class="tag-pill">
+                    <span x-text="item"></span>
+                    <button type="button" @click="remove(i)">×</button>
+                  </span>
+                </template>
+                <span x-show="items.length === 0" style="font-size:12px;color:rgba(255,255,255,0.2);padding:4px 0;">No differentiators added</span>
+              </div>
+              <div class="tag-add-row">
+                <input x-model="newItem" @keydown.enter.prevent="add()" type="text"
+                       placeholder="Lifetime warranty, OEM parts..." class="tag-add-input">
+                <button @click="add()" type="button" class="tag-add-btn">Add</button>
+              </div>
+              <input type="hidden" name="differentiators" :value="JSON.stringify(items)">
+            </div>
+          </div>
+        </div>
+
+        {# ── Section 5: Competitors — Tiered View ── #}
+        <div class="edit-section" x-data="{
+          tier1: window._EDIT_DATA.competitors_tier1 || [],
+          tier2: window._EDIT_DATA.competitors_tier2 || [],
+          manual: window._EDIT_DATA.competitors.length > 0 ? window._EDIT_DATA.competitors : [{name:'',url:''}],
+          brandTier: window._EDIT_DATA.brand_tier || 'mid',
+          showManual: false,
+          add() { this.manual.push({name:'', url:''}); },
+          remove(i) { if(this.manual.length > 1) this.manual.splice(i, 1); },
+          toJson() { return JSON.stringify(this.manual.filter(c => c.name && c.name.trim())); }
+        }">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <p class="edit-section-title" style="margin:0;">Competitors</p>
+            <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;padding:3px 10px;border-radius:999px;"
+                  :class="{
+                    'bg-gray-500/20 text-gray-400': brandTier === 'budget',
+                    'bg-blue-500/20 text-blue-400': brandTier === 'mid',
+                    'bg-purple-500/20 text-purple-400': brandTier === 'premium',
+                    'bg-yellow-500/20 text-yellow-300': brandTier === 'luxury'
+                  }"
+                  x-text="(brandTier || 'mid').charAt(0).toUpperCase() + (brandTier || 'mid').slice(1) + ' Tier'"></span>
+          </div>
+
+          {# Tier 1: Same Brand + Nearby City #}
+          <div style="margin-bottom:20px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:22px;height:22px;border-radius:50%;background:rgba(251,146,60,0.15);border:1px solid rgba(251,146,60,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <span style="font-size:11px;font-weight:700;color:#fb923c;">1</span>
+              </div>
+              <div>
+                <span style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.7);">Tier 1 — Same Brand · Nearby City</span>
+                <span style="font-size:10px;font-weight:600;color:#fb923c;background:rgba(251,146,60,0.12);border:1px solid rgba(251,146,60,0.2);border-radius:999px;padding:2px 8px;margin-left:6px;">Franchise Rivals</span>
+              </div>
+            </div>
+            <template x-if="tier1.length === 0">
+              <div style="padding:12px;border:1px dashed rgba(255,255,255,0.08);border-radius:8px;text-align:center;">
+                <p style="font-size:12px;color:rgba(255,255,255,0.25);">No Tier 1 rivals detected yet — run Competitor Intel to discover them.</p>
+              </div>
+            </template>
+            <template x-for="(comp, i) in tier1" :key="'t1-'+i">
+              <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(251,146,60,0.05);border:1px solid rgba(251,146,60,0.15);border-radius:8px;margin-bottom:6px;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#fb923c;flex-shrink:0;"></div>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.8);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" x-text="comp.name"></p>
+                  <p style="font-size:11px;color:rgba(255,255,255,0.3);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" x-text="(comp.url || '') + (comp.location ? ' · ' + comp.location : '')"></p>
+                </div>
+                <span style="font-size:10px;font-weight:700;color:#fb923c;background:rgba(251,146,60,0.12);padding:2px 6px;border-radius:4px;flex-shrink:0;">T1</span>
+                <span x-show="comp.competitor_score" style="font-size:10px;color:rgba(255,255,255,0.25);" x-text="'score: ' + comp.competitor_score"></span>
+              </div>
+            </template>
+          </div>
+
+          {# Tier 2: Category Competitors #}
+          <div style="margin-bottom:20px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:22px;height:22px;border-radius:50%;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <span style="font-size:11px;font-weight:700;color:#818cf8;">2</span>
+              </div>
+              <div>
+                <span style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.7);">Tier 2 — Category Competitors</span>
+                <span style="font-size:10px;font-weight:600;color:#818cf8;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.2);border-radius:999px;padding:2px 8px;margin-left:6px;">Same Market</span>
+              </div>
+            </div>
+            <template x-if="tier2.length === 0">
+              <div style="padding:12px;border:1px dashed rgba(255,255,255,0.08);border-radius:8px;text-align:center;">
+                <p style="font-size:12px;color:rgba(255,255,255,0.25);">No Tier 2 competitors yet — run Competitor Intel to populate.</p>
+              </div>
+            </template>
+            <template x-for="(comp, i) in tier2" :key="'t2-'+i">
+              <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.12);border-radius:8px;margin-bottom:6px;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#818cf8;flex-shrink:0;"></div>
+                <div style="flex:1;min-width:0;">
+                  <p style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.8);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" x-text="comp.name"></p>
+                  <p style="font-size:11px;color:rgba(255,255,255,0.3);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" x-text="(comp.url || '') + (comp.location ? ' · ' + comp.location : '')"></p>
+                </div>
+                <span style="font-size:10px;font-weight:700;color:#818cf8;background:rgba(99,102,241,0.12);padding:2px 6px;border-radius:4px;flex-shrink:0;">T2</span>
+              </div>
+            </template>
+          </div>
+
+          {# Manual competitors entry #}
+          <div style="border-top:1px solid rgba(255,255,255,0.06);padding-top:16px;">
+            <button type="button" @click="showManual = !showManual"
+                    style="display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,0.35);background:none;border:none;cursor:pointer;padding:0;transition:color 0.15s;"
+                    onmouseover="this.style.color='rgba(255,255,255,0.6)'"
+                    onmouseout="this.style.color='rgba(255,255,255,0.35)'">
+              <svg style="width:12px;height:12px;transition:transform 0.2s;" :style="showManual ? 'transform:rotate(90deg)' : ''"
+                   fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+              </svg>
+              Manual competitor overrides
+              <span x-show="manual.filter(c=>c.name).length > 0"
+                    style="font-size:10px;background:rgba(255,255,255,0.08);padding:1px 6px;border-radius:999px;"
+                    x-text="manual.filter(c=>c.name).length + ' added'"></span>
+            </button>
+
+            <div x-show="showManual" x-cloak style="margin-top:12px;">
+              <template x-for="(comp, i) in manual" :key="i">
+                <div class="comp-row">
+                  <input x-model="comp.name" type="text" placeholder="Competitor name" class="field-input">
+                  <input x-model="comp.url" type="url" placeholder="https://competitor.com" class="field-input">
+                  <button @click="remove(i)" type="button" class="comp-remove" x-show="manual.length > 1">×</button>
+                  <div x-show="manual.length <= 1" style="width:36px;"></div>
+                </div>
+              </template>
+              <button @click="add()" type="button"
+                      style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);color:rgba(255,255,255,0.4);border-radius:8px;padding:8px 16px;font-size:12px;cursor:pointer;margin-top:4px;transition:background 0.15s;"
+                      onmouseover="this.style.background='rgba(255,255,255,0.06)'"
+                      onmouseout="this.style.background='rgba(255,255,255,0.03)'">
+                + Add Competitor
+              </button>
+            </div>
+          </div>
+
+          <input type="hidden" name="competitors" :value="toJson()">
+        </div>
+
+        {# ── Section 6: Publisher Configuration ── #}
+        <div class="edit-section" x-data="{ publisher: window._EDIT_DATA.publisher, showGhModal: false, showWpModal: false }">
+          <p class="edit-section-title">Publisher Configuration</p>
+
+          <div class="pub-toggle">
+            <label class="pub-option" :class="{ active: publisher === 'github' }" @click="publisher = 'github'" style="cursor:pointer;">
+              <input type="radio" name="publisher_type" value="github" x-model="publisher" style="display:none;">
+              <div class="pub-option-label">GitHub Pages</div>
+              <div class="pub-option-sub">Static HTML → GitHub repo</div>
+            </label>
+            <label class="pub-option" :class="{ active: publisher === 'wordpress' }" @click="publisher = 'wordpress'" style="cursor:pointer;">
+              <input type="radio" name="publisher_type" value="wordpress" x-model="publisher" style="display:none;">
+              <div class="pub-option-label">WordPress</div>
+              <div class="pub-option-sub">REST API → WP site</div>
+            </label>
+          </div>
+
+          {# GitHub fields #}
+          <div x-show="publisher === 'github'" x-cloak>
+            <div class="field-group">
+              <label class="field-label">GitHub Repo</label>
+              <input type="text" name="github_repo"
+                     value="{{ context.github_repo if context else '' }}"
+                     placeholder="username/repo-name" class="field-input">
+            </div>
+            <div class="field-grid-2">
+              <div>
+                <label class="field-label">Branch</label>
+                <input type="text" name="github_branch"
+                       value="{{ context.github_branch if context else 'main' }}"
+                       placeholder="main" class="field-input">
+              </div>
+              <div>
+                <label class="field-label" style="display:flex;align-items:center;gap:8px;">
+                  GitHub Token
+                  <span style="color:rgba(255,255,255,0.25);font-weight:400;">(leave blank to keep)</span>
+                  <button type="button" @click="showGhModal = true"
+                          style="width:18px;height:18px;border-radius:50%;background:rgba(99,102,241,0.25);border:1px solid rgba(99,102,241,0.5);color:#a5b4fc;font-size:11px;font-weight:700;cursor:pointer;line-height:1;flex-shrink:0;display:flex;align-items:center;justify-content:center;"
+                          title="How to get a GitHub Token">?</button>
+                </label>
+                {% if context and context.has_github_token %}
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px;color:#4ade80;">
+                  <svg style="width:13px;height:13px;flex-shrink:0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                  Token configured — leave blank to keep current
+                </div>
+                {% endif %}
+                <input type="password" name="github_token"
+                       placeholder="ghp_... (paste new token to replace)" class="field-input">
+
+                {# ── GitHub Token Modal ── #}
+                <div x-show="showGhModal" x-cloak @click.self="showGhModal = false"
+                     style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;">
+                  <div style="background:#1e1e2e;border:1px solid rgba(255,255,255,0.1);border-radius:12px;max-width:480px;width:100%;padding:28px;position:relative;">
+                    <button type="button" @click="showGhModal = false"
+                            style="position:absolute;top:14px;right:14px;background:none;border:none;color:rgba(255,255,255,0.4);font-size:18px;cursor:pointer;line-height:1;">✕</button>
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+                      <div style="width:36px;height:36px;background:rgba(99,102,241,0.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;">🔑</div>
+                      <div>
+                        <div style="font-weight:700;font-size:15px;color:#fff;">How to get your GitHub Token</div>
+                        <div style="font-size:12px;color:rgba(255,255,255,0.4);">Personal Access Token (Classic)</div>
+                      </div>
+                    </div>
+                    <ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:12px;">
+                      <li style="color:rgba(255,255,255,0.8);font-size:13px;line-height:1.5;">
+                        Go to <strong style="color:#a5b4fc;">github.com</strong> → click your avatar (top right) → <strong>Settings</strong>
+                      </li>
+                      <li style="color:rgba(255,255,255,0.8);font-size:13px;line-height:1.5;">
+                        In the left menu, scroll down to <strong>Developer settings</strong> (at the bottom)
+                      </li>
+                      <li style="color:rgba(255,255,255,0.8);font-size:13px;line-height:1.5;">
+                        Click <strong>Personal access tokens</strong> → <strong>Tokens (classic)</strong>
+                      </li>
+                      <li style="color:rgba(255,255,255,0.8);font-size:13px;line-height:1.5;">
+                        Click <strong>Generate new token (classic)</strong>
+                      </li>
+                      <li style="color:rgba(255,255,255,0.8);font-size:13px;line-height:1.5;">
+                        Give it a name (e.g. <em>denzo-seo</em>), set expiration, and check scope <strong style="color:#86efac;">✓ repo</strong> (full repository access)
+                      </li>
+                      <li style="color:rgba(255,255,255,0.8);font-size:13px;line-height:1.5;">
+                        Click <strong>Generate token</strong> → copy the token starting with <code style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;font-size:12px;">ghp_</code>
+                      </li>
+                    </ol>
+                    <div style="margin-top:18px;padding:12px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:8px;font-size:12px;color:rgba(251,191,36,0.9);">
+                      ⚠️ Copy the token immediately — GitHub only shows it once.
+                    </div>
+                    <button type="button" @click="showGhModal = false"
+                            style="margin-top:18px;width:100%;background:#6366f1;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;">
+                      Got it
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {# WordPress fields #}
+          <div x-show="publisher === 'wordpress'" x-cloak>
+            <div class="field-group">
+              <label class="field-label">WordPress Site URL</label>
+              <input type="url" name="wp_url"
+                     value="{{ context.wp_url if context else '' }}"
+                     placeholder="https://yoursite.com" class="field-input">
+            </div>
+            <div class="field-grid-2">
+              <div>
+                <label class="field-label">WP Username</label>
+                <input type="text" name="wp_user"
+                       value="{{ context.wp_user if context else '' }}"
+                       placeholder="admin" class="field-input">
+              </div>
+              <div>
+                <label class="field-label" style="display:flex;align-items:center;gap:8px;">
+                  App Password
+                  <span style="color:rgba(255,255,255,0.25);font-weight:400;">(leave blank to keep)</span>
+                  <button type="button" @click="showWpModal = true"
+                          style="width:18px;height:18px;border-radius:50%;background:rgba(99,102,241,0.25);border:1px solid rgba(99,102,241,0.5);color:#a5b4fc;font-size:11px;font-weight:700;cursor:pointer;line-height:1;flex-shrink:0;display:flex;align-items:center;justify-content:center;"
+                          title="How to create a WP App Password">?</button>
+                </label>
+                {% if context and context.has_wp_password %}
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px;color:#4ade80;">
+                  <svg style="width:13px;height:13px;flex-shrink:0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                  Password configured — leave blank to keep current
+                </div>
+                {% endif %}
+                <input type="password" name="wp_app_password"
+                       placeholder="xxxx xxxx xxxx xxxx (paste to replace)" class="field-input">
+
+                {# ── WordPress App Password Modal ── #}
+                <div x-show="showWpModal" x-cloak @click.self="showWpModal = false"
+                     style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;">
+                  <div style="background:#1e1e2e;border:1px solid rgba(255,255,255,0.1);border-radius:12px;max-width:480px;width:100%;padding:28px;position:relative;">
+                    <button type="button" @click="showWpModal = false"
+                            style="position:absolute;top:14px;right:14px;background:none;border:none;color:rgba(255,255,255,0.4);font-size:18px;cursor:pointer;line-height:1;">✕</button>
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+                      <div style="width:36px;height:36px;background:rgba(99,102,241,0.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;">🔐</div>
+                      <div>
+                        <div style="font-weight:700;font-size:15px;color:#fff;">How to create a WordPress App Password</div>
+                        <div style="font-size:12px;color:rgba(255,255,255,0.4);">Requires WordPress 5.6+ with Application Passwords enabled</div>
+                      </div>
+                    </div>
+                    <ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:12px;">
+                      <li style="color:rgba(255,255,255,0.8);font-size:13px;line-height:1.5;">
+                        Go to your WordPress <strong style="color:#a5b4fc;">admin panel</strong> (<code style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;font-size:12px;">/wp-admin</code>)
+                      </li>
+                      <li style="color:rgba(255,255,255,0.8);font-size:13px;line-height:1.5;">
+                        Click your username (top right) → <strong>Edit Profile</strong>
+                      </li>
+                      <li style="color:rgba(255,255,255,0.8);font-size:13px;line-height:1.5;">
+                        Scroll down to the <strong>Application Passwords</strong> section (at the bottom)
+                      </li>
+                      <li style="color:rgba(255,255,255,0.8);font-size:13px;line-height:1.5;">
+                        Enter a name (e.g. <em>denzo-seo</em>) and click <strong>Add New Application Password</strong>
+                      </li>
+                      <li style="color:rgba(255,255,255,0.8);font-size:13px;line-height:1.5;">
+                        Copy the generated password with format <code style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;font-size:12px;">xxxx xxxx xxxx xxxx xxxx xxxx</code>
+                      </li>
+                      <li style="color:rgba(255,255,255,0.8);font-size:13px;line-height:1.5;">
+                        Use your <strong>WordPress username</strong> in the WP Username field above
+                      </li>
+                    </ol>
+                    <div style="margin-top:18px;padding:12px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:8px;font-size:12px;color:rgba(251,191,36,0.9);">
+                      ⚠️ If you don't see "Application Passwords", the feature may be disabled — enable it in <strong>Plugins</strong> or contact your hosting provider.
+                    </div>
+                    <button type="button" @click="showWpModal = false"
+                            style="margin-top:18px;width:100%;background:#6366f1;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;">
+                      Got it
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {# Domain field — always visible #}
+          <div style="margin-top:14px;">
+            <label class="field-label">Domain / Pages URL</label>
+            <input type="text" name="domain"
+                   value="{{ context.domain if context else '' }}"
+                   placeholder="https://www.yoursite.com" class="field-input">
+          </div>
+        </div>
+
+        {# ── Save Button ── #}
+        <button type="submit"
+                style="background:#6366f1;color:#fff;border:none;border-radius:8px;padding:14px 24px;font-size:14px;font-weight:600;cursor:pointer;width:100%;transition:background 0.15s;letter-spacing:-0.01em;"
+                onmouseover="this.style.background='#4f52d9'"
+                onmouseout="this.style.background='#6366f1'">
+          Save Changes
+        </button>
+      </form>
+    </div>
+
+    {# ═══════════════════════════════════════════════════ #}
+    {# RIGHT COLUMN — stats + links + danger               #}
+    {# ═══════════════════════════════════════════════════ #}
+    <div>
+
+      {# Quick navigation #}
+      <div class="stats-card">
+        <p class="edit-section-title" style="margin-bottom:12px;">Quick Navigation</p>
+        <div class="quick-links">
+          <a href="/clients/{{ client.tenant_id }}/pipeline" class="quick-link">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            Pipeline
+          </a>
+          <a href="/clients/{{ client.tenant_id }}/keywords" class="quick-link">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
+            </svg>
+            Keywords
+          </a>
+          <a href="/clients/{{ client.tenant_id }}/pages" class="quick-link">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            Pages
+          </a>
+          <a href="/clients/{{ client.tenant_id }}/competitors" class="quick-link">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+            Competitor Intel
+          </a>
+          <a href="/clients/{{ client.tenant_id }}/brand-voice/" class="quick-link">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+            </svg>
+            Brand Voice
+          </a>
+          <a href="/clients/{{ client.tenant_id }}/geo" class="quick-link">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+            </svg>
+            GEO Monitor
+          </a>
+        </div>
+      </div>
+
+      {# Client info summary #}
+      <div class="stats-card">
+        <p class="edit-section-title" style="margin-bottom:12px;">Client Info</p>
+        <div class="stat-row">
+          <span class="stat-row-label">Tenant ID</span>
+          <span class="stat-row-value" style="font-family:monospace;font-size:11px;color:rgba(255,255,255,0.5);">{{ client.tenant_id }}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-row-label">Publisher</span>
+          <span class="stat-row-value" style="text-transform:capitalize;">{{ client.publisher_type or '—' }}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-row-label">Business Type</span>
+          <span class="stat-row-value" style="text-transform:capitalize;">{{ (client.business_type or 'general') | replace('_', ' ') }}</span>
+        </div>
+        {% if client.website_url %}
+        <div class="stat-row">
+          <span class="stat-row-label">Website</span>
+          <a href="{{ client.website_url }}" target="_blank"
+             style="font-size:12px;color:#818cf8;text-decoration:none;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;"
+             onmouseover="this.style.textDecoration='underline'"
+             onmouseout="this.style.textDecoration='none'">
+            {{ client.website_url | replace('https://', '') | replace('http://', '') }}
+          </a>
+        </div>
+        {% endif %}
+        {% if client.city %}
+        <div class="stat-row">
+          <span class="stat-row-label">Location</span>
+          <span class="stat-row-value">{{ client.city }}{% if client.state %}, {{ client.state }}{% endif %}</span>
+        </div>
+        {% endif %}
+      </div>
+
+      {# Danger Zone #}
+      <div class="danger-zone-card">
+        <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgba(239,68,68,0.6);margin:0 0 8px 0;">Danger Zone</p>
+        <p style="font-size:12px;color:rgba(255,255,255,0.35);margin:0 0 16px 0;line-height:1.5;">
+          Permanently delete this client and all associated data including keywords, pages, agents, and activity logs.
+        </p>
+        <button type="button"
+                onclick="if(confirm('Delete {{ client.name }}?\n\nThis will permanently remove ALL data including keywords, pages, agents, and logs. This cannot be undone.')) { document.getElementById('delete-form').submit(); }"
+                style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:#f87171;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:500;cursor:pointer;width:100%;transition:background 0.15s;"
+                onmouseover="this.style.background='rgba(239,68,68,0.15)'"
+                onmouseout="this.style.background='rgba(239,68,68,0.08)'">
+          Delete {{ client.name }}
+        </button>
+      </div>
+
+    </div>
+    {# end right column #}
+
+  </div>
+  {# end two-column grid #}
+
+  {# Hidden delete form #}
+  <form id="delete-form" method="POST" action="/clients/{{ client.tenant_id }}/delete" style="display:none;"></form>
+
+</div>
+{% endblock %}

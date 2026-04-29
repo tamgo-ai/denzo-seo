@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DENZO SEO — AI-Powered Programmatic SEO Platform</title>
+  <meta name="description" content="Get a free SEO analysis of your website in 30 seconds. DENZO SEO deploys AI agents to automate your entire SEO pipeline. $1 trial, then $249/mo." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg:      '#080808',
+            surface: '#111111',
+            card:    '#161616',
+            border:  '#222222',
+            indigo:  { DEFAULT: '#6366f1', light: '#818cf8', dark: '#4f46e5' },
+            muted:   '#6b7280',
+            text:    '#e5e7eb',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+          },
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    body { background-color: #080808; color: #e5e7eb; }
+    .bg-grid { background-image: linear-gradient(rgba(99,102,241,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,.04) 1px,transparent 1px); background-size: 40px 40px; }
+    .glow-indigo { box-shadow: 0 0 60px rgba(99,102,241,.25); }
+    .glow-border { border: 1px solid rgba(99,102,241,.35); }
+    .gradient-text { background: linear-gradient(135deg, #818cf8 0%, #6366f1 50%, #a855f7 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .btn-primary { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); transition: all .2s ease; }
+    .btn-primary:hover { background: linear-gradient(135deg, #818cf8 0%, #6366f1 100%); box-shadow: 0 0 30px rgba(99,102,241,.5); transform: translateY(-1px); }
+    .btn-outline { border: 1px solid rgba(99,102,241,.5); transition: all .2s ease; }
+    .btn-outline:hover { border-color: #6366f1; background: rgba(99,102,241,.1); }
+    details summary::-webkit-details-marker { display: none; }
+    details summary { cursor: pointer; }
+    details[open] .faq-arrow { transform: rotate(180deg); }
+    .faq-arrow { transition: transform .25s ease; }
+    .analyze-btn { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
+    .analyze-btn:hover { background: linear-gradient(135deg, #fb923c 0%, #f97316 100%); box-shadow: 0 0 30px rgba(249,115,22,.4); transform: translateY(-1px); }
+  </style>
+</head>
+<body class="font-sans antialiased">
+
+<!-- NAV -->
+<nav class="fixed top-0 inset-x-0 z-50 border-b border-border bg-bg/80 backdrop-blur-md">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+    <a href="/" class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-lg btn-primary flex items-center justify-center">
+        <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      </div>
+      <span class="font-bold text-lg tracking-tight text-white">DENZO <span class="gradient-text">SEO</span></span>
+    </a>
+    <div class="hidden md:flex items-center gap-8 text-sm text-muted font-medium">
+      <a href="#how-it-works" class="hover:text-text transition-colors">How It Works</a>
+      <a href="#features" class="hover:text-text transition-colors">Features</a>
+      <a href="/pricing" class="hover:text-text transition-colors">Pricing</a>
+      <a href="#faq" class="hover:text-text transition-colors">FAQ</a>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="/login" class="text-sm text-muted hover:text-text transition-colors font-medium">Sign In</a>
+      <a href="#analyze-form" class="analyze-btn text-white text-sm font-semibold px-5 py-2 rounded-lg transition-all">Free Analysis →</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="relative pt-32 pb-20 overflow-hidden bg-grid">
+  <div class="absolute inset-0 pointer-events-none">
+    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-indigo-500/10 rounded-full blur-3xl opacity-60"></div>
+  </div>
+
+  <div class="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+    <div class="inline-flex items-center gap-2 bg-card border border-border rounded-full px-4 py-1.5 text-sm text-muted mb-8">
+      <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+      <span>Powered by 10 AI Agents running in parallel</span>
+    </div>
+
+    <h1 class="text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-[1.05] mb-6">
+      <span class="text-white">Free SEO Report</span><br />
+      <span class="gradient-text">In 30 Seconds.</span>
+    </h1>
+
+    <p class="max-w-2xl mx-auto text-xl text-muted leading-relaxed mb-10">
+      Enter your website URL and our AI instantly audits your SEO gaps, missed keywords, and competitor opportunities. No account needed.
+    </p>
+
+    <!-- ANALYZE FORM — the hook -->
+    <div id="analyze-form" class="max-w-2xl mx-auto">
+      <form action="/wizard/start" method="POST">
+        <div class="flex flex-col sm:flex-row gap-3 p-2 bg-card border border-border rounded-2xl glow-border">
+          <div class="flex-1 flex items-center gap-3 px-4">
+            <svg class="w-5 h-5 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/>
+            </svg>
+            <input
+              type="text"
+              name="url"
+              placeholder="yourwebsite.com"
+              required
+              class="flex-1 bg-transparent text-text placeholder-muted text-lg font-medium outline-none py-3"
+            />
+          </div>
+          <button type="submit" class="analyze-btn text-white font-bold text-base px-8 py-3 rounded-xl transition-all shrink-0">
+            Analyze for Free →
+          </button>
+        </div>
+        <p class="text-xs text-muted mt-3">No credit card · No account · Results in ~30 seconds</p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- STATS BAR -->
+<section class="py-14 border-y border-border bg-surface">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+      <div>
+        <div class="text-4xl font-black gradient-text mb-1">4.8M+</div>
+        <div class="text-sm text-muted font-medium">Pages Generated</div>
+      </div>
+      <div>
+        <div class="text-4xl font-black gradient-text mb-1">1,200+</div>
+        <div class="text-sm text-muted font-medium">Businesses Growing</div>
+      </div>
+      <div>
+        <div class="text-4xl font-black gradient-text mb-1">287%</div>
+        <div class="text-sm text-muted font-medium">Avg Traffic Increase</div>
+      </div>
+      <div>
+        <div class="text-4xl font-black gradient-text mb-1">18 min</div>
+        <div class="text-sm text-muted font-medium">Avg Pipeline Run</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how-it-works" class="py-24">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16">
+      <h2 class="text-4xl font-black text-white mb-4">From Zero to Ranking in 4 Steps</h2>
+      <p class="text-xl text-muted max-w-2xl mx-auto">Our AI pipeline handles everything — you just review and approve.</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div class="bg-card border border-border rounded-2xl p-6 text-center">
+        <div class="w-12 h-12 bg-orange-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+          <span class="text-2xl font-black text-orange-400">1</span>
+        </div>
+        <h3 class="font-bold text-white mb-2">Free Analysis</h3>
+        <p class="text-sm text-muted">Enter your URL. Our AI scans your site and finds every SEO gap in seconds.</p>
+      </div>
+      <div class="bg-card border border-border rounded-2xl p-6 text-center">
+        <div class="w-12 h-12 bg-indigo-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+          <span class="text-2xl font-black text-indigo-400">2</span>
+        </div>
+        <h3 class="font-bold text-white mb-2">Connect Your Site</h3>
+        <p class="text-sm text-muted">Link WordPress or GitHub. Takes 2 minutes. No developer needed.</p>
+      </div>
+      <div class="bg-card border border-border rounded-2xl p-6 text-center">
+        <div class="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+          <span class="text-2xl font-black text-purple-400">3</span>
+        </div>
+        <h3 class="font-bold text-white mb-2">AI Builds Pages</h3>
+        <p class="text-sm text-muted">10 agents run in parallel: keyword research, competitor intel, schema, content, and publishing.</p>
+      </div>
+      <div class="bg-card border border-border rounded-2xl p-6 text-center">
+        <div class="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+          <span class="text-2xl font-black text-green-400">4</span>
+        </div>
+        <h3 class="font-bold text-white mb-2">You Rank &amp; Grow</h3>
+        <p class="text-sm text-muted">Review, approve, and watch your traffic climb — on autopilot every day.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features" class="py-24 bg-surface border-y border-border">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16">
+      <h2 class="text-4xl font-black text-white mb-4">10 AI Agents. One Platform.</h2>
+      <p class="text-xl text-muted max-w-2xl mx-auto">Every agent runs automatically — or you can trigger them individually.</p>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {% set agents = [
+        ("Keyword Strategist", "blue", "Maps thousands of keywords by intent, volume, and difficulty", "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"),
+        ("Competitor Intel", "purple", "Analyzes rivals, finds their gaps, steals their best keywords", "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"),
+        ("Technical Auditor", "yellow", "Finds critical SEO errors: broken links, slow pages, missing tags", "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"),
+        ("E-E-A-T Architect", "green", "Builds topical authority and expertise signals Google rewards", "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"),
+        ("Schema Engineer", "cyan", "Injects JSON-LD structured data for rich results eligibility", "M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"),
+        ("Programmatic SEO", "orange", "Generates hundreds of location pages that dominate local search", "M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4"),
+        ("Content Optimizer", "pink", "Rewrites and scores content for keyword density and readability", "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"),
+        ("Internal Linker", "teal", "Builds a smart internal link architecture to pass page authority", "M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101"),
+        ("GEO Intelligence", "indigo", "Optimizes content to get cited by ChatGPT, Gemini and Perplexity", "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"),
+        ("Publisher", "violet", "Auto-publishes to WordPress or GitHub — zero manual work", "M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"),
+      ] %}
+      {% for name, color, desc, icon_path in agents %}
+      <div class="bg-card border border-border rounded-xl p-5 flex items-start gap-4">
+        <div class="w-10 h-10 rounded-lg bg-{{ color }}-500/20 flex items-center justify-center shrink-0 mt-0.5">
+          <svg class="w-5 h-5 text-{{ color }}-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ icon_path }}"/>
+          </svg>
+        </div>
+        <div>
+          <p class="font-bold text-white text-sm mb-1">{{ name }}</p>
+          <p class="text-xs text-muted leading-relaxed">{{ desc }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- PRICING TEASER -->
+<section id="pricing" class="py-20 border-t border-border">
+  <div class="max-w-3xl mx-auto px-4 text-center">
+    <h2 class="text-4xl font-black text-white mb-4">Simple, All-In Pricing</h2>
+    <p class="text-xl text-muted mb-8">Start for $1. Full access for 3 days. Then $249/month. Cancel anytime.</p>
+    <div class="flex flex-col sm:flex-row gap-4 justify-center mb-6">
+      <div class="bg-card border border-border rounded-2xl px-8 py-5 text-left sm:w-56">
+        <p class="text-xs font-bold text-muted uppercase tracking-wider mb-1">Free Analysis</p>
+        <p class="text-4xl font-black text-white mb-1">$0</p>
+        <p class="text-sm text-muted">Instant, no account needed</p>
+      </div>
+      <div class="bg-card glow-border rounded-2xl px-8 py-5 text-left sm:w-56 relative">
+        <div class="absolute top-3 right-3 bg-indigo-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">POPULAR</div>
+        <p class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">Full Access</p>
+        <p class="text-4xl font-black text-white mb-1">$249<span class="text-lg text-muted font-normal">/mo</span></p>
+        <p class="text-sm text-orange-400 font-semibold">Start for $1 · 3-day trial</p>
+      </div>
+    </div>
+    <a href="/pricing" class="inline-block btn-primary text-white font-bold px-8 py-3 rounded-xl">See Full Pricing & Features →</a>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" class="py-24 border-t border-border bg-surface">
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+    <h2 class="text-4xl font-black text-white text-center mb-12">Frequently Asked Questions</h2>
+    <div class="space-y-4">
+      {% set faqs = [
+        ("What does the free analysis actually check?", "We fetch your website and check: title tag, meta description, H1 tags, structured data (Schema.org), canonical tags, noindex flags, image alt text, and page speed. We also estimate competitor gaps and keyword opportunities. It takes about 30 seconds."),
+        ("Do I need a developer to set this up?", "No. You connect your WordPress site with your existing credentials, or your GitHub repo with a token. Our wizard walks you through it in under 10 minutes."),
+        ("What happens after the 3-day trial?", "You'll be charged $249/month automatically. Cancel anytime before day 3 from your settings page and you pay nothing more than the $1."),
+        ("How many pages can the AI generate?", "There's no hard limit. A typical local business with 12 service cities and 30 brands generates ~400–500 location pages in one pipeline run. Enterprise clients generate thousands."),
+        ("Does this work for my industry?", "Yes — auto body, dental, legal, medical, real estate, SaaS, e-commerce, restaurants. The AI adapts keyword strategy and content templates to your specific vertical."),
+        ("Can I use this if I already have an SEO agency?", "Absolutely. Many of our clients use Denzo as the AI layer that generates and publishes pages while their agency handles link building and strategy. The two complement each other."),
+      ] %}
+      {% for q, a in faqs %}
+      <details class="bg-card border border-border rounded-xl">
+        <summary class="flex items-center justify-between p-5 text-white font-semibold text-sm">
+          {{ q }}
+          <svg class="w-5 h-5 text-muted faq-arrow shrink-0 ml-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </summary>
+        <div class="px-5 pb-5 text-sm text-muted leading-relaxed">{{ a }}</div>
+      </details>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- BOTTOM CTA -->
+<section class="py-24">
+  <div class="max-w-3xl mx-auto px-4 text-center">
+    <h2 class="text-4xl font-black text-white mb-4">See What's Holding Your Site Back</h2>
+    <p class="text-xl text-muted mb-10">Free analysis. No account. 30 seconds.</p>
+    <form action="/wizard/start" method="POST">
+      <div class="flex flex-col sm:flex-row gap-3 p-2 bg-card border border-border rounded-2xl glow-border max-w-xl mx-auto">
+        <input
+          type="text"
+          name="url"
+          placeholder="yourwebsite.com"
+          required
+          class="flex-1 bg-transparent text-text placeholder-muted text-lg font-medium outline-none px-4 py-3"
+        />
+        <button type="submit" class="analyze-btn text-white font-bold text-base px-8 py-3 rounded-xl transition-all shrink-0">
+          Analyze Free →
+        </button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="border-t border-border py-10">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted">
+    <div class="flex items-center gap-2">
+      <div class="w-6 h-6 rounded btn-primary flex items-center justify-center">
+        <svg class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      </div>
+      <span class="font-bold text-white">DENZO SEO</span>
+    </div>
+    <div class="flex gap-6">
+      <a href="/login" class="hover:text-text transition-colors">Sign In</a>
+      <a href="/signup" class="hover:text-text transition-colors">Start Trial</a>
+      <a href="/pricing" class="hover:text-text transition-colors">Pricing</a>
+    </div>
+    <p>© 2026 Denzo Estudios. All rights reserved.</p>
+  </div>
+</footer>
+
+</body>
+</html>

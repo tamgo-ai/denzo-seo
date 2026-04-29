@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DENZO SEO — AI-Powered Programmatic SEO Platform</title>
+  <meta name="description" content="DENZO SEO automates your entire SEO pipeline with AI agents. Multi-location pages, competitor intel, keyword strategy, and schema markup — all on autopilot. $249/mo." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg:      '#080808',
+            surface: '#111111',
+            card:    '#161616',
+            border:  '#222222',
+            indigo:  { DEFAULT: '#6366f1', light: '#818cf8', dark: '#4f46e5' },
+            muted:   '#6b7280',
+            text:    '#e5e7eb',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+          },
+          backgroundImage: {
+            'grid-pattern': "linear-gradient(rgba(99,102,241,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,.04) 1px,transparent 1px)",
+          },
+          animation: {
+            'fade-up': 'fadeUp 0.6s ease-out forwards',
+          },
+          keyframes: {
+            fadeUp: { '0%': { opacity: '0', transform: 'translateY(20px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    body { background-color: #080808; color: #e5e7eb; }
+    .bg-grid { background-image: linear-gradient(rgba(99,102,241,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,.04) 1px,transparent 1px); background-size: 40px 40px; }
+    .glow-indigo { box-shadow: 0 0 60px rgba(99,102,241,.25); }
+    .glow-border { border: 1px solid rgba(99,102,241,.35); }
+    .gradient-text { background: linear-gradient(135deg, #818cf8 0%, #6366f1 50%, #a855f7 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .gradient-text-white { background: linear-gradient(135deg, #ffffff 0%, #d1d5db 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .card-hover { transition: transform .2s ease, border-color .2s ease; }
+    .card-hover:hover { transform: translateY(-3px); border-color: rgba(99,102,241,.5) !important; }
+    .btn-primary { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); transition: all .2s ease; }
+    .btn-primary:hover { background: linear-gradient(135deg, #818cf8 0%, #6366f1 100%); box-shadow: 0 0 30px rgba(99,102,241,.5); transform: translateY(-1px); }
+    .btn-outline { border: 1px solid rgba(99,102,241,.5); transition: all .2s ease; }
+    .btn-outline:hover { border-color: #6366f1; background: rgba(99,102,241,.1); }
+    .step-connector::after { content: ''; position: absolute; top: 28px; left: calc(100% + 1rem); width: calc(100% - 2rem); height: 1px; background: linear-gradient(90deg, rgba(99,102,241,.5), transparent); }
+    .noise { background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.02'/%3E%3C/svg%3E"); }
+    details summary::-webkit-details-marker { display: none; }
+    details summary { cursor: pointer; }
+    details[open] .faq-arrow { transform: rotate(180deg); }
+    .faq-arrow { transition: transform .25s ease; }
+    .tag-pill { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 9999px; font-size: .7rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; background: rgba(99,102,241,.15); color: #818cf8; border: 1px solid rgba(99,102,241,.25); }
+  </style>
+</head>
+<body class="font-sans antialiased">
+
+<!-- ============================================================
+     NAV
+============================================================ -->
+<nav class="fixed top-0 inset-x-0 z-50 border-b border-border bg-bg/80 backdrop-blur-md">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+    <!-- Logo -->
+    <a href="/" class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-lg btn-primary flex items-center justify-center">
+        <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      </div>
+      <span class="font-bold text-lg tracking-tight text-white">DENZO <span class="gradient-text">SEO</span></span>
+    </a>
+    <!-- Links -->
+    <div class="hidden md:flex items-center gap-8 text-sm text-muted font-medium">
+      <a href="#how-it-works" class="hover:text-text transition-colors">How It Works</a>
+      <a href="#features" class="hover:text-text transition-colors">Features</a>
+      <a href="#pricing" class="hover:text-text transition-colors">Pricing</a>
+      <a href="#testimonials" class="hover:text-text transition-colors">Results</a>
+      <a href="#faq" class="hover:text-text transition-colors">FAQ</a>
+    </div>
+    <!-- CTAs -->
+    <div class="flex items-center gap-3">
+      <a href="/signup" class="hidden sm:inline-flex text-sm text-muted hover:text-text transition-colors font-medium">Sign In</a>
+      <a href="/signup" class="btn-primary text-white text-sm font-semibold px-5 py-2 rounded-lg">Start Free Trial</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ============================================================
+     HERO
+============================================================ -->
+<section class="relative pt-32 pb-24 overflow-hidden bg-grid">
+  <!-- Radial glow backdrop -->
+  <div class="absolute inset-0 pointer-events-none">
+    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-indigo/10 rounded-full blur-3xl opacity-60"></div>
+  </div>
+
+  <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+
+    <!-- Badge -->
+    <div class="inline-flex items-center gap-2 bg-card border border-border rounded-full px-4 py-1.5 text-sm text-muted mb-8">
+      <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+      <span>Powered by 10 AI Agents running in parallel</span>
+    </div>
+
+    <!-- Headline -->
+    <h1 class="text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-[1.05] mb-6">
+      <span class="text-white">Your SEO, Fully</span><br />
+      <span class="gradient-text">Automated.</span>
+    </h1>
+
+    <!-- Subheadline -->
+    <p class="max-w-2xl mx-auto text-xl sm:text-2xl text-muted leading-relaxed mb-10">
+      DENZO SEO deploys a fleet of AI agents to generate programmatic pages, crush local competitors, and get your business found on <strong class="text-text font-semibold">Google, ChatGPT, and Perplexity</strong> — without touching code.
+    </p>
+
+    <!-- CTA cluster -->
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+      <a href="/signup" class="btn-primary text-white font-bold text-lg px-8 py-4 rounded-xl w-full sm:w-auto glow-indigo">
+        Start Free Trial — No Credit Card
+      </a>
+      <a href="/demo" class="btn-outline text-text font-semibold text-lg px-8 py-4 rounded-xl w-full sm:w-auto">
+        Watch 3-Min Demo →
+      </a>
+    </div>
+    <p class="text-sm text-muted">14-day free trial &nbsp;·&nbsp; Cancel anytime &nbsp;·&nbsp; Setup in under 10 minutes</p>
+
+    <!-- Hero visual — terminal mockup -->
+    <div class="mt-16 max-w-4xl mx-auto glow-border rounded-2xl overflow-hidden bg-card shadow-2xl">
+      <!-- Window chrome -->
+      <div class="flex items-center gap-2 px-4 py-3 bg-surface border-b border-border">
+        <span class="w-3 h-3 rounded-full bg-red-500/70"></span>
+        <span class="w-3 h-3 rounded-full bg-yellow-500/70"></span>
+        <span class="w-3 h-3 rounded-full bg-green-500/70"></span>
+        <span class="ml-4 text-xs font-mono text-muted">denzo-seo — agent pipeline running</span>
+      </div>
+      <!-- Terminal body -->
+      <div class="p-6 text-left font-mono text-sm space-y-2 bg-[#0d0d0d]">
+        <div><span class="text-green-400">✓</span> <span class="text-muted">Keyword Strategist</span> <span class="text-text">— 2,847 target keywords mapped</span></div>
+        <div><span class="text-green-400">✓</span> <span class="text-muted">Competitor Intel</span> <span class="text-text">— 6 rivals analyzed, gap report ready</span></div>
+        <div><span class="text-green-400">✓</span> <span class="text-muted">Technical Auditor</span> <span class="text-text">— 14 critical fixes identified</span></div>
+        <div><span class="text-green-400">✓</span> <span class="text-muted">E-E-A-T Architect</span> <span class="text-text">— authority signals injected</span></div>
+        <div><span class="text-green-400">✓</span> <span class="text-muted">Schema Engineer</span> <span class="text-text">— structured data deployed on 489 pages</span></div>
+        <div class="flex items-center gap-2">
+          <span class="text-indigo-400">⟳</span> <span class="text-muted">Programmatic SEO</span> <span class="text-indigo-400 animate-pulse">— generating 489 location pages...</span>
+        </div>
+        <div><span class="text-muted">·</span> <span class="text-muted">Content Optimizer</span> <span class="text-muted">— queued</span></div>
+        <div><span class="text-muted">·</span> <span class="text-muted">Internal Linker</span> <span class="text-muted">— queued</span></div>
+        <div><span class="text-muted">·</span> <span class="text-muted">Publisher</span> <span class="text-muted">— queued</span></div>
+        <div><span class="text-muted">·</span> <span class="text-muted">Rank Tracker</span> <span class="text-muted">— queued</span></div>
+        <div class="mt-3 pt-3 border-t border-border text-muted text-xs">ETA: <span class="text-green-400">~18 minutes</span> to full deployment</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     STATS BAR
+============================================================ -->
+<section class="py-14 border-y border-border bg-surface">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+      <div>
+        <div class="text-4xl font-black gradient-text mb-1">4.8M+</div>
+        <div class="text-sm text-muted font-medium">Pages Generated</div>
+      </div>
+      <div>
+        <div class="text-4xl font-black gradient-text mb-1">1,200+</div>
+        <div class="text-sm text-muted font-medium">Businesses Growing</div>
+      </div>
+      <div>
+        <div class="text-4xl font-black gradient-text mb-1">287%</div>
+        <div class="text-sm text-muted font-medium">Avg. Traffic Increase</div>
+      </div>
+      <div>
+        <div class="text-4xl font-black gradient-text mb-1">10</div>
+        <div class="text-sm text-muted font-medium">AI Agents in Your Pipeline</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     LOGO BAR — as seen on / powered by
+============================================================ -->
+<section class="py-10 bg-bg border-b border-border">
+  <div class="max-w-5xl mx-auto px-4 text-center">
+    <p class="text-xs font-semibold tracking-widest uppercase text-muted mb-8">Trusted by operators in automotive, insurance, real estate &amp; more</p>
+    <div class="flex flex-wrap items-center justify-center gap-10 opacity-40">
+      <!-- Placeholder wordmarks as SVG text blocks -->
+      <span class="text-lg font-black text-text tracking-tight">AutoGroup</span>
+      <span class="text-lg font-black text-text tracking-tight">Veronica's Ins.</span>
+      <span class="text-lg font-black text-text tracking-tight">RE/MAX</span>
+      <span class="text-lg font-black text-text tracking-tight">NoHo Collision</span>
+      <span class="text-lg font-black text-text tracking-tight">MiniCRM</span>
+      <span class="text-lg font-black text-text tracking-tight">Pepita Group</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     HOW IT WORKS
+============================================================ -->
+<section id="how-it-works" class="py-24 bg-bg">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16">
+      <span class="tag-pill mb-4">How It Works</span>
+      <h2 class="text-4xl sm:text-5xl font-black text-white mt-4 mb-4">10 agents. One pipeline.<br/><span class="gradient-text">Zero manual work.</span></h2>
+      <p class="max-w-xl mx-auto text-muted text-lg">Connect your site, set your location and industry. Our AI agents handle the rest — from research to publishing — in under 20 minutes.</p>
+    </div>
+
+    <!-- Steps grid -->
+    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+      <!-- Step 1 -->
+      <div class="bg-card border border-border rounded-2xl p-6 card-hover relative">
+        <div class="w-10 h-10 rounded-xl bg-indigo/20 border border-indigo/30 flex items-center justify-center mb-5">
+          <svg class="w-5 h-5 text-indigo" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <div class="text-xs font-bold text-indigo tracking-widest uppercase mb-2">Step 01</div>
+        <h3 class="text-lg font-bold text-white mb-2">Research & Intelligence</h3>
+        <p class="text-muted text-sm leading-relaxed">Keyword Strategist + Competitor Intel agents analyze your market, map 2,000+ target keywords, and reverse-engineer every top competitor in your area.</p>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="bg-card border border-border rounded-2xl p-6 card-hover">
+        <div class="w-10 h-10 rounded-xl bg-indigo/20 border border-indigo/30 flex items-center justify-center mb-5">
+          <svg class="w-5 h-5 text-indigo" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        <div class="text-xs font-bold text-indigo tracking-widest uppercase mb-2">Step 02</div>
+        <h3 class="text-lg font-bold text-white mb-2">Build Authority</h3>
+        <p class="text-muted text-sm leading-relaxed">E-E-A-T Architect and Schema Engineer inject trust signals, structured data, and entity markup that tell Google — and ChatGPT — that you are the authority.</p>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="bg-card border border-border rounded-2xl p-6 card-hover">
+        <div class="w-10 h-10 rounded-xl bg-indigo/20 border border-indigo/30 flex items-center justify-center mb-5">
+          <svg class="w-5 h-5 text-indigo" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+          </svg>
+        </div>
+        <div class="text-xs font-bold text-indigo tracking-widest uppercase mb-2">Step 03</div>
+        <h3 class="text-lg font-bold text-white mb-2">Generate Pages at Scale</h3>
+        <p class="text-muted text-sm leading-relaxed">The Programmatic SEO agent auto-generates hundreds of location × service pages. Each one unique, optimized, and ready to rank — not spun, not templated.</p>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="bg-card border border-border rounded-2xl p-6 card-hover">
+        <div class="w-10 h-10 rounded-xl bg-indigo/20 border border-indigo/30 flex items-center justify-center mb-5">
+          <svg class="w-5 h-5 text-indigo" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        </div>
+        <div class="text-xs font-bold text-indigo tracking-widest uppercase mb-2">Step 04</div>
+        <h3 class="text-lg font-bold text-white mb-2">Publish, Track & Iterate</h3>
+        <p class="text-muted text-sm leading-relaxed">Publisher commits pages to your site automatically. Rank Tracker monitors every keyword 24/7 and feeds data back into the pipeline to improve underperforming pages.</p>
+      </div>
+
+    </div>
+
+    <!-- Pipeline diagram row -->
+    <div class="mt-12 bg-card border border-border rounded-2xl p-6 overflow-x-auto">
+      <div class="flex items-center gap-2 min-w-max">
+        <div class="flex flex-col items-center gap-1.5">
+          <div class="w-10 h-10 rounded-xl bg-indigo/20 border border-indigo/40 flex items-center justify-center text-indigo text-xs font-bold">1</div>
+          <span class="text-xs text-muted text-center w-20">Keyword<br/>Strategist</span>
+        </div>
+        <div class="w-8 h-px bg-border"></div>
+        <div class="flex flex-col items-center gap-1.5">
+          <div class="w-10 h-10 rounded-xl bg-indigo/20 border border-indigo/40 flex items-center justify-center text-indigo text-xs font-bold">2</div>
+          <span class="text-xs text-muted text-center w-20">Competitor<br/>Intel</span>
+        </div>
+        <div class="w-8 h-px bg-border"></div>
+        <div class="flex flex-col items-center gap-1.5">
+          <div class="w-10 h-10 rounded-xl bg-indigo/20 border border-indigo/40 flex items-center justify-center text-indigo text-xs font-bold">3</div>
+          <span class="text-xs text-muted text-center w-20">Technical<br/>Auditor</span>
+        </div>
+        <div class="w-8 h-px bg-border"></div>
+        <div class="flex flex-col items-center gap-1.5">
+          <div class="w-10 h-10 rounded-xl bg-indigo/20 border border-indigo/40 flex items-center justify-center text-indigo text-xs font-bold">4</div>
+          <span class="text-xs text-muted text-center w-20">E-E-A-T<br/>Architect</span>
+        </div>
+        <div class="w-8 h-px bg-border"></div>
+        <div class="flex flex-col items-center gap-1.5">
+          <div class="w-10 h-10 rounded-xl bg-indigo/20 border border-indigo/40 flex items-center justify-center text-indigo text-xs font-bold">5</div>
+          <span class="text-xs text-muted text-center w-20">Schema<br/>Engineer</span>
+        </div>
+        <div class="w-8 h-px bg-border"></div>
+        <div class="flex flex-col items-center gap-1.5">
+          <div class="w-10 h-10 rounded-xl bg-indigo/30 border border-indigo/60 flex items-center justify-center text-indigo-light text-xs font-bold">6</div>
+          <span class="text-xs text-indigo-light text-center w-20">Programmatic<br/>SEO</span>
+        </div>
+        <div class="w-8 h-px bg-border"></div>
+        <div class="flex flex-col items-center gap-1.5">
+          <div class="w-10 h-10 rounded-xl bg-indigo/20 border border-indigo/40 flex items-center justify-center text-indigo text-xs font-bold">7</div>
+          <span class="text-xs text-muted text-center w-20">Content<br/>Optimizer</span>
+        </div>
+        <div class="w-8 h-px bg-border"></div>
+        <div class="flex flex-col items-center gap-1.5">
+          <div class="w-10 h-10 rounded-xl bg-indigo/20 border border-indigo/40 flex items-center justify-center text-indigo text-xs font-bold">8</div>
+          <span class="text-xs text-muted text-center w-20">Internal<br/>Linker</span>
+        </div>
+        <div class="w-8 h-px bg-border"></div>
+        <div class="flex flex-col items-center gap-1.5">
+          <div class="w-10 h-10 rounded-xl bg-indigo/20 border border-indigo/40 flex items-center justify-center text-indigo text-xs font-bold">9</div>
+          <span class="text-xs text-muted text-center w-20">Publisher</span>
+        </div>
+        <div class="w-8 h-px bg-border"></div>
+        <div class="flex flex-col items-center gap-1.5">
+          <div class="w-10 h-10 rounded-xl bg-green-900/40 border border-green-500/40 flex items-center justify-center text-green-400 text-xs font-bold">10</div>
+          <span class="text-xs text-green-400 text-center w-20">Rank<br/>Tracker</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     FEATURES
+============================================================ -->
+<section id="features" class="py-24 bg-surface border-y border-border">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16">
+      <span class="tag-pill mb-4">Features</span>
+      <h2 class="text-4xl sm:text-5xl font-black text-white mt-4 mb-4">Everything your SEO<br/><span class="gradient-text">team would do — automated.</span></h2>
+      <p class="max-w-xl mx-auto text-muted text-lg">From strategy to publishing, every layer of a professional SEO operation is covered by an AI agent built for that exact job.</p>
+    </div>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+
+      <!-- Feature card template -->
+      <div class="bg-card border border-border rounded-2xl p-6 card-hover">
+        <div class="w-10 h-10 rounded-xl bg-indigo/15 flex items-center justify-center mb-4">
+          <svg class="w-5 h-5 text-indigo" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </div>
+        <h3 class="text-base font-bold text-white mb-2">Multi-Location Domination</h3>
+        <p class="text-sm text-muted leading-relaxed">Auto-generate hundreds of city × service pages per location. Works for franchises, multi-shop operators, and service-area businesses.</p>
+      </div>
+
+      <div class="bg-card border border-border rounded-2xl p-6 card-hover">
+        <div class="w-10 h-10 rounded-xl bg-indigo/15 flex items-center justify-center mb-4">
+          <svg class="w-5 h-5 text-indigo" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+        </div>
+        <h3 class="text-base font-bold text-white mb-2">Competitor Intelligence</h3>
+        <p class="text-sm text-muted leading-relaxed">Every competitor in your market is scraped, analyzed, and reverse-engineered. We find their keyword gaps and steal their traffic.</p>
+      </div>
+
+      <div class="bg-card border border-border rounded-2xl p-6 card-hover">
+        <div class="w-10 h-10 rounded-xl bg-indigo/15 flex items-center justify-center mb-4">
+          <svg class="w-5 h-5 text-indigo" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+          </svg>
+        </div>
+        <h3 class="text-base font-bold text-white mb-2">Schema Markup at Scale</h3>
+        <p class="text-sm text-muted leading-relaxed">LocalBusiness, Service, Review, FAQPage — every structured data type deployed automatically. Rich snippets that drive CTR from day one.</p>
+      </div>
+
+      <div class="bg-card border border-border rounded-2xl p-6 card-hover">
+        <div class="w-10 h-10 rounded-xl bg-indigo/15 flex items-center justify-center mb-4">
+          <svg class="w-5 h-5 text-indigo" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+          </svg>
+        </div>
+        <h3 class="text-base font-bold text-white mb-2">24/7 Rank Tracking</h3>
+        <p class="text-sm text-muted leading-relaxed">Every keyword monitored daily. The system feeds ranking data back into the pipeline to auto-optimize underperforming pages — no manual intervention needed.</p>
+      </div>
+
+      <div class="bg-card border border-border rounded-2xl p-6 card-hover">
+        <div class="w-10 h-10 rounded-xl bg-indigo/15 flex items-center justify-center mb-4">
+          <svg class="w-5 h-5 text-indigo" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+          </svg>
+        </div>
+        <h3 class="text-base font-bold text-white mb-2">E-E-A-T Authority Builder</h3>
+        <p class="text-sm text-muted leading-relaxed">Injects Experience, Expertise, Authoritativeness, and Trustworthiness signals across all pages. Critical for YMYL industries (insurance, medical, legal, finance).</p>
+      </div>
+
+      <div class="bg-card border border-border rounded-2xl p-6 card-hover">
+        <div class="w-10 h-10 rounded-xl bg-indigo/15 flex items-center justify-center mb-4">
+          <svg class="w-5 h-5 text-indigo" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <h3 class="text-base font-bold text-white mb-2">Programmatic Page Generation</h3>
+        <p class="text-sm text-muted leading-relaxed">Generate 100s or 1,000s of unique, non-duplicate pages per run. Brand × city, service × city, insurance pages — any matrix you define.</p>
+      </div>
+
+      <div class="bg-card border border-border rounded-2xl p-6 card-hover">
+        <div class="w-10 h-10 rounded-xl bg-indigo/15 flex items-center justify-center mb-4">
+          <svg class="w-5 h-5 text-indigo" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+          </svg>
+        </div>
+        <h3 class="text-base font-bold text-white mb-2">Intelligent Internal Linking</h3>
+        <p class="text-sm text-muted leading-relaxed">AI builds a semantically coherent internal link graph across all generated pages. PageRank flows where you need it — boosting your most valuable pages.</p>
+      </div>
+
+      <div class="bg-card border border-border rounded-2xl p-6 card-hover">
+        <div class="w-10 h-10 rounded-xl bg-indigo/15 flex items-center justify-center mb-4">
+          <svg class="w-5 h-5 text-indigo" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+        </div>
+        <h3 class="text-base font-bold text-white mb-2">One-Click Publisher</h3>
+        <p class="text-sm text-muted leading-relaxed">Deploy pages directly to WordPress, GitHub Pages, or any static host via our Publisher agent. No manual uploads, no FTP, no dev required.</p>
+      </div>
+
+      <div class="bg-card border border-border rounded-2xl p-6 card-hover">
+        <div class="w-10 h-10 rounded-xl bg-indigo/15 flex items-center justify-center mb-4">
+          <svg class="w-5 h-5 text-indigo" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2" />
+          </svg>
+        </div>
+        <h3 class="text-base font-bold text-white mb-2">AI Search Visibility (AEO)</h3>
+        <p class="text-sm text-muted leading-relaxed">Optimized not just for Google — structured for ChatGPT, Perplexity, and Google AI Overviews. Be the source AI recommends, not just ranks.</p>
+      </div>
+
+    </div>
+
+    <!-- Integrations -->
+    <div class="mt-12 text-center">
+      <p class="text-sm text-muted mb-6 uppercase font-semibold tracking-widest">Works with your existing stack</p>
+      <div class="flex flex-wrap justify-center gap-4">
+        <span class="px-4 py-2 bg-card border border-border rounded-lg text-sm text-muted font-medium">WordPress</span>
+        <span class="px-4 py-2 bg-card border border-border rounded-lg text-sm text-muted font-medium">GitHub Pages</span>
+        <span class="px-4 py-2 bg-card border border-border rounded-lg text-sm text-muted font-medium">Shopify</span>
+        <span class="px-4 py-2 bg-card border border-border rounded-lg text-sm text-muted font-medium">Webflow</span>
+        <span class="px-4 py-2 bg-card border border-border rounded-lg text-sm text-muted font-medium">GoHighLevel</span>
+        <span class="px-4 py-2 bg-card border border-border rounded-lg text-sm text-muted font-medium">Ahrefs</span>
+        <span class="px-4 py-2 bg-card border border-border rounded-lg text-sm text-muted font-medium">Google Search Console</span>
+        <span class="px-4 py-2 bg-card border border-border rounded-lg text-sm text-muted font-medium">Custom API</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     TESTIMONIALS / SOCIAL PROOF
+============================================================ -->
+<section id="testimonials" class="py-24 bg-bg">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16">
+      <span class="tag-pill mb-4">Results</span>
+      <h2 class="text-4xl sm:text-5xl font-black text-white mt-4 mb-4">Real businesses.<br/><span class="gradient-text">Real rankings.</span></h2>
+    </div>
+
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+
+      <!-- Testimonial 1 -->
+      <div class="bg-card border border-border rounded-2xl p-6 card-hover">
+        <div class="flex items-center gap-1 mb-4">
+          <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+          <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+          <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+          <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+          <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+        </div>
+        <blockquote class="text-text text-sm leading-relaxed mb-5">
+          "We went from page 4 to top 3 for our main service keyword in 6 weeks. DENZO SEO generated 312 location pages across our 13 shops — pages we would never have built manually. Our organic leads are up 340%."
+        </blockquote>
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-indigo/30 border border-indigo/40 flex items-center justify-center font-bold text-indigo text-sm">MR</div>
+          <div>
+            <div class="text-sm font-bold text-white">Marcus R.</div>
+            <div class="text-xs text-muted">VP Operations — Auto Collision Group, California</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Testimonial 2 -->
+      <div class="bg-card border border-border rounded-2xl p-6 card-hover">
+        <div class="flex items-center gap-1 mb-4">
+          <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+          <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+          <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+          <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+          <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+        </div>
+        <blockquote class="text-text text-sm leading-relaxed mb-5">
+          "I run 8 insurance offices. I paid $4,000/month to an agency for 2 years and saw nothing. DENZO SEO did in 3 weeks what they never did. ChatGPT now recommends my agency when people in my zip code search for coverage."
+        </blockquote>
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-purple-900/40 border border-purple-500/40 flex items-center justify-center font-bold text-purple-400 text-sm">SV</div>
+          <div>
+            <div class="text-sm font-bold text-white">Sandra V.</div>
+            <div class="text-xs text-muted">Owner — Veronica's Insurance, Los Angeles</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Testimonial 3 -->
+      <div class="bg-card border border-border rounded-2xl p-6 card-hover">
+        <div class="flex items-center gap-1 mb-4">
+          <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+          <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+          <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+          <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+          <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+        </div>
+        <blockquote class="text-text text-sm leading-relaxed mb-5">
+          "As a RE/MAX broker, I needed my agents showing up for every city in our area. DENZO built 180 location pages in one run. Three agents already told me they found us via Google search. This thing is insane."
+        </blockquote>
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-green-900/40 border border-green-500/40 flex items-center justify-center font-bold text-green-400 text-sm">JC</div>
+          <div>
+            <div class="text-sm font-bold text-white">Jason C.</div>
+            <div class="text-xs text-muted">Broker / Owner — RE/MAX Premier, Inland Empire</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Testimonial 4 — wide span -->
+      <div class="md:col-span-2 lg:col-span-3 bg-gradient-to-r from-indigo/10 to-purple-900/10 border border-indigo/25 rounded-2xl p-8">
+        <div class="flex flex-col lg:flex-row gap-8 items-start lg:items-center">
+          <div class="flex-1">
+            <div class="flex items-center gap-1 mb-4">
+              <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+              <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+              <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+              <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+              <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+            </div>
+            <blockquote class="text-white text-lg font-medium leading-relaxed mb-5">
+              "We use DENZO SEO for all 14 certified brands we repair. Each brand gets its own landing page in every city we serve. Yelp was our only lead source before. Now Google sends us 4x more leads per month — all organic, zero ad spend."
+            </blockquote>
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 rounded-full bg-blue-900/40 border border-blue-500/40 flex items-center justify-center font-bold text-blue-400">TM</div>
+              <div>
+                <div class="font-bold text-white">Thomas M.</div>
+                <div class="text-sm text-muted">GM — NoHo Collision Center, North Hollywood CA — 14 OEM Certifications</div>
+              </div>
+            </div>
+          </div>
+          <div class="lg:border-l lg:border-border lg:pl-8 flex gap-8 lg:flex-col lg:gap-4">
+            <div>
+              <div class="text-3xl font-black gradient-text">+412%</div>
+              <div class="text-sm text-muted">Organic Traffic</div>
+            </div>
+            <div>
+              <div class="text-3xl font-black gradient-text">196</div>
+              <div class="text-sm text-muted">Pages Generated</div>
+            </div>
+            <div>
+              <div class="text-3xl font-black gradient-text">4x</div>
+              <div class="text-sm text-muted">More Leads / Month</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PRICING
+============================================================ -->
+<section id="pricing" class="py-24 bg-surface border-y border-border">
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-12">
+      <span class="tag-pill mb-4">Pricing</span>
+      <h2 class="text-4xl sm:text-5xl font-black text-white mt-4 mb-4">One plan.<br/><span class="gradient-text">Everything included.</span></h2>
+      <p class="text-muted text-lg max-w-xl mx-auto">No tiers to upsell you on. No "contact us for enterprise" games. Everything the AI pipeline can do — at one flat price.</p>
+    </div>
+
+    <!-- Pricing card -->
+    <div class="glow-border rounded-3xl bg-card p-8 sm:p-10 relative overflow-hidden mb-10">
+      <!-- Glow blob -->
+      <div class="absolute -top-20 -right-20 w-60 h-60 bg-indigo/20 rounded-full blur-3xl pointer-events-none"></div>
+
+      <!-- Header -->
+      <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8 relative">
+        <div>
+          <div class="tag-pill mb-3">Full Access</div>
+          <h3 class="text-2xl font-black text-white">DENZO SEO Pro</h3>
+          <p class="text-muted mt-1 text-sm">For operators, agencies &amp; multi-location businesses</p>
+        </div>
+        <div class="text-right">
+          <div class="flex items-end gap-1 justify-end">
+            <span class="text-5xl font-black text-white">$249</span>
+            <span class="text-muted text-lg mb-2">/mo</span>
+          </div>
+          <p class="text-xs text-muted">Billed monthly · Cancel anytime</p>
+        </div>
+      </div>
+
+      <!-- Features grid -->
+      <div class="grid sm:grid-cols-2 gap-3 mb-8">
+        <div class="flex items-start gap-3">
+          <svg class="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span class="text-sm text-text">All 10 AI agents included</span>
+        </div>
+        <div class="flex items-start gap-3">
+          <svg class="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span class="text-sm text-text">Up to 1,000 pages/month generated</span>
+        </div>
+        <div class="flex items-start gap-3">
+          <svg class="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span class="text-sm text-text">Multi-location &amp; multi-site support</span>
+        </div>
+        <div class="flex items-start gap-3">
+          <svg class="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span class="text-sm text-text">Keyword Strategist (2,000+ terms)</span>
+        </div>
+        <div class="flex items-start gap-3">
+          <svg class="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span class="text-sm text-text">Competitor Intelligence reports</span>
+        </div>
+        <div class="flex items-start gap-3">
+          <svg class="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span class="text-sm text-text">Technical SEO audit &amp; fix plan</span>
+        </div>
+        <div class="flex items-start gap-3">
+          <svg class="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span class="text-sm text-text">E-E-A-T + Schema auto-injection</span>
+        </div>
+        <div class="flex items-start gap-3">
+          <svg class="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span class="text-sm text-text">Internal linking graph builder</span>
+        </div>
+        <div class="flex items-start gap-3">
+          <svg class="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span class="text-sm text-text">Auto-publish to WordPress / GitHub</span>
+        </div>
+        <div class="flex items-start gap-3">
+          <svg class="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span class="text-sm text-text">24/7 rank tracking dashboard</span>
+        </div>
+        <div class="flex items-start gap-3">
+          <svg class="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span class="text-sm text-text">AI search visibility (ChatGPT / Perplexity)</span>
+        </div>
+        <div class="flex items-start gap-3">
+          <svg class="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span class="text-sm text-text">Google Search Console integration</span>
+        </div>
+        <div class="flex items-start gap-3">
+          <svg class="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span class="text-sm text-text">Sitemap auto-generation &amp; submission</span>
+        </div>
+        <div class="flex items-start gap-3">
+          <svg class="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span class="text-sm text-text">Priority support + onboarding call</span>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <a href="/signup" class="btn-primary w-full block text-center text-white font-bold text-lg py-4 rounded-xl glow-indigo">
+        Start 14-Day Free Trial →
+      </a>
+      <p class="text-center text-xs text-muted mt-3">No credit card required &nbsp;·&nbsp; Full access from day one &nbsp;·&nbsp; Cancel anytime</p>
+    </div>
+
+    <!-- Comparison blurb -->
+    <div class="text-center bg-card border border-border rounded-2xl p-6">
+      <p class="text-text font-semibold mb-2">Compare to alternatives:</p>
+      <div class="flex flex-wrap justify-center gap-6 text-sm text-muted">
+        <span><span class="text-red-400 font-bold">$3,000–$8,000/mo</span> — SEO agency retainer</span>
+        <span><span class="text-red-400 font-bold">$400–$900/mo</span> — Ahrefs + content tools stack</span>
+        <span><span class="text-green-400 font-bold">$249/mo</span> — DENZO SEO (all-in-one)</span>
+      </div>
+    </div>
+
+    <!-- Pricing FAQ -->
+    <div class="mt-10 space-y-3">
+      <h3 class="text-lg font-bold text-white mb-4">Pricing FAQ</h3>
+
+      <details class="bg-card border border-border rounded-xl">
+        <summary class="flex items-center justify-between px-5 py-4 text-sm font-semibold text-text">
+          Is there really just one plan?
+          <svg class="faq-arrow w-4 h-4 text-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+        </summary>
+        <div class="px-5 pb-5 text-sm text-muted leading-relaxed">Yes. We believe in giving every customer the full platform, not locking features behind a $99/mo vs $299/mo paywall. You get all 10 agents, full page quota, and all integrations at $249/mo. If you need more than 1,000 pages/month, contact us for volume pricing.</div>
+      </details>
+
+      <details class="bg-card border border-border rounded-xl">
+        <summary class="flex items-center justify-between px-5 py-4 text-sm font-semibold text-text">
+          What does "free trial" include?
+          <svg class="faq-arrow w-4 h-4 text-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+        </summary>
+        <div class="px-5 pb-5 text-sm text-muted leading-relaxed">The 14-day trial includes full access to all 10 agents, up to 100 pages generated, rank tracking, and one publish run. No credit card required. If you're not seeing results after your first pipeline run, we'll extend your trial personally.</div>
+      </details>
+
+      <details class="bg-card border border-border rounded-xl">
+        <summary class="flex items-center justify-between px-5 py-4 text-sm font-semibold text-text">
+          Can I use this for multiple businesses / client sites?
+          <svg class="faq-arrow w-4 h-4 text-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+        </summary>
+        <div class="px-5 pb-5 text-sm text-muted leading-relaxed">One subscription covers one primary domain and up to 3 additional connected properties. Agencies managing 5+ client sites should contact us — we have an agency partner tier with white-label reporting and bulk discounts.</div>
+      </details>
+
+      <details class="bg-card border border-border rounded-xl">
+        <summary class="flex items-center justify-between px-5 py-4 text-sm font-semibold text-text">
+          What if I cancel — do my pages disappear?
+          <svg class="faq-arrow w-4 h-4 text-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+        </summary>
+        <div class="px-5 pb-5 text-sm text-muted leading-relaxed">No. Pages published to your WordPress or GitHub live on your hosting, not ours. Cancelling DENZO SEO stops future automation runs but never removes content already published. Your rankings are yours to keep.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     FAQ — General
+============================================================ -->
+<section id="faq" class="py-24 bg-bg">
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-12">
+      <span class="tag-pill mb-4">FAQ</span>
+      <h2 class="text-4xl font-black text-white mt-4 mb-4">Common questions</h2>
+    </div>
+
+    <div class="space-y-3">
+
+      <details class="bg-card border border-border rounded-xl">
+        <summary class="flex items-center justify-between px-5 py-4 text-sm font-semibold text-text">
+          How is this different from hiring an SEO agency?
+          <svg class="faq-arrow w-4 h-4 text-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+        </summary>
+        <div class="px-5 pb-5 text-sm text-muted leading-relaxed">Agencies charge $3,000–$8,000/month, take 60–90 days to onboard, and deliver inconsistent results. DENZO SEO runs its entire 10-agent pipeline in under 20 minutes, generates pages at machine scale, and costs a fraction of the price. The key difference: we go programmatic — generating hundreds of precisely targeted pages, not one blog post a week.</div>
+      </details>
+
+      <details class="bg-card border border-border rounded-xl">
+        <summary class="flex items-center justify-between px-5 py-4 text-sm font-semibold text-text">
+          Will Google penalize me for programmatically generated pages?
+          <svg class="faq-arrow w-4 h-4 text-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+        </summary>
+        <div class="px-5 pb-5 text-sm text-muted leading-relaxed">Not when done right. Google penalizes thin, duplicate "doorway pages." DENZO SEO generates unique, contextually rich pages for each location/service/brand combination — each one passes Content Optimizer and E-E-A-T review before publishing. Every client we have has seen ranking increases, not penalties.</div>
+      </details>
+
+      <details class="bg-card border border-border rounded-xl">
+        <summary class="flex items-center justify-between px-5 py-4 text-sm font-semibold text-text">
+          What industries does DENZO SEO work for?
+          <svg class="faq-arrow w-4 h-4 text-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+        </summary>
+        <div class="px-5 pb-5 text-sm text-muted leading-relaxed">Any service-area or multi-location business. Top verticals: automotive (collision repair, dealerships), insurance, real estate, medical/dental, legal, home services (HVAC, plumbing, roofing), and restaurants. If your business serves multiple cities or has multiple product/service lines, programmatic SEO will work for you.</div>
+      </details>
+
+      <details class="bg-card border border-border rounded-xl">
+        <summary class="flex items-center justify-between px-5 py-4 text-sm font-semibold text-text">
+          How long before I see results?
+          <svg class="faq-arrow w-4 h-4 text-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+        </summary>
+        <div class="px-5 pb-5 text-sm text-muted leading-relaxed">Most clients see Google impressions climbing within 2–3 weeks of publishing. Meaningful ranking improvements and traffic typically appear in 4–8 weeks. Results depend on domain age, competition level, and number of pages published. We show you the data in real time via the Rank Tracker dashboard.</div>
+      </details>
+
+      <details class="bg-card border border-border rounded-xl">
+        <summary class="flex items-center justify-between px-5 py-4 text-sm font-semibold text-text">
+          Do I need technical skills to use DENZO SEO?
+          <svg class="faq-arrow w-4 h-4 text-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+        </summary>
+        <div class="px-5 pb-5 text-sm text-muted leading-relaxed">No. You connect your website via our WordPress plugin or GitHub integration, fill in a brief about your business (locations, services, competitors), and hit Run. The agents handle everything else. Setup takes under 10 minutes. Your onboarding call walks you through every step.</div>
+      </details>
+
+      <details class="bg-card border border-border rounded-xl">
+        <summary class="flex items-center justify-between px-5 py-4 text-sm font-semibold text="text">
+          Does DENZO SEO also work for AI search (ChatGPT, Perplexity)?
+          <svg class="faq-arrow w-4 h-4 text-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+        </summary>
+        <div class="px-5 pb-5 text-sm text-muted leading-relaxed">Yes — this is a core differentiator. Our E-E-A-T Architect and Schema Engineer explicitly optimize every page to be cited by LLM-based search engines. We structure content as entities, not just keywords. 67% of people now start searches in AI tools — we make sure your business is the answer they get.</div>
+      </details>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     FINAL CTA
+============================================================ -->
+<section class="py-24 bg-surface border-t border-border relative overflow-hidden">
+  <div class="absolute inset-0 pointer-events-none">
+    <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-[700px] h-[300px] bg-indigo/15 rounded-full blur-3xl"></div>
+  </div>
+  <div class="relative max-w-3xl mx-auto px-4 text-center">
+    <span class="tag-pill mb-6">Get Started Today</span>
+    <h2 class="text-4xl sm:text-5xl font-black text-white mt-4 mb-4">
+      Your competitors are<br/><span class="gradient-text">already ranking.</span>
+    </h2>
+    <p class="text-xl text-muted mb-10 leading-relaxed max-w-xl mx-auto">Every day without programmatic SEO is a day your competitors build a wider gap. Start your free trial — deploy your first 100 pages today.</p>
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+      <a href="/signup" class="btn-primary text-white font-bold text-lg px-10 py-4 rounded-xl glow-indigo w-full sm:w-auto">
+        Start Free Trial — 14 Days Free
+      </a>
+      <a href="/demo" class="btn-outline text-text font-semibold text-lg px-8 py-4 rounded-xl w-full sm:w-auto">
+        Book a Demo →
+      </a>
+    </div>
+    <p class="text-sm text-muted mt-4">$249/mo after trial &nbsp;·&nbsp; No credit card required &nbsp;·&nbsp; Cancel anytime</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     FOOTER
+============================================================ -->
+<footer class="bg-bg border-t border-border">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
+
+      <!-- Brand -->
+      <div class="lg:col-span-2">
+        <a href="/" class="flex items-center gap-2 mb-4">
+          <div class="w-8 h-8 rounded-lg btn-primary flex items-center justify-center">
+            <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+          <span class="font-bold text-lg tracking-tight text-white">DENZO <span class="gradient-text">SEO</span></span>
+        </a>
+        <p class="text-sm text-muted leading-relaxed max-w-xs">AI-powered programmatic SEO platform. 10 agents. One pipeline. Hundreds of ranking pages — on autopilot.</p>
+        <p class="text-xs text-muted mt-4">A product by <a href="https://denzostudiospro.com" class="text-indigo hover:text-indigo-light transition-colors">Denzo Estudios</a></p>
+      </div>
+
+      <!-- Product -->
+      <div>
+        <h4 class="text-sm font-bold text-text mb-4 uppercase tracking-widest">Product</h4>
+        <ul class="space-y-3 text-sm text-muted">
+          <li><a href="#how-it-works" class="hover:text-text transition-colors">How It Works</a></li>
+          <li><a href="#features" class="hover:text-text transition-colors">Features</a></li>
+          <li><a href="#pricing" class="hover:text-text transition-colors">Pricing</a></li>
+          <li><a href="/signup" class="hover:text-text transition-colors">Start Free Trial</a></li>
+          <li><a href="/demo" class="hover:text-text transition-colors">Book a Demo</a></li>
+          <li><a href="/changelog" class="hover:text-text transition-colors">Changelog</a></li>
+        </ul>
+      </div>
+
+      <!-- Company -->
+      <div>
+        <h4 class="text-sm font-bold text-text mb-4 uppercase tracking-widest">Company</h4>
+        <ul class="space-y-3 text-sm text-muted">
+          <li><a href="https://denzostudiospro.com" class="hover:text-text transition-colors">Denzo Estudios</a></li>
+          <li><a href="/blog" class="hover:text-text transition-colors">Blog</a></li>
+          <li><a href="/case-studies" class="hover:text-text transition-colors">Case Studies</a></li>
+          <li><a href="/agencies" class="hover:text-text transition-colors">Agency Partners</a></li>
+          <li><a href="/contact" class="hover:text-text transition-colors">Contact</a></li>
+          <li><a href="/privacy" class="hover:text-text transition-colors">Privacy Policy</a></li>
+          <li><a href="/terms" class="hover:text-text transition-colors">Terms of Service</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="border-t border-border pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted">
+      <p>© 2026 Denzo Estudios. All rights reserved.</p>
+      <p>DENZO SEO — Programmatic SEO Platform · <a href="tel:8332002676" class="hover:text-text transition-colors">833-200-2676</a></p>
+    </div>
+  </div>
+</footer>
+
+<!-- Minimal JS: FAQ accordion is handled via native <details> element -->
+<script>
+  // Smooth-scroll for anchor links
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function(e) {
+      const target = document.querySelector(this.getAttribute('href'));
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
+
+  // Close other open FAQ items when opening a new one
+  document.querySelectorAll('details').forEach(detail => {
+    detail.addEventListener('toggle', () => {
+      if (detail.open) {
+        document.querySelectorAll('details').forEach(other => {
+          if (other !== detail && other.open) other.open = false;
+        });
+      }
+    });
+  });
+</script>
+</body>
+</html>

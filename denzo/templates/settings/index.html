@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+{% block title %}Platform Settings{% endblock %}
+
+{% block breadcrumb %}
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+  <a href="/" style="color:var(--muted);text-decoration:none;">Overview</a>
+  <span style="color:var(--muted2)">/</span>
+  <span style="color:var(--text);font-weight:600;">Platform Settings</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl space-y-6">
+
+  {% if saved %}
+  <div class="bg-green-50 border border-green-200 rounded-xl px-5 py-3 flex items-center gap-3">
+    <svg class="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+    </svg>
+    <p class="text-sm text-green-800 font-medium">Settings saved successfully.</p>
+  </div>
+  {% endif %}
+
+  <form method="POST" action="/settings/">
+
+    <!-- ── Apify — Real Data Sources ─────────────────────────────────────── -->
+    <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden text-gray-900 mb-6">
+      <div class="px-6 py-5 border-b border-gray-100">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="font-semibold text-gray-900">Apify — Real Data Sources</h2>
+              <span class="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">★ Unlocks Real SERP Data</span>
+            </div>
+            <p class="text-sm text-gray-500">Upgrades 5 agents from AI estimates to real Google data. ~$5–40/mo for typical usage.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-5 space-y-4">
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="flex items-center gap-2">
+              <div class="w-6 h-6 bg-orange-500 rounded flex items-center justify-center text-white text-xs font-bold">A</div>
+              <label for="apify_api_key" class="text-sm font-medium text-gray-700">Apify API Key</label>
+            </div>
+            {% if is_set["apify_api_key"] %}
+            <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">✓ Active</span>
+            {% else %}
+            <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Not set</span>
+            {% endif %}
+          </div>
+          <input type="password" id="apify_api_key" name="apify_api_key"
+                 autocomplete="new-password"
+                 placeholder="{{ masked['apify_api_key'] if is_set['apify_api_key'] else 'apify_api_...' }}"
+                 class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 font-mono bg-white">
+          <p class="text-xs text-gray-400 mt-1">Get your key at apify.com — $5 free credits/month to start.</p>
+        </div>
+
+        <!-- What gets unlocked -->
+        <div class="bg-orange-50 rounded-xl p-4 border border-orange-100">
+          <p class="text-xs font-semibold text-orange-700 uppercase tracking-wide mb-3">Agents Upgraded When Key Is Set</p>
+          <div class="grid grid-cols-1 gap-y-2">
+            {% set upgrades = [
+              ("Rank Tracker", "Real SERP positions (was AI estimates)", "google-search-scraper"),
+              ("Competitor Intel", "Real Google Maps competitor discovery (was Claude only)", "crawler-google-places"),
+              ("SERP Intelligence", "Real SERP features: snippets, PAA, local pack", "google-search-scraper"),
+              ("Technical Auditor", "Real SEO audit score per URL", "seo-audit-tool"),
+              ("Data Intelligence", "Real Google News articles (was NewsAPI)", "google-news-scraper"),
+              ("Reviews Intelligence", "NEW — competitor review NLP analysis", "google-maps-reviews-scraper"),
+            ] %}
+            {% for agent, desc, actor in upgrades %}
+            <div class="flex items-start gap-3">
+              <span class="w-2 h-2 rounded-full {{ 'bg-green-500' if is_set['apify_api_key'] else 'bg-gray-300' }} shrink-0 mt-1.5"></span>
+              <div>
+                <span class="text-xs font-semibold text-gray-800">{{ agent }}</span>
+                <span class="text-xs text-gray-500 ml-1">— {{ desc }}</span>
+                <span class="text-xs font-mono text-orange-500 ml-1">[{{ actor }}]</span>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Cost reference -->
+        <div class="grid grid-cols-3 gap-2 text-center">
+          {% for actor, cost in [
+            ("SERP checks", "$1.80/1K"),
+            ("Maps places", "$2.10/1K"),
+            ("Reviews", "$0.30/1K"),
+          ] %}
+          <div class="bg-gray-50 rounded-lg p-2 border border-gray-100">
+            <p class="text-xs font-semibold text-gray-700">{{ actor }}</p>
+            <p class="text-sm font-bold text-orange-600">{{ cost }}</p>
+          </div>
+          {% endfor %}
+        </div>
+
+      </div>
+
+      <div class="px-6 py-4 border-t border-gray-100 bg-orange-50/50 flex items-center justify-between">
+        <p class="text-xs text-gray-400">Graceful fallback — agents work without this key (AI estimates).</p>
+        <button type="submit"
+                class="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+          </svg>
+          Save Settings
+        </button>
+      </div>
+    </div>
+
+    <!-- GEO Monitor API Keys -->
+    <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden text-gray-900 mb-6">
+      <div class="px-6 py-5 border-b border-gray-100">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="font-semibold text-gray-900">GEO Monitor — AI Engine Keys</h2>
+            <p class="text-sm text-gray-500">Global keys shared by all tenants. Leave blank to keep current value.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-5 space-y-4">
+
+        <!-- Perplexity -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="flex items-center gap-2">
+              <div class="w-6 h-6 bg-black rounded flex items-center justify-center text-white text-xs font-bold">P</div>
+              <label for="perplexity_api_key" class="text-sm font-medium text-gray-700">Perplexity Sonar</label>
+              <span class="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-semibold">★ #1 Priority</span>
+            </div>
+            {% if is_set["perplexity_api_key"] %}
+            <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">✓ Active</span>
+            {% else %}
+            <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Not set</span>
+            {% endif %}
+          </div>
+          <input type="password" id="perplexity_api_key" name="perplexity_api_key"
+                 autocomplete="new-password"
+                 placeholder="{{ masked['perplexity_api_key'] if is_set['perplexity_api_key'] else 'pplx-...' }}"
+                 class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 font-mono bg-white">
+          <p class="text-xs text-gray-400 mt-1">AI search engine #1 — most important for GEO monitoring</p>
+        </div>
+
+        <!-- OpenAI -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="flex items-center gap-2">
+              <div class="w-6 h-6 bg-emerald-600 rounded flex items-center justify-center text-white text-xs font-bold">G</div>
+              <label for="openai_api_key" class="text-sm font-medium text-gray-700">ChatGPT (OpenAI)</label>
+            </div>
+            {% if is_set["openai_api_key"] %}
+            <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">✓ Active</span>
+            {% else %}
+            <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Not set</span>
+            {% endif %}
+          </div>
+          <input type="password" id="openai_api_key" name="openai_api_key"
+                 autocomplete="new-password"
+                 placeholder="{{ masked['openai_api_key'] if is_set['openai_api_key'] else 'sk-...' }}"
+                 class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 font-mono bg-white">
+          <p class="text-xs text-gray-400 mt-1">Largest AI user base globally</p>
+        </div>
+
+        <!-- Gemini -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="flex items-center gap-2">
+              <div class="w-6 h-6 bg-blue-500 rounded flex items-center justify-center text-white text-xs font-bold">Ge</div>
+              <label for="gemini_api_key" class="text-sm font-medium text-gray-700">Google Gemini</label>
+            </div>
+            {% if is_set["gemini_api_key"] %}
+            <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">✓ Active</span>
+            {% else %}
+            <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Not set</span>
+            {% endif %}
+          </div>
+          <input type="password" id="gemini_api_key" name="gemini_api_key"
+                 autocomplete="new-password"
+                 placeholder="{{ masked['gemini_api_key'] if is_set['gemini_api_key'] else 'AIza...' }}"
+                 class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 font-mono bg-white">
+          <p class="text-xs text-gray-400 mt-1">Google AI chatbot — integrated in Android + Search</p>
+        </div>
+
+        <!-- Bing -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="flex items-center gap-2">
+              <div class="w-6 h-6 bg-sky-500 rounded flex items-center justify-center text-white text-xs font-bold">B</div>
+              <label for="bing_api_key" class="text-sm font-medium text-gray-700">Bing Search / Copilot</label>
+            </div>
+            {% if is_set["bing_api_key"] %}
+            <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">✓ Active</span>
+            {% else %}
+            <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Not set</span>
+            {% endif %}
+          </div>
+          <input type="password" id="bing_api_key" name="bing_api_key"
+                 autocomplete="new-password"
+                 placeholder="{{ masked['bing_api_key'] if is_set['bing_api_key'] else 'Azure Bing Search API key...' }}"
+                 class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 font-mono bg-white">
+          <p class="text-xs text-gray-400 mt-1">Powers Microsoft Copilot — integrated in Windows + Edge + Office</p>
+        </div>
+
+        <!-- Claude cold (auto) -->
+        <div class="flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+          <div class="w-6 h-6 bg-orange-500 rounded flex items-center justify-center text-white text-xs font-bold shrink-0">C</div>
+          <div class="flex-1">
+            <p class="text-sm font-medium text-gray-800">Claude — cold test</p>
+            <p class="text-xs text-gray-500">No config needed — uses <code class="bg-emerald-100 px-1 rounded">ANTHROPIC_API_KEY</code> from .env automatically</p>
+          </div>
+          <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium shrink-0">✓ Auto</span>
+        </div>
+
+        <!-- Coverage summary -->
+        <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Current GEO Coverage</p>
+          <div class="grid grid-cols-2 gap-y-2 gap-x-4">
+            {% for key, label in [
+              ("perplexity_api_key", "Perplexity Sonar"),
+              ("openai_api_key", "ChatGPT"),
+              ("gemini_api_key", "Google Gemini"),
+              ("bing_api_key", "Bing / Copilot"),
+            ] %}
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full {{ 'bg-green-500' if is_set[key] else 'bg-gray-300' }} shrink-0"></span>
+              <span class="text-xs text-gray-600">{{ label }}</span>
+              <span class="text-xs font-semibold {{ 'text-green-600' if is_set[key] else 'text-gray-400' }} ml-auto">
+                {{ 'Active' if is_set[key] else 'Add key' }}
+              </span>
+            </div>
+            {% endfor %}
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-green-500 shrink-0"></span>
+              <span class="text-xs text-gray-600">Claude</span>
+              <span class="text-xs font-semibold text-green-600 ml-auto">Auto</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+        <p class="text-xs text-gray-400">Keys stored globally — all tenants use the same keys.</p>
+        <button type="submit"
+                class="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+          </svg>
+          Save Settings
+        </button>
+      </div>
+    </div>
+
+    <!-- Data Sources -->
+    <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden text-gray-900">
+      <div class="px-6 py-5 border-b border-gray-100">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="font-semibold text-gray-900">Data Sources</h2>
+            <p class="text-sm text-gray-500">Powers the Data Intelligence agent</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-5 space-y-4">
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label for="newsapi_key" class="text-sm font-medium text-gray-700">
+              NewsAPI Key <span class="text-xs font-normal text-gray-400">(free tier at newsapi.org)</span>
+            </label>
+            {% if is_set["newsapi_key"] %}
+            <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">✓ Active</span>
+            {% else %}
+            <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Not set</span>
+            {% endif %}
+          </div>
+          <input type="password" id="newsapi_key" name="newsapi_key"
+                 autocomplete="new-password"
+                 placeholder="{{ masked['newsapi_key'] if is_set['newsapi_key'] else 'your-newsapi-key' }}"
+                 class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 font-mono bg-white">
+          <p class="text-xs text-gray-400 mt-1">Industry news and trends for Data Intelligence agent. 100 req/day free.</p>
+        </div>
+
+        <div class="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
+          <p class="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-2">Always Active (no key needed)</p>
+          <div class="space-y-1.5">
+            {% for s in ["Reddit trends", "Google Trends RSS", "Industry stats via DuckDuckGo"] %}
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-green-500"></span>
+              <span class="text-xs text-gray-600">{{ s }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+        <p class="text-xs text-gray-400">Keys encrypted at rest, never exposed in logs.</p>
+        <button type="submit"
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+          </svg>
+          Save Settings
+        </button>
+      </div>
+    </div>
+
+  </form>
+</div>
+{% endblock %}

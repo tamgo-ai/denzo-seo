@@ -1,0 +1,436 @@
+{% extends "base.html" %}
+
+{% block title %}Competitors — {{ client.name }}{% endblock %}
+
+{% block breadcrumb %}
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+  <a href="/" style="color:rgba(255,255,255,0.4);text-decoration:none;">Overview</a>
+  <span style="color:rgba(255,255,255,0.2)">/</span>
+  <a href="/clients/{{ tenant_id }}/pipeline" style="color:rgba(255,255,255,0.4);text-decoration:none;">{{ client.name }}</a>
+  <span style="color:rgba(255,255,255,0.2)">/</span>
+  <span style="color:rgba(255,255,255,0.87);font-weight:600;">Competitors</span>
+</div>
+{% endblock %}
+
+{% block topbar_actions %}
+<a href="/clients/{{ tenant_id }}/pipeline"
+   style="font-size:12px;color:rgba(255,255,255,0.4);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='rgba(255,255,255,0.87)'" onmouseout="this.style.color='rgba(255,255,255,0.4)'">&#8592; Pipeline</a>
+{% endblock %}
+
+{% block content %}
+{# ── Pagination macro ── #}
+{% macro paginator(current, total_pages, param_name, other_param_name, other_param_val) %}
+{% if total_pages > 1 %}
+{% set base = "/clients/" ~ tenant_id ~ "/competitors?" ~ other_param_name ~ "=" ~ other_param_val %}
+<div style="display:flex;align-items:center;gap:6px;margin-top:20px;justify-content:center;">
+  {% if current > 1 %}
+  <a href="{{ base }}&{{ param_name }}={{ current - 1 }}" style="padding:6px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);font-size:13px;text-decoration:none;">&#8592;</a>
+  {% endif %}
+  {% for p in range(1, total_pages + 1) %}
+    {% if p == current %}
+    <span style="padding:6px 12px;border-radius:6px;background:#6366f1;color:#fff;font-size:13px;font-weight:600;">{{ p }}</span>
+    {% elif p <= 3 or p >= total_pages - 2 or (p >= current - 1 and p <= current + 1) %}
+    <a href="{{ base }}&{{ param_name }}={{ p }}" style="padding:6px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);font-size:13px;text-decoration:none;">{{ p }}</a>
+    {% elif p == 4 or p == total_pages - 3 %}
+    <span style="color:rgba(255,255,255,0.3);font-size:13px;">&#8230;</span>
+    {% endif %}
+  {% endfor %}
+  {% if current < total_pages %}
+  <a href="{{ base }}&{{ param_name }}={{ current + 1 }}" style="padding:6px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);font-size:13px;text-decoration:none;">&#8594;</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{# ── Competitor card macro ── #}
+{% macro _render_competitor_card(comp, idx, tier=2) %}
+<div style="background:#111111;border:1px solid {% if tier == 1 %}rgba(239,68,68,0.2){% else %}rgba(255,255,255,0.06){% endif %};border-radius:12px;overflow:hidden;{% if tier == 1 %}border-left:2px solid #f87171;{% endif %}transition:border-color 0.15s,transform 0.15s;"
+     onmouseover="this.style.borderColor='rgba(255,255,255,0.12)';this.style.transform='translateY(-1px)'"
+     onmouseout="this.style.borderColor='{% if tier == 1 %}rgba(239,68,68,0.2){% else %}rgba(255,255,255,0.06){% endif %}';this.style.transform='translateY(0)'">
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.05);">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:{% if tier == 1 %}rgba(239,68,68,0.12){% else %}rgba(99,102,241,0.1){% endif %};">
+        <span style="font-size:13px;font-weight:700;color:{% if tier == 1 %}#f87171{% else %}#818cf8{% endif %};">
+          {{ idx }}
+        </span>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <h3 style="font-size:14px;font-weight:600;color:rgba(255,255,255,0.87);margin:0;">{{ comp.name }}</h3>
+          {% if comp.discovery_method == 'geo_radius' %}
+          <span style="background:rgba(99,102,241,0.1);color:#818cf8;border-radius:9999px;padding:2px 8px;font-size:11px;font-weight:500;">geo</span>
+          {% elif comp.discovery_method == 'manual' %}
+          <span style="background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);border-radius:9999px;padding:2px 8px;font-size:11px;font-weight:500;">manual</span>
+          {% endif %}
+        </div>
+        {% if comp.url %}
+        <a href="{{ comp.url }}" target="_blank"
+           style="font-size:12px;color:rgba(255,255,255,0.35);text-decoration:none;transition:color 0.15s;"
+           onmouseover="this.style.color='rgba(255,255,255,0.6)'" onmouseout="this.style.color='rgba(255,255,255,0.35)'">
+          {{ comp.url }}
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+      {% if comp.location %}
+      <span style="font-size:11px;color:rgba(255,255,255,0.4);background:rgba(255,255,255,0.05);border-radius:9999px;padding:2px 10px;">{{ comp.location }}</span>
+      {% endif %}
+      {% if comp.competitor_score %}
+      <span style="border-radius:9999px;padding:2px 10px;font-size:12px;font-weight:600;
+        {% if comp.competitor_score >= 4 %}background:rgba(239,68,68,0.12);color:#f87171;
+        {% elif comp.competitor_score >= 3 %}background:rgba(251,146,60,0.12);color:#fb923c;
+        {% else %}background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);{% endif %}">
+        Score {{ comp.competitor_score }}
+      </span>
+      {% endif %}
+      {% if comp.certified_brands_list %}
+      {% for brand in comp.certified_brands_list[:3] %}
+      <span style="background:rgba(99,102,241,0.08);color:#a5b4fc;border:1px solid rgba(99,102,241,0.2);border-radius:9999px;padding:2px 8px;font-size:11px;font-weight:500;">{{ brand }}</span>
+      {% endfor %}
+      {% endif %}
+      {% if comp.strengths %}
+      <span style="background:rgba(74,222,128,0.1);color:#4ade80;border-radius:9999px;padding:2px 10px;font-size:12px;font-weight:500;">Analyzed</span>
+      {% else %}
+      <span style="background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.35);border-radius:9999px;padding:2px 10px;font-size:12px;font-weight:500;">Pending</span>
+      {% endif %}
+    </div>
+  </div>
+  <!-- Intelligence body — collapsible via <details> -->
+  <div style="padding:0 20px 16px 20px;">
+  {% if comp.strengths or comp.weaknesses or comp.notes or comp.gap_cities_list or comp.gap_keywords_list %}
+  <details style="margin-top:12px;">
+    <summary style="cursor:pointer;font-size:12px;color:rgba(255,255,255,0.4);font-weight:500;list-style:none;display:flex;align-items:center;gap:6px;padding:6px 0;user-select:none;">
+      <svg style="width:12px;height:12px;flex-shrink:0;transition:transform 0.15s;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+      View analysis
+    </summary>
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:20px;">
+      {% if comp.strengths_list %}
+      <div>
+        <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.35);margin:0 0 8px 0;display:flex;align-items:center;gap:6px;">
+          <span style="width:6px;height:6px;border-radius:50%;background:#4ade80;display:inline-block;"></span>Strengths
+        </p>
+        <ul style="list-style:none;margin:0;padding:0;">
+          {% for s in comp.strengths_list %}
+          <li style="font-size:13px;color:rgba(255,255,255,0.6);padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;align-items:flex-start;gap:6px;">
+            <svg style="width:12px;height:12px;color:#4ade80;margin-top:2px;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            {{ s }}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+      {% if comp.weaknesses_list %}
+      <div>
+        <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.35);margin:0 0 8px 0;display:flex;align-items:center;gap:6px;">
+          <span style="width:6px;height:6px;border-radius:50%;background:#f87171;display:inline-block;"></span>Weaknesses / Gaps
+        </p>
+        <ul style="list-style:none;margin:0;padding:0;">
+          {% for w in comp.weaknesses_list %}
+          <li style="font-size:13px;color:rgba(255,255,255,0.6);padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;align-items:flex-start;gap:6px;">
+            <svg style="width:12px;height:12px;color:#f87171;margin-top:2px;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"/></svg>
+            {{ w }}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+      {% if comp.gap_cities_list %}
+      <div>
+        <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.35);margin:0 0 8px 0;display:flex;align-items:center;gap:6px;">
+          <span style="width:6px;height:6px;border-radius:50%;background:#fb923c;display:inline-block;"></span>Cities They Target
+        </p>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;">
+          {% for city in comp.gap_cities_list %}
+          <span style="font-size:11px;background:rgba(251,146,60,0.08);color:#fb923c;border:1px solid rgba(251,146,60,0.15);border-radius:9999px;padding:2px 8px;">{{ city }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% if comp.gap_keywords_list %}
+      <div>
+        <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.35);margin:0 0 8px 0;display:flex;align-items:center;gap:6px;">
+          <span style="width:6px;height:6px;border-radius:50%;background:#818cf8;display:inline-block;"></span>Their Keywords
+        </p>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;">
+          {% for kw in comp.gap_keywords_list[:6] %}
+          <span style="font-size:11px;background:rgba(99,102,241,0.08);color:#a5b4fc;border:1px solid rgba(99,102,241,0.15);border-radius:9999px;padding:2px 8px;">{{ kw }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% if comp.notes %}
+      <div>
+        <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.35);margin:0 0 8px 0;display:flex;align-items:center;gap:6px;">
+          <span style="width:6px;height:6px;border-radius:50%;background:#818cf8;display:inline-block;"></span>Keyword Themes
+        </p>
+        <p style="font-size:13px;color:rgba(255,255,255,0.6);line-height:1.5;margin:0;">{{ comp.notes }}</p>
+      </div>
+      {% endif %}
+    </div>
+  </details>
+  {% else %}
+  <details style="margin-top:12px;">
+    <summary style="cursor:pointer;font-size:12px;color:rgba(255,255,255,0.35);font-weight:500;list-style:none;display:flex;align-items:center;gap:6px;padding:6px 0;user-select:none;font-style:italic;">
+      <svg style="width:12px;height:12px;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+      Pending analysis
+    </summary>
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:14px;margin-top:8px;font-size:13px;color:rgba(255,255,255,0.35);font-style:italic;">
+      Run <strong style="font-style:normal;color:rgba(255,255,255,0.5);font-weight:600;">Competitor Intel</strong> agent to analyze this competitor.
+    </div>
+  </details>
+  {% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+<div style="display:flex;flex-direction:column;gap:32px;">
+
+  <!-- Header with export -->
+  <div style="display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <h2 style="font-size:13px;font-weight:500;color:rgba(255,255,255,0.5);margin:0;">{{ competitors | length }} competitors tracked</h2>
+      {% if tier1 %}
+      <p style="font-size:12px;color:#f87171;font-weight:500;margin:4px 0 0 0;">
+        {{ tier1 | length }} Tier-1 threat{{ 's' if tier1 | length != 1 }} (same brand certification + nearby)
+      </p>
+      {% endif %}
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      {% if competitors %}
+      <a href="/clients/{{ tenant_id }}/competitors/export.csv"
+         style="display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);font-size:12px;font-weight:500;padding:7px 14px;border-radius:8px;text-decoration:none;transition:color 0.15s,border-color 0.15s;"
+         onmouseover="this.style.color='rgba(255,255,255,0.87)';this.style.borderColor='rgba(255,255,255,0.2)'"
+         onmouseout="this.style.color='rgba(255,255,255,0.5)';this.style.borderColor='rgba(255,255,255,0.1)'">
+        &#8595; Export CSV
+      </a>
+      {% endif %}
+      <a href="/clients/{{ tenant_id }}/pipeline"
+         style="display:inline-flex;align-items:center;gap:6px;background:#6366f1;border:none;color:white;font-size:12px;font-weight:600;padding:7px 14px;border-radius:8px;text-decoration:none;transition:opacity 0.15s;"
+         onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+        Run Competitor Intel &#8594;
+      </a>
+    </div>
+  </div>
+
+  <!-- Stats bar -->
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px;">
+    <div style="background:rgba(255,255,255,0.03);border:none;border-radius:12px;padding:24px;">
+      <p style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin:0 0 8px 0;">Total Tracked</p>
+      <p style="font-size:48px;font-weight:300;letter-spacing:-0.02em;color:#ffffff;margin:0;line-height:1;">{{ competitors | length }}</p>
+    </div>
+    <div style="background:rgba(255,255,255,0.03);border:none;border-radius:12px;padding:24px;">
+      <p style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin:0 0 8px 0;">Tier 1 Threats</p>
+      <p style="font-size:48px;font-weight:300;letter-spacing:-0.02em;color:#f87171;margin:0;line-height:1;">{{ tier1 | length }}</p>
+      <p style="font-size:11px;color:rgba(255,255,255,0.35);margin:6px 0 0 0;">Same brand + nearby</p>
+    </div>
+    <div style="background:rgba(255,255,255,0.03);border:none;border-radius:12px;padding:24px;">
+      <p style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin:0 0 8px 0;">Gap Keywords</p>
+      <p style="font-size:48px;font-weight:300;letter-spacing:-0.02em;color:#fb923c;margin:0;line-height:1;">{{ gap_keywords }}</p>
+      <p style="font-size:11px;color:rgba(255,255,255,0.35);margin:6px 0 0 0;">from competitor analysis</p>
+    </div>
+    <div style="background:rgba(255,255,255,0.03);border:none;border-radius:12px;padding:24px;">
+      <p style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin:0 0 8px 0;">Cannibalization</p>
+      <p style="font-size:48px;font-weight:300;letter-spacing:-0.02em;color:#fbbf24;margin:0;line-height:1;">{{ cannibal_risks | length }}</p>
+      <p style="font-size:11px;color:rgba(255,255,255,0.35);margin:6px 0 0 0;">internal page conflicts</p>
+    </div>
+    <div style="background:rgba(255,255,255,0.03);border:none;border-radius:12px;padding:24px;">
+      <p style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin:0 0 8px 0;">Geo-Discovered</p>
+      <p style="font-size:48px;font-weight:300;letter-spacing:-0.02em;color:#818cf8;margin:0;line-height:1;">{{ geo_discovered }}</p>
+      <p style="font-size:11px;color:rgba(255,255,255,0.35);margin:6px 0 0 0;">via radius search</p>
+    </div>
+  </div>
+
+  {% if not competitors %}
+  <!-- Empty state -->
+  <div style="background:#111111;border:1px solid rgba(255,255,255,0.06);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 32px;text-align:center;">
+    <div style="width:56px;height:56px;border-radius:50%;background:rgba(99,102,241,0.1);display:flex;align-items:center;justify-content:center;margin-bottom:16px;">
+      <svg style="width:28px;height:28px;color:#818cf8;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+      </svg>
+    </div>
+    <h3 style="font-size:16px;font-weight:600;color:rgba(255,255,255,0.87);margin:0 0 8px 0;">No competitor data yet</h3>
+    <p style="font-size:13px;color:rgba(255,255,255,0.5);margin:0 0 24px 0;max-width:360px;line-height:1.6;">
+      Run the <strong style="color:rgba(255,255,255,0.7);">Competitor Intel</strong> agent to discover brand-certified competitors
+      in your geo-radius, identify keyword gaps, and detect cannibalization risks automatically.
+    </p>
+    <a href="/clients/{{ tenant_id }}/pipeline"
+       style="display:inline-flex;align-items:center;gap:8px;background:#6366f1;border:none;color:white;font-size:13px;font-weight:600;padding:10px 20px;border-radius:8px;text-decoration:none;transition:opacity 0.15s;"
+       onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+      Go to Pipeline &#8594;
+    </a>
+  </div>
+
+  {% else %}
+
+  <!-- Cannibalization warning panel -->
+  {% if cannibal_risks %}
+  <div style="background:rgba(251,146,60,0.06);border:1px solid rgba(251,146,60,0.15);border-radius:12px;padding:20px;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px;">
+      <div style="display:flex;align-items:flex-start;gap:12px;">
+        <div style="width:36px;height:36px;border-radius:8px;background:rgba(251,146,60,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg style="width:18px;height:18px;color:#fb923c;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+          </svg>
+        </div>
+        <div>
+          <p style="font-size:15px;font-weight:600;color:#fb923c;margin:0 0 4px 0;">
+            Keyword Cannibalization Detected — {{ can_total }} risk{{ 's' if can_total != 1 }}
+          </p>
+          <p style="font-size:13px;color:rgba(255,255,255,0.5);margin:0;line-height:1.5;">
+            These are YOUR OWN pages competing against each other in Google for the same keywords.
+            Fix them to consolidate ranking signals.
+          </p>
+        </div>
+      </div>
+      {% if can_total > 20 %}
+      {% set can_start_disp = (can_page - 1) * 20 + 1 %}
+      {% set can_end_disp = [can_page * 20, can_total] | min %}
+      <span style="font-size:12px;color:rgba(255,255,255,0.35);white-space:nowrap;flex-shrink:0;">Showing {{ can_start_disp }}–{{ can_end_disp }} of {{ can_total }}</span>
+      {% endif %}
+    </div>
+    <!-- Dismiss all -->
+    <div style="display:flex;justify-content:flex-end;margin-bottom:4px;">
+      <button onclick="dismissAllCannibalization('{{ tenant_id }}')"
+              style="font-size:12px;color:rgba(255,255,255,0.35);background:transparent;border:1px solid rgba(255,255,255,0.1);padding:5px 12px;border-radius:6px;cursor:pointer;transition:all .15s;"
+              onmouseover="this.style.color='#f87171';this.style.borderColor='rgba(239,68,68,0.3)'" onmouseout="this.style.color='rgba(255,255,255,0.35)';this.style.borderColor='rgba(255,255,255,0.1)'">
+        Dismiss all
+      </button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;" id="cannibalization-list">
+      {% for risk in can_paged %}
+      <div id="risk-{{ risk.id }}" style="background:#111111;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:16px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+        <div style="flex:1;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:9999px;
+              {% if risk.risk_level == 'high' %}background:rgba(239,68,68,0.12);color:#f87171;
+              {% else %}background:rgba(251,146,60,0.12);color:#fb923c;{% endif %}">
+              {{ risk.risk_level | upper }}
+            </span>
+            <span style="font-size:12px;color:rgba(255,255,255,0.4);">keyword: <code style="background:rgba(255,255,255,0.06);padding:1px 6px;border-radius:4px;font-size:11px;color:rgba(255,255,255,0.6);">{{ risk.shared_keyword }}</code></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:6px;flex-wrap:wrap;">
+            <span style="font-weight:500;">{{ risk.page_title_a or risk.page_slug_a }}</span>
+            <span style="color:rgba(255,255,255,0.3);">vs</span>
+            <span style="font-weight:500;">{{ risk.page_title_b or risk.page_slug_b }}</span>
+          </div>
+          {% if risk.suggestion %}
+          <p style="font-size:12px;color:rgba(255,255,255,0.45);line-height:1.5;margin:0;">{{ risk.suggestion }}</p>
+          {% endif %}
+        </div>
+        <!-- Dismiss button -->
+        <button onclick="dismissRisk({{ risk.id }}, '{{ tenant_id }}')"
+                title="Dismiss this risk"
+                style="flex-shrink:0;background:transparent;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:5px 10px;color:rgba(255,255,255,0.3);cursor:pointer;font-size:12px;transition:all .15s;white-space:nowrap;"
+                onmouseover="this.style.color='#4ade80';this.style.borderColor='rgba(74,222,128,0.3)'" onmouseout="this.style.color='rgba(255,255,255,0.3)';this.style.borderColor='rgba(255,255,255,0.08)'">
+          ✓ Dismiss
+        </button>
+      </div>
+      {% endfor %}
+    </div>
+
+    <script>
+    function dismissRisk(id, tenantId) {
+      fetch('/clients/' + tenantId + '/competitors/' + id + '/resolve-cannibalization', {method:'POST'})
+        .then(r => r.json())
+        .then(d => {
+          if (d.ok) {
+            const el = document.getElementById('risk-' + id);
+            if (el) {
+              el.style.transition = 'opacity .3s, max-height .4s';
+              el.style.opacity = '0';
+              setTimeout(() => { el.style.display = 'none'; }, 350);
+            }
+          }
+        });
+    }
+    function dismissAllCannibalization(tenantId) {
+      const items = document.querySelectorAll('#cannibalization-list [id^="risk-"]');
+      items.forEach(el => {
+        const id = el.id.replace('risk-', '');
+        fetch('/clients/' + tenantId + '/competitors/' + id + '/resolve-cannibalization', {method:'POST'});
+        el.style.transition = 'opacity .3s';
+        el.style.opacity = '0';
+        setTimeout(() => { el.style.display = 'none'; }, 400);
+      });
+    }
+    </script>
+    {{ paginator(can_page, can_pages, 'canp', 'cp', tier2_page) }}
+  </div>
+  {% endif %}
+
+  <!-- Tier 1 competitors -->
+  {% if tier1 %}
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    <div style="background:#111111;border:1px solid rgba(239,68,68,0.15);border-radius:12px;padding:16px 20px;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <svg style="width:14px;height:14px;color:#f87171;" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+          </svg>
+          <span style="font-size:15px;font-weight:600;color:#f87171;">Tier 1 — Same Brand + Nearby City</span>
+        </div>
+        <span style="font-size:12px;color:rgba(255,255,255,0.4);">Customers will drive 30-40 miles to a certified shop — these are your REAL competitors</span>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      {% for comp in tier1 %}
+      {{ _render_competitor_card(comp, loop.index, tier=1) }}
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Tier 2 competitors -->
+  {% if tier2_total > 0 %}
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    {% if tier1 %}
+    <div style="background:#111111;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px 20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:15px;font-weight:600;color:rgba(255,255,255,0.87);">Tier 2 — Other Competitors</span>
+          <span style="font-size:12px;color:rgba(255,255,255,0.4);">Generic shops or farther distance</span>
+        </div>
+        {% set t2_start_disp = (tier2_page - 1) * 10 + 1 %}
+        {% set t2_end_disp = [tier2_page * 10, tier2_total] | min %}
+        <span style="font-size:12px;color:rgba(255,255,255,0.35);">Showing {{ t2_start_disp }}–{{ t2_end_disp }} of {{ tier2_total }}</span>
+      </div>
+    </div>
+    {% endif %}
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      {% set t2_idx_offset = (tier2_page - 1) * 10 %}
+      {% for comp in tier2 %}
+      {{ _render_competitor_card(comp, t2_idx_offset + loop.index, tier=2) }}
+      {% endfor %}
+    </div>
+    {{ paginator(tier2_page, tier2_pages, 'cp', 'canp', can_page) }}
+  </div>
+  {% endif %}
+
+  <!-- Gap keywords callout -->
+  {% if gap_keywords > 0 %}
+  <div style="background:rgba(251,146,60,0.06);border:1px solid rgba(251,146,60,0.15);border-radius:12px;padding:20px;display:flex;align-items:flex-start;gap:16px;">
+    <div style="width:40px;height:40px;border-radius:8px;background:rgba(251,146,60,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg style="width:18px;height:18px;color:#fb923c;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+      </svg>
+    </div>
+    <div>
+      <p style="font-size:15px;font-weight:600;color:#fb923c;margin:0 0 4px 0;">{{ gap_keywords }} gap keywords discovered</p>
+      <p style="font-size:13px;color:rgba(255,255,255,0.5);margin:0;line-height:1.5;">
+        These are keywords your competitors rank for but you don't. Check the
+        <a href="/clients/{{ tenant_id }}/keywords?category=competitor_gap"
+           style="color:#818cf8;text-decoration:underline;font-weight:500;">Keywords tab</a>
+        filtered by <code style="background:rgba(255,255,255,0.06);padding:1px 6px;border-radius:4px;font-size:11px;color:rgba(255,255,255,0.6);">competitor_gap</code> to see them.
+      </p>
+    </div>
+  </div>
+  {% endif %}
+
+  {% endif %} {# end if competitors #}
+</div>
+{% endblock %}

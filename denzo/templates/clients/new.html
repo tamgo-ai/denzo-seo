@@ -1,0 +1,722 @@
+{% extends "base.html" %}
+
+{% block title %}New Client — Denzo SEO{% endblock %}
+{% block page_title %}New Client{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto pb-16"
+     x-data="{
+       step: 1,
+       totalSteps: 5,
+       analyzing: false,
+       analyzed: false,
+       analyzeProgress: 0,
+       analyzeError: '',
+       currentAnalyzeStep: 0,
+       isMultilocation: false,
+       analysisData: {},
+       publisherType: 'wordpress',
+       fields: {
+         name: '', tagline: '', description: '', phone: '', address: '',
+         city: '', state: 'CA', primary_city: '', service_cities: '',
+         services: '', certifications: '', differentiators: '',
+         insurance_partners: '', website_url: '', business_type: 'auto_body_shop'
+       },
+       servicesList: [],
+       dontSellList: [],
+       competitors: [],
+       publisherConfig: {
+         wp_url: '', wp_user: '', wp_app_password: '',
+         github_repo: '', github_branch: 'main', github_token: '', github_format: 'html',
+         pages_domain: ''
+       },
+       analyzeSteps: [
+         'Connecting to your website…',
+         'Reading content and structure…',
+         'Identifying services and market…',
+         'Finding competitors in your area…',
+         'Building your SEO profile…',
+         'Done!'
+       ],
+
+       stepLabels: ['Website', 'Profile', 'Services', 'Competitors', 'Connect'],
+
+       addService(name) {
+         if (name && !this.servicesList.find(s => s.name === name))
+           this.servicesList.push({name: name, priority: this.servicesList.length + 1});
+       },
+       removeService(i) { this.servicesList.splice(i, 1); },
+       addDontSell(name) {
+         if (name) this.dontSellList.push(name);
+       },
+       removeDontSell(i) { this.dontSellList.splice(i, 1); },
+       moveService(i, dir) {
+         const j = i + dir;
+         if (j < 0 || j >= this.servicesList.length) return;
+         [this.servicesList[i], this.servicesList[j]] = [this.servicesList[j], this.servicesList[i]];
+       },
+       addCompetitor() { this.competitors.push({name: '', url: ''}); },
+       removeCompetitor(i) { this.competitors.splice(i, 1); },
+       servicesJson() { return JSON.stringify(this.servicesList.map(s => s.name)); },
+       dontSellJson() { return JSON.stringify(this.dontSellList); },
+       competitorsJson() { return JSON.stringify(this.competitors.filter(c => c.name.trim())); },
+
+       get progressPct() { return ((this.step - 1) / (this.totalSteps - 1)) * 100; },
+
+       async doAnalyze() {
+         const url = this.fields.website_url.trim();
+         if (!url) { this.step = 2; return; }
+         this.analyzing = true;
+         this.analyzeError = '';
+         this.analyzeProgress = 0;
+         this.currentAnalyzeStep = 0;
+         const self = this;
+         const timer = setInterval(() => {
+           if (self.currentAnalyzeStep < self.analyzeSteps.length - 1) {
+             self.currentAnalyzeStep++;
+             self.analyzeProgress = Math.round((self.currentAnalyzeStep / (self.analyzeSteps.length - 1)) * 90);
+           }
+         }, 1100);
+         try {
+           const resp = await fetch('/clients/analyze', {
+             method: 'POST',
+             headers: {'Content-Type': 'application/json'},
+             body: JSON.stringify({url})
+           });
+           const data = await resp.json();
+           clearInterval(timer);
+           if (data.error) {
+             self.analyzeError = data.error;
+             setTimeout(() => { self.analyzing = false; self.step = 2; }, 2000);
+             return;
+           }
+           // Populate fields
+           if (data.business_name)   self.fields.name         = data.business_name;
+           if (data.business_type)   self.fields.business_type = data.business_type;
+           if (data.tagline)         self.fields.tagline       = data.tagline;
+           if (data.description)     self.fields.description   = data.description;
+           if (data.phone)           self.fields.phone         = data.phone;
+           if (data.address)         self.fields.address       = data.address;
+           if (data.city)            self.fields.city          = data.city;
+           if (data.state)           self.fields.state         = data.state;
+           if (data.primary_city)    self.fields.primary_city  = data.primary_city;
+           if (data.service_cities?.length)
+             self.fields.service_cities = data.service_cities.join(', ');
+           if (data.certifications?.length)
+             self.fields.certifications = data.certifications.join(', ');
+           if (data.differentiators?.length)
+             self.fields.differentiators = data.differentiators.join('\n');
+           if (data.insurance_partners?.length)
+             self.fields.insurance_partners = data.insurance_partners.join(', ');
+           // Services list
+           if (data.services?.length) {
+             self.servicesList = data.services.map((s, i) => ({name: s, priority: i+1}));
+           }
+           // Competitors
+           const comps = data.suggested_competitors_tier1 || data.suggested_competitors || [];
+           if (comps.length) {
+             self.competitors = comps.slice(0, 6).map(c => ({name: c.name || '', url: c.url || ''}));
+           }
+           if (data.is_multilocation) self.isMultilocation = true;
+           self.analysisData = data;
+           self.analyzed = true;
+           self.analyzeProgress = 100;
+           self.currentAnalyzeStep = self.analyzeSteps.length - 1;
+           setTimeout(() => { self.analyzing = false; self.step = 2; }, 1000);
+         } catch(e) {
+           clearInterval(timer);
+           self.analyzeError = 'Could not reach the website. Fill in the fields manually.';
+           setTimeout(() => { self.analyzing = false; self.step = 2; }, 2000);
+         }
+       }
+     }">
+
+  <!-- ── Analyze overlay ── -->
+  <div x-show="analyzing" x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-8">
+      <div class="text-center mb-6">
+        <div class="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center mx-auto mb-4">
+          <svg class="w-7 h-7 text-orange-500 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+        </div>
+        <h3 class="text-base font-bold text-gray-900">Analyzing your website</h3>
+        <p class="text-sm text-gray-400 mt-1 truncate" x-text="fields.website_url"></p>
+      </div>
+      <div class="w-full bg-gray-100 rounded-full h-1.5 mb-5">
+        <div class="bg-orange-500 h-1.5 rounded-full transition-all duration-700" :style="'width:'+analyzeProgress+'%'"></div>
+      </div>
+      <div class="space-y-2.5">
+        <template x-for="(s, i) in analyzeSteps" :key="i">
+          <div class="flex items-center gap-3">
+            <div class="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
+                 :class="i < currentAnalyzeStep ? 'bg-green-500' : i === currentAnalyzeStep ? 'bg-orange-500 animate-pulse' : 'bg-gray-100'">
+              <template x-if="i < currentAnalyzeStep">
+                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                </svg>
+              </template>
+            </div>
+            <span class="text-sm"
+                  :class="i < currentAnalyzeStep ? 'text-green-700 font-medium' : i === currentAnalyzeStep ? 'text-orange-600 font-semibold' : 'text-gray-300'"
+                  x-text="s"></span>
+          </div>
+        </template>
+      </div>
+      <div x-show="analyzeError" class="mt-4 p-3 bg-red-50 rounded-lg text-xs text-red-600" x-text="analyzeError"></div>
+    </div>
+  </div>
+
+  <!-- ── Progress bar ── -->
+  <div class="mb-8">
+    <div class="flex items-center justify-between mb-3">
+      <h1 class="text-xl font-bold text-gray-900">New Client</h1>
+      <span class="text-sm text-gray-400">Step <span x-text="step"></span> of <span x-text="totalSteps"></span></span>
+    </div>
+    <!-- Step dots -->
+    <div class="flex items-center gap-0">
+      <template x-for="(label, idx) in stepLabels" :key="idx">
+        <div class="flex items-center flex-1 last:flex-none">
+          <div class="flex flex-col items-center">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300"
+                 :class="(idx+1) < step ? 'bg-green-500 text-white' :
+                         (idx+1) === step ? 'bg-orange-500 text-white ring-4 ring-orange-100' :
+                         'bg-gray-100 text-gray-400'">
+              <template x-if="(idx+1) < step">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                </svg>
+              </template>
+              <template x-if="(idx+1) >= step"><span x-text="idx+1"></span></template>
+            </div>
+            <span class="text-xs mt-1 font-medium"
+                  :class="(idx+1) === step ? 'text-orange-600' : (idx+1) < step ? 'text-green-600' : 'text-gray-300'"
+                  x-text="label"></span>
+          </div>
+          <div x-show="idx < stepLabels.length - 1"
+               class="flex-1 h-0.5 mx-1 mb-4 transition-all duration-300"
+               :class="(idx+1) < step ? 'bg-green-400' : 'bg-gray-100'"></div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- ── FORM ── -->
+  <form method="POST" action="/clients/create" id="onboarding-form" novalidate>
+    <!-- Hidden fields populated by Alpine -->
+    <input type="hidden" name="website_url"        :value="fields.website_url">
+    <input type="hidden" name="business_type"      :value="fields.business_type">
+    <input type="hidden" name="is_multilocation"   :value="isMultilocation ? '1' : '0'">
+    <input type="hidden" name="brand_tier"         :value="analysisData.brand_tier || 'mid'">
+    <input type="hidden" name="locations_json"     :value="JSON.stringify(analysisData.locations || [])">
+    <input type="hidden" name="competitors_json"   :value="competitorsJson()">
+    <input type="hidden" name="services_json"      :value="servicesJson()">
+    <input type="hidden" name="dont_sell_json"     :value="dontSellJson()">
+    <input type="hidden" name="publisher_type"     :value="publisherType">
+    <input type="hidden" name="wp_url"             :value="publisherConfig.wp_url">
+    <input type="hidden" name="wp_user"            :value="publisherConfig.wp_user">
+    <input type="hidden" name="wp_app_password"    :value="publisherConfig.wp_app_password">
+    <input type="hidden" name="github_repo"        :value="publisherConfig.github_repo">
+    <input type="hidden" name="github_branch"      :value="publisherConfig.github_branch">
+    <input type="hidden" name="github_token"       :value="publisherConfig.github_token">
+    <input type="hidden" name="github_format"      :value="publisherConfig.github_format">
+    <input type="hidden" name="pages_domain"       :value="publisherConfig.pages_domain">
+
+    <!-- ════════════════════════════════════════
+         STEP 1 — WEBSITE URL
+    ════════════════════════════════════════ -->
+    <div x-show="step === 1" x-cloak>
+      <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
+        <div class="text-center mb-8">
+          <div class="w-14 h-14 rounded-2xl bg-orange-50 flex items-center justify-center mx-auto mb-4">
+            <svg class="w-7 h-7 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+            </svg>
+          </div>
+          <h2 class="text-xl font-bold text-gray-900">Enter your website</h2>
+          <p class="text-sm text-gray-500 mt-2">Our AI will analyze it and fill in your business profile automatically in under 30 seconds.</p>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Website URL</label>
+            <input type="url" x-model="fields.website_url"
+                   placeholder="https://yourbusiness.com"
+                   class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-orange-400 transition-colors"
+                   @keydown.enter.prevent="doAnalyze()">
+            <p class="text-xs text-gray-400 mt-2">We'll analyze services, competitors, location, and build your SEO profile.</p>
+          </div>
+
+          <!-- Features -->
+          <div class="grid grid-cols-3 gap-3 pt-2">
+            <div class="text-center p-3 bg-green-50 rounded-xl">
+              <div class="text-lg mb-1">⚡</div>
+              <p class="text-xs font-medium text-green-700">Auto-fill</p>
+              <p class="text-xs text-green-500">All fields</p>
+            </div>
+            <div class="text-center p-3 bg-blue-50 rounded-xl">
+              <div class="text-lg mb-1">🎯</div>
+              <p class="text-xs font-medium text-blue-700">Detect</p>
+              <p class="text-xs text-blue-500">Services + Cities</p>
+            </div>
+            <div class="text-center p-3 bg-purple-50 rounded-xl">
+              <div class="text-lg mb-1">🔍</div>
+              <p class="text-xs font-medium text-purple-700">Find</p>
+              <p class="text-xs text-purple-500">Competitors</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-8 flex items-center justify-between">
+          <p class="text-xs text-gray-400">Or skip to fill everything manually</p>
+          <div class="flex gap-3">
+            <button type="button" @click="step = 2"
+                    class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">
+              Skip analysis →
+            </button>
+            <button type="button" @click="doAnalyze()"
+                    class="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl shadow-sm shadow-orange-200 transition-colors">
+              Analyze Website
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════
+         STEP 2 — BUSINESS PROFILE
+    ════════════════════════════════════════ -->
+    <div x-show="step === 2" x-cloak>
+      <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="px-8 pt-7 pb-5 border-b border-gray-100">
+          <h2 class="text-lg font-bold text-gray-900">Business Profile</h2>
+          <p class="text-sm text-gray-500 mt-1">
+            <template x-if="analyzed"><span class="text-green-600 font-medium">✓ Auto-filled from your website.</span> Review and adjust.</template>
+            <template x-if="!analyzed">Fill in your business details.</template>
+          </p>
+        </div>
+        <div class="p-8 space-y-5">
+
+          <!-- Name + Type -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5">Business Name <span class="text-red-400">*</span></label>
+              <input type="text" name="name" x-model="fields.name" required
+                     placeholder="Your Business Name"
+                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5">Business Type</label>
+              <select x-model="fields.business_type"
+                      class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white">
+                <option value="auto_body_shop">Auto Body Shop</option>
+                <option value="dental_clinic">Dental Clinic</option>
+                <option value="law_firm">Law Firm</option>
+                <option value="insurance_agency">Insurance Agency</option>
+                <option value="restaurant">Restaurant</option>
+                <option value="real_estate">Real Estate</option>
+                <option value="home_services">Home Services</option>
+                <option value="medical_clinic">Medical Clinic</option>
+                <option value="saas_tech">SaaS / Tech</option>
+                <option value="agency">Marketing Agency</option>
+                <option value="ecommerce">E-commerce</option>
+                <option value="education_academy">Education / Academy</option>
+                <option value="online_courses">Online Courses</option>
+                <option value="coaching">Coaching</option>
+                <option value="veterinary">Veterinary</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Tagline -->
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1.5">Tagline / Value Proposition</label>
+            <input type="text" name="tagline" x-model="fields.tagline"
+                   placeholder="We Fight For You. Not The Insurance Company."
+                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent">
+          </div>
+
+          <!-- Description -->
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1.5">Business Description</label>
+            <textarea name="description" x-model="fields.description" rows="3"
+                      placeholder="Describe what you do, who you serve, and what makes you unique…"
+                      class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent resize-none"></textarea>
+          </div>
+
+          <!-- Phone + City -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5">Phone</label>
+              <input type="text" name="phone" x-model="fields.phone"
+                     placeholder="(555) 123-4567"
+                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5">Primary City</label>
+              <input type="text" name="primary_city" x-model="fields.primary_city"
+                     placeholder="Los Angeles"
+                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent">
+            </div>
+          </div>
+
+          <!-- Address + State -->
+          <div class="grid grid-cols-3 gap-4">
+            <div class="col-span-2">
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5">Address</label>
+              <input type="text" name="address" x-model="fields.address"
+                     placeholder="123 Main St, City, CA"
+                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5">State</label>
+              <input type="text" name="state" x-model="fields.state"
+                     placeholder="CA"
+                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent">
+            </div>
+          </div>
+
+          <!-- Service cities -->
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1.5">Service Cities</label>
+            <input type="text" name="service_cities" x-model="fields.service_cities"
+                   placeholder="Los Angeles, Whittier, Gardena, Ontario…"
+                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent">
+            <p class="text-xs text-gray-400 mt-1">Comma-separated cities you serve</p>
+          </div>
+
+          <!-- Multi-location toggle -->
+          <div class="flex items-center justify-between p-4 bg-purple-50 rounded-xl">
+            <div>
+              <p class="text-sm font-semibold text-gray-800">Multi-location business</p>
+              <p class="text-xs text-gray-500">Franchise, chain, or multiple branches</p>
+            </div>
+            <button type="button" @click="isMultilocation = !isMultilocation"
+                    class="relative w-11 h-6 rounded-full transition-colors focus:outline-none"
+                    :class="isMultilocation ? 'bg-purple-600' : 'bg-gray-200'">
+              <span class="absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform"
+                    :class="isMultilocation ? 'translate-x-5' : 'translate-x-0'"></span>
+            </button>
+          </div>
+
+          <!-- Certifications -->
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1.5">Certifications / Specialties</label>
+            <input type="text" name="certifications" x-model="fields.certifications"
+                   placeholder="Tesla, BMW, Mercedes-Benz, State Farm…"
+                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent">
+          </div>
+
+          <!-- Differentiators -->
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1.5">Key Differentiators</label>
+            <textarea name="differentiators" x-model="fields.differentiators" rows="2"
+                      placeholder="Lifetime warranty, OEM parts only, free towing 24/7…"
+                      class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent resize-none"></textarea>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="flex justify-between mt-6">
+        <button type="button" @click="step = 1"
+                class="px-5 py-2.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl transition-colors">
+          ← Back
+        </button>
+        <button type="button" @click="fields.name.trim() ? step = 3 : null"
+                :class="fields.name.trim() ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-gray-100 text-gray-300 cursor-not-allowed'"
+                class="px-6 py-2.5 text-sm font-semibold rounded-xl transition-colors">
+          Next: Services →
+        </button>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════
+         STEP 3 — SERVICES PRIORITY
+    ════════════════════════════════════════ -->
+    <div x-show="step === 3" x-cloak>
+      <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="px-8 pt-7 pb-5 border-b border-gray-100">
+          <h2 class="text-lg font-bold text-gray-900">What do you offer?</h2>
+          <p class="text-sm text-gray-500 mt-1">Order by priority — we'll focus content on your top services first.</p>
+        </div>
+        <div class="p-8 space-y-6">
+
+          <!-- What you sell -->
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <span class="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                  <svg class="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                  </svg>
+                </span>
+                <span class="text-sm font-bold text-gray-800">What You Sell</span>
+              </div>
+              <span class="text-xs text-gray-400">Drag ↕ to reorder priority</span>
+            </div>
+
+            <div class="space-y-2" id="services-sortable">
+              <template x-for="(svc, i) in servicesList" :key="i">
+                <div class="flex items-center gap-3 p-3 bg-green-50 border border-green-100 rounded-xl group hover:border-green-300 transition-colors">
+                  <div class="flex flex-col gap-0.5 cursor-move text-gray-300">
+                    <button type="button" @click="moveService(i, -1)" :disabled="i===0"
+                            class="hover:text-gray-600 disabled:opacity-20 disabled:cursor-not-allowed leading-none">▲</button>
+                    <button type="button" @click="moveService(i, 1)" :disabled="i===servicesList.length-1"
+                            class="hover:text-gray-600 disabled:opacity-20 disabled:cursor-not-allowed leading-none">▼</button>
+                  </div>
+                  <span class="w-5 h-5 rounded-full bg-green-500 text-white text-xs font-bold flex items-center justify-center shrink-0"
+                        x-text="i+1"></span>
+                  <span class="flex-1 text-sm font-medium text-gray-800" x-text="svc.name"></span>
+                  <span x-show="i===0" class="text-xs bg-green-600 text-white px-2 py-0.5 rounded-full font-medium">Top priority</span>
+                  <button type="button" @click="removeService(i)"
+                          class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all text-lg leading-none">×</button>
+                </div>
+              </template>
+            </div>
+
+            <!-- Add service -->
+            <div class="mt-3 flex gap-2" x-data="{newService:''}">
+              <input type="text" x-model="newService" placeholder="Add a service…"
+                     class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                     @keydown.enter.prevent="if(newService.trim()){addService(newService.trim());newService=''}">
+              <button type="button" @click="if(newService.trim()){addService(newService.trim());newService=''}"
+                      class="px-3 py-2 bg-green-500 text-white text-sm rounded-xl hover:bg-green-600 font-medium">+ Add</button>
+            </div>
+
+            <div x-show="!servicesList.length" class="mt-3 p-4 bg-gray-50 rounded-xl text-center text-sm text-gray-400">
+              No services detected. Add them manually above.
+            </div>
+          </div>
+
+          <!-- What you don't sell -->
+          <div>
+            <div class="flex items-center gap-2 mb-3">
+              <span class="w-5 h-5 bg-red-100 rounded-full flex items-center justify-center">
+                <svg class="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </span>
+              <span class="text-sm font-bold text-gray-800">What You <span class="text-red-500">Don't</span> Offer</span>
+              <span class="text-xs text-gray-400 ml-1">(helps AI avoid irrelevant content)</span>
+            </div>
+            <div class="space-y-2">
+              <template x-for="(item, i) in dontSellList" :key="i">
+                <div class="flex items-center gap-2 p-2.5 bg-red-50 border border-red-100 rounded-xl">
+                  <span class="w-4 h-4 text-red-400 shrink-0">✕</span>
+                  <span class="flex-1 text-sm text-gray-700" x-text="item"></span>
+                  <button type="button" @click="removeDontSell(i)" class="text-red-300 hover:text-red-500 text-lg leading-none">×</button>
+                </div>
+              </template>
+            </div>
+            <div class="mt-2 flex gap-2" x-data="{newDontSell:''}">
+              <input type="text" x-model="newDontSell" placeholder="e.g. Vehicle Sales, Routine Maintenance…"
+                     class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                     @keydown.enter.prevent="if(newDontSell.trim()){addDontSell(newDontSell.trim());newDontSell=''}">
+              <button type="button" @click="if(newDontSell.trim()){addDontSell(newDontSell.trim());newDontSell=''}"
+                      class="px-3 py-2 bg-red-100 text-red-600 text-sm rounded-xl hover:bg-red-200 font-medium">+ Add</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="flex justify-between mt-6">
+        <button type="button" @click="step = 2"
+                class="px-5 py-2.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl transition-colors">
+          ← Back
+        </button>
+        <button type="button" @click="step = 4"
+                class="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-colors">
+          Next: Competitors →
+        </button>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════
+         STEP 4 — COMPETITORS
+    ════════════════════════════════════════ -->
+    <div x-show="step === 4" x-cloak>
+      <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="px-8 pt-7 pb-5 border-b border-gray-100">
+          <h2 class="text-lg font-bold text-gray-900">Your Competitors</h2>
+          <p class="text-sm text-gray-500 mt-1">
+            <template x-if="competitors.length > 0">
+              <span><span class="text-purple-600 font-medium" x-text="competitors.length"></span> competitors detected. Review and add more.</span>
+            </template>
+            <template x-if="!competitors.length">Add your main competitors — we'll analyze their SEO strategy.</template>
+          </p>
+        </div>
+        <div class="p-8 space-y-3">
+
+          <template x-for="(comp, i) in competitors" :key="i">
+            <div class="flex items-center gap-3 p-3 border border-gray-100 rounded-xl hover:border-gray-200 transition-colors group">
+              <div class="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center shrink-0 text-sm font-bold text-purple-400"
+                   x-text="i+1"></div>
+              <input type="text" x-model="comp.name" placeholder="Competitor Name"
+                     class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-purple-300 min-w-0">
+              <input type="text" x-model="comp.url" placeholder="competitor.com"
+                     class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-purple-300 min-w-0">
+              <button type="button" @click="removeCompetitor(i)"
+                      class="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 text-xl leading-none transition-all shrink-0">×</button>
+            </div>
+          </template>
+
+          <button type="button" @click="addCompetitor()"
+                  class="w-full p-3 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-purple-300 hover:text-purple-500 transition-colors flex items-center justify-center gap-2">
+            <span class="text-lg leading-none">+</span> Add Competitor
+          </button>
+
+          <div x-show="!competitors.length"
+               class="p-4 bg-purple-50 rounded-xl text-sm text-purple-600">
+            💡 Tip: Even if we don't know your competitors yet, the agents will find them automatically from Google.
+          </div>
+
+        </div>
+      </div>
+
+      <div class="flex justify-between mt-6">
+        <button type="button" @click="step = 3"
+                class="px-5 py-2.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl transition-colors">
+          ← Back
+        </button>
+        <button type="button" @click="step = 5"
+                class="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-colors">
+          Next: Connect Site →
+        </button>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════
+         STEP 5 — CONNECT SITE
+    ════════════════════════════════════════ -->
+    <div x-show="step === 5" x-cloak>
+      <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="px-8 pt-7 pb-5 border-b border-gray-100">
+          <h2 class="text-lg font-bold text-gray-900">Connect Your Site</h2>
+          <p class="text-sm text-gray-500 mt-1">Where should the generated pages be published?</p>
+        </div>
+        <div class="p-8 space-y-5">
+
+          <!-- Publisher toggle -->
+          <div class="grid grid-cols-2 gap-3">
+            <button type="button" @click="publisherType = 'wordpress'"
+                    :class="publisherType === 'wordpress' ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-300'"
+                    class="p-4 border-2 rounded-xl text-left transition-all">
+              <div class="flex items-center gap-3 mb-2">
+                <span class="text-2xl">🔵</span>
+                <span class="font-bold text-gray-900">WordPress</span>
+              </div>
+              <p class="text-xs text-gray-500">Publish pages directly via REST API</p>
+            </button>
+            <button type="button" @click="publisherType = 'github'"
+                    :class="publisherType === 'github' ? 'border-gray-700 bg-gray-50 ring-2 ring-gray-200' : 'border-gray-200 hover:border-gray-300'"
+                    class="p-4 border-2 rounded-xl text-left transition-all">
+              <div class="flex items-center gap-3 mb-2">
+                <span class="text-2xl">⚫</span>
+                <span class="font-bold text-gray-900">GitHub Pages</span>
+              </div>
+              <p class="text-xs text-gray-500">Commit HTML files to a GitHub repo</p>
+            </button>
+          </div>
+
+          <!-- WordPress fields -->
+          <div x-show="publisherType === 'wordpress'" class="space-y-4">
+            <div class="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
+              💡 Requires WordPress Application Password. Go to Users → Profile → Application Passwords.
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5">WordPress URL</label>
+              <input type="text" x-model="publisherConfig.wp_url"
+                     placeholder="https://yourbusiness.com"
+                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">WP Username</label>
+                <input type="text" x-model="publisherConfig.wp_user"
+                       placeholder="admin"
+                       class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent">
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Application Password</label>
+                <input type="password" x-model="publisherConfig.wp_app_password"
+                       placeholder="xxxx xxxx xxxx xxxx"
+                       class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent">
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5">Live Domain</label>
+              <input type="text" x-model="publisherConfig.pages_domain"
+                     @input="if(!publisherConfig.pages_domain && publisherConfig.wp_url) publisherConfig.pages_domain = publisherConfig.wp_url"
+                     placeholder="https://yourbusiness.com"
+                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent">
+              <p class="text-xs text-gray-400 mt-1">Used for internal links and sitemap</p>
+            </div>
+          </div>
+
+          <!-- GitHub fields -->
+          <div x-show="publisherType === 'github'" class="space-y-4">
+            <div class="p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-600">
+              💡 Create a GitHub Personal Access Token with repo write access at github.com/settings/tokens
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5">GitHub Repo</label>
+              <input type="text" x-model="publisherConfig.github_repo"
+                     placeholder="username/repo-name"
+                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Branch</label>
+                <input type="text" x-model="publisherConfig.github_branch"
+                       placeholder="main"
+                       class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent">
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Format</label>
+                <select x-model="publisherConfig.github_format"
+                        class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white">
+                  <option value="html">HTML</option>
+                  <option value="nextjs">Next.js / MDX</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5">GitHub Token</label>
+              <input type="password" x-model="publisherConfig.github_token"
+                     placeholder="ghp_xxxxxxxxxxxx"
+                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1.5">Live Domain</label>
+              <input type="text" x-model="publisherConfig.pages_domain"
+                     placeholder="https://yourbusiness.com"
+                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent">
+            </div>
+          </div>
+
+          <!-- Skip option -->
+          <p class="text-xs text-gray-400 text-center">You can configure publishing later in Settings.</p>
+
+        </div>
+      </div>
+
+      <div class="flex justify-between mt-6">
+        <button type="button" @click="step = 4"
+                class="px-5 py-2.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl transition-colors">
+          ← Back
+        </button>
+        <button type="submit"
+                class="px-8 py-2.5 bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white text-sm font-bold rounded-xl shadow-md shadow-orange-200 transition-all">
+          🚀 Launch Pipeline
+        </button>
+      </div>
+    </div>
+
+  </form>
+</div>
+{% endblock %}

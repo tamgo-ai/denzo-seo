@@ -1,0 +1,166 @@
+{% extends "lite/base.html" %}
+{% block title %}Settings — Denzo SEO Lite{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl space-y-6">
+
+  <!-- Business Info -->
+  <div class="lite-card overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100">
+      <h2 class="text-sm font-bold text-gray-900">Business Info</h2>
+      <p class="text-xs text-gray-400 mt-0.5">Basic details used to generate your content</p>
+    </div>
+    <form method="POST" action="{{ url_for('lite.update_settings', tenant_id=tenant_id) }}" class="p-5 space-y-4">
+      <input type="hidden" name="section" value="business">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1.5">Business Name</label>
+          <input type="text" name="name" value="{{ client.name or '' }}"
+                 class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1.5">Phone</label>
+          <input type="text" name="phone" value="{{ client.phone or '' }}"
+                 class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1.5">City</label>
+          <input type="text" name="city" value="{{ client.city or '' }}"
+                 class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1.5">State</label>
+          <input type="text" name="state" value="{{ client.state or 'CA' }}"
+                 class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Website URL</label>
+        <input type="text" name="website_url" value="{{ client.website_url or '' }}"
+               class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300">
+      </div>
+      <button type="submit"
+              class="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-colors">
+        Save Changes
+      </button>
+    </form>
+  </div>
+
+  <!-- Publishing -->
+  <div class="lite-card overflow-hidden" x-data="{pub: '{{ ctx.publisher_type or 'wordpress' }}'}">
+    <div class="px-5 py-4 border-b border-gray-100">
+      <h2 class="text-sm font-bold text-gray-900">Publishing</h2>
+      <p class="text-xs text-gray-400 mt-0.5">Where to publish generated articles</p>
+    </div>
+    <form method="POST" action="{{ url_for('lite.update_settings', tenant_id=tenant_id) }}" class="p-5 space-y-5">
+      <input type="hidden" name="section" value="publishing">
+
+      <!-- Publisher type -->
+      <div class="grid grid-cols-2 gap-3">
+        <button type="button" @click="pub='wordpress'"
+                :class="pub==='wordpress' ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-100' : 'border-gray-200 hover:border-gray-300'"
+                class="p-4 border-2 rounded-xl text-left transition-all">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-xl">🔵</span>
+            <span class="font-semibold text-sm text-gray-900">WordPress</span>
+          </div>
+          <p class="text-xs text-gray-400">Publish via REST API</p>
+        </button>
+        <button type="button" @click="pub='github'"
+                :class="pub==='github' ? 'border-gray-700 bg-gray-50 ring-2 ring-gray-200' : 'border-gray-200 hover:border-gray-300'"
+                class="p-4 border-2 rounded-xl text-left transition-all">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-xl">⚫</span>
+            <span class="font-semibold text-sm text-gray-900">GitHub Pages</span>
+          </div>
+          <p class="text-xs text-gray-400">Commit HTML to repo</p>
+        </button>
+      </div>
+      <input type="hidden" name="publisher_type" :value="pub">
+
+      <!-- WordPress fields -->
+      <div x-show="pub==='wordpress'" class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1.5">WordPress URL</label>
+          <input type="text" name="wp_url" value="{{ ctx.wp_url or '' }}"
+                 placeholder="https://yourbusiness.com"
+                 class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">WP Username</label>
+            <input type="text" name="wp_user" value="{{ ctx.wp_user or '' }}" placeholder="admin"
+                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">App Password</label>
+            <input type="password" name="wp_app_password" placeholder="leave blank to keep"
+                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+          </div>
+        </div>
+      </div>
+
+      <!-- GitHub fields -->
+      <div x-show="pub==='github'" class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1.5">GitHub Repo</label>
+          <input type="text" name="github_repo" value="{{ ctx.github_repo or '' }}" placeholder="username/repo"
+                 class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Branch</label>
+            <input type="text" name="github_branch" value="{{ ctx.github_branch or 'main' }}"
+                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Format</label>
+            <select name="github_format"
+                    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 bg-white">
+              <option value="html" {% if ctx.github_format == 'html' %}selected{% endif %}>HTML</option>
+              <option value="nextjs" {% if ctx.github_format == 'nextjs' %}selected{% endif %}>Next.js / MDX</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1.5">GitHub Token</label>
+          <input type="password" name="github_token" placeholder="leave blank to keep"
+                 class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Live Domain</label>
+        <input type="text" name="pages_domain" value="{{ ctx.pages_domain or '' }}"
+               placeholder="https://yourbusiness.com"
+               class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300">
+        <p class="text-xs text-gray-400 mt-1">Used for sitemap and internal links</p>
+      </div>
+
+      <button type="submit"
+              class="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-colors">
+        Save Publishing Settings
+      </button>
+    </form>
+  </div>
+
+  <!-- Danger zone -->
+  <div class="lite-card overflow-hidden border-red-200">
+    <div class="px-5 py-4 border-b border-red-100 bg-red-50">
+      <h2 class="text-sm font-bold text-red-700">Enterprise Dashboard</h2>
+    </div>
+    <div class="p-5 flex items-center justify-between">
+      <div>
+        <p class="text-sm text-gray-700">Access the full Enterprise dashboard</p>
+        <p class="text-xs text-gray-400 mt-0.5">Full pipeline control, all 20 agents, advanced settings</p>
+      </div>
+      <a href="/clients/{{ tenant_id }}/pipeline"
+         class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors">
+        Open →
+      </a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

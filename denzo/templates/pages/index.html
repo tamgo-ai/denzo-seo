@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block title %}Pages — {{ client.name }}{% endblock %}
+
+{% block breadcrumb %}
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+  <a href="/" style="color:rgba(255,255,255,0.4);text-decoration:none;">Overview</a>
+  <span style="color:rgba(255,255,255,0.2)">/</span>
+  <a href="/clients/{{ tenant_id }}/pipeline" style="color:rgba(255,255,255,0.4);text-decoration:none;">{{ client.name }}</a>
+  <span style="color:rgba(255,255,255,0.2)">/</span>
+  <span style="color:rgba(255,255,255,0.87);font-weight:600;">Pages</span>
+</div>
+{% endblock %}
+
+{% block topbar_actions %}
+<a href="/clients/{{ tenant_id }}/pipeline"
+   style="font-size:12px;color:rgba(255,255,255,0.4);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='rgba(255,255,255,0.87)'" onmouseout="this.style.color='rgba(255,255,255,0.4)'">← Pipeline</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Stats bar -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;">
+  <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:24px 28px;text-align:center;">
+    <p style="font-size:48px;font-weight:300;letter-spacing:-0.02em;color:{% if not counts.total or counts.total == 0 %}rgba(255,255,255,0.25){% else %}#ffffff{% endif %};line-height:1;">{{ counts.total or 0 }}</p>
+    <p style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-top:8px;">Total Pages</p>
+  </div>
+  <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:24px 28px;text-align:center;">
+    <p style="font-size:48px;font-weight:300;letter-spacing:-0.02em;color:{% if not counts.draft or counts.draft == 0 %}rgba(255,255,255,0.25){% else %}rgba(255,255,255,0.87){% endif %};line-height:1;">{{ counts.draft or 0 }}</p>
+    <p style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-top:8px;">Draft</p>
+  </div>
+  <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:24px 28px;text-align:center;">
+    <p style="font-size:48px;font-weight:300;letter-spacing:-0.02em;color:{% if not counts.ready or counts.ready == 0 %}rgba(255,255,255,0.25){% else %}#818cf8{% endif %};line-height:1;">{{ counts.ready or 0 }}</p>
+    <p style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-top:8px;">Ready</p>
+  </div>
+  <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:24px 28px;text-align:center;">
+    <p style="font-size:48px;font-weight:300;letter-spacing:-0.02em;color:{% if not counts.published or counts.published == 0 %}rgba(255,255,255,0.25){% else %}#4ade80{% endif %};line-height:1;">{{ counts.published or 0 }}</p>
+    <p style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-top:8px;">Published</p>
+  </div>
+</div>
+
+<!-- Filter bar -->
+<form method="GET" action=""
+      style="background:#111111;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;margin-bottom:20px;">
+  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;">
+    <!-- Status filter -->
+    <select name="status"
+            style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0 12px;color:rgba(255,255,255,0.7);font-size:13px;font-family:inherit;height:40px;outline:none;min-width:140px;"
+            onchange="this.form.submit()">
+      <option value="" style="background:#1a1a1a;">All Statuses</option>
+      <option value="draft"     {% if filters.status == 'draft'     %}selected{% endif %} style="background:#1a1a1a;">Draft</option>
+      <option value="ready"     {% if filters.status == 'ready'     %}selected{% endif %} style="background:#1a1a1a;">Ready</option>
+      <option value="published" {% if filters.status == 'published' %}selected{% endif %} style="background:#1a1a1a;">Published</option>
+    </select>
+
+    <!-- Type filter -->
+    <select name="type"
+            style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0 12px;color:rgba(255,255,255,0.7);font-size:13px;font-family:inherit;height:40px;outline:none;min-width:140px;"
+            onchange="this.form.submit()">
+      <option value="" style="background:#1a1a1a;">All Types</option>
+      {% for pt in page_types %}
+      <option value="{{ pt }}" {% if filters.type == pt %}selected{% endif %} style="background:#1a1a1a;">{{ pt | replace('_', ' ') | title }}</option>
+      {% endfor %}
+    </select>
+
+    {% if filters.status or filters.type %}
+    <a href="/clients/{{ tenant_id }}/pages"
+       style="font-size:13px;color:rgba(255,255,255,0.4);text-decoration:none;padding:0 12px;height:40px;display:flex;align-items:center;border-radius:8px;border:1px solid rgba(255,255,255,0.08);transition:color 0.15s;"
+       onmouseover="this.style.color='rgba(255,255,255,0.7)'" onmouseout="this.style.color='rgba(255,255,255,0.4)'">
+      Clear
+    </a>
+    {% endif %}
+
+    <div style="flex:1;"></div>
+    <p style="font-size:13px;color:rgba(255,255,255,0.5);">
+      <span style="font-weight:600;color:rgba(255,255,255,0.87);">{{ total }}</span> pages
+      {% if total_pages > 1 %}<span style="color:rgba(255,255,255,0.3);">· Page {{ page }} of {{ total_pages }}</span>{% endif %}
+    </p>
+    <a href="/clients/{{ tenant_id }}/pages/export.csv?status={{ filters.status }}&type={{ filters.type }}"
+       style="display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);font-size:12px;font-weight:500;padding:6px 12px;border-radius:8px;text-decoration:none;transition:color 0.15s,border-color 0.15s;"
+       onmouseover="this.style.color='rgba(255,255,255,0.87)';this.style.borderColor='rgba(255,255,255,0.2)'"
+       onmouseout="this.style.color='rgba(255,255,255,0.5)';this.style.borderColor='rgba(255,255,255,0.1)'">
+      ↓ Export CSV
+    </a>
+  </div>
+</form>
+
+{% if not pages %}
+<div style="background:#111111;border:1px solid rgba(255,255,255,0.06);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 32px;text-align:center;">
+  <svg style="width:48px;height:48px;color:rgba(255,255,255,0.15);margin-bottom:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+  </svg>
+  <p style="color:rgba(255,255,255,0.5);font-size:14px;font-weight:500;">No pages found</p>
+  <p style="color:rgba(255,255,255,0.3);font-size:12px;margin-top:4px;">Run the Programmatic SEO agent to generate pages.</p>
+</div>
+{% else %}
+
+<div style="background:#111111;border:1px solid rgba(255,255,255,0.06);border-radius:12px;overflow:hidden;">
+  <table style="width:100%;border-collapse:collapse;">
+    <thead>
+      <tr style="background:rgba(255,255,255,0.03);">
+        <th style="text-align:left;padding:10px 20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);border-bottom:1px solid rgba(255,255,255,0.04);">Title</th>
+        <th style="text-align:left;padding:10px 20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);border-bottom:1px solid rgba(255,255,255,0.04);">Type</th>
+        <th style="text-align:left;padding:10px 20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);border-bottom:1px solid rgba(255,255,255,0.04);">Location</th>
+        <th style="text-align:left;padding:10px 20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);border-bottom:1px solid rgba(255,255,255,0.04);">Status</th>
+        <th style="text-align:left;padding:10px 20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);border-bottom:1px solid rgba(255,255,255,0.04);">Created</th>
+        <th style="padding:10px 20px;border-bottom:1px solid rgba(255,255,255,0.04);"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in pages %}
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.15s ease;"
+          onmouseover="this.style.background='rgba(255,255,255,0.03)'"
+          onmouseout="this.style.background='transparent'">
+        <td style="padding:12px 20px;">
+          <div>
+            <p style="font-weight:500;color:rgba(255,255,255,0.87);font-size:13px;margin:0;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ p.title }}">{{ p.title }}</p>
+            {% if p.target_keyword %}
+            <p style="font-size:12px;color:rgba(255,255,255,0.35);margin:2px 0 0;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ p.target_keyword }}</p>
+            {% endif %}
+          </div>
+        </td>
+        <td style="padding:12px 20px;">
+          {% if p.type %}
+          {% set ptype = p.type | lower %}
+          <span style="padding:2px 10px;border-radius:9999px;font-size:12px;font-weight:500;
+            {% if ptype in ['service', 'location', 'brand_city'] %}background:rgba(99,102,241,0.1);color:#818cf8;
+            {% elif ptype in ['faq', 'about'] %}background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5);
+            {% elif ptype == 'blog' %}background:rgba(167,139,250,0.1);color:#c4b5fd;
+            {% elif ptype == 'insurance' %}background:rgba(99,102,241,0.1);color:#818cf8;
+            {% else %}background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);{% endif %}">
+            {{ p.type | replace('_', ' ') | title }}
+          </span>
+          {% else %}
+          <span style="color:rgba(255,255,255,0.15);font-size:13px;">—</span>
+          {% endif %}
+        </td>
+        <td style="padding:12px 20px;color:rgba(255,255,255,0.4);font-size:12px;">{{ p.location or '—' }}</td>
+        <td style="padding:12px 20px;">
+          <span style="display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:9999px;font-size:12px;font-weight:500;
+            {% if p.status == 'published' %}background:rgba(74,222,128,0.12);color:#4ade80;
+            {% elif p.status == 'ready' %}background:rgba(99,102,241,0.12);color:#818cf8;
+            {% elif p.status == 'error' %}background:rgba(239,68,68,0.12);color:#f87171;
+            {% else %}background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);{% endif %}">
+            <span style="width:5px;height:5px;border-radius:50%;flex-shrink:0;
+              {% if p.status == 'published' %}background:#4ade80;
+              {% elif p.status == 'ready' %}background:#818cf8;
+              {% elif p.status == 'error' %}background:#ef4444;
+              {% else %}background:rgba(255,255,255,0.3);{% endif %}"></span>
+            {{ p.status | title }}
+          </span>
+        </td>
+        <td style="padding:12px 20px;color:rgba(255,255,255,0.3);font-size:12px;white-space:nowrap;">{{ p.created_at[:10] if p.created_at else '—' }}</td>
+        <td style="padding:12px 20px;">
+          <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end;">
+            {% if p.content %}
+            <a href="/clients/{{ tenant_id }}/pages/{{ p.id }}/review"
+               style="font-size:12px;color:#fb923c;text-decoration:none;padding:4px 10px;border-radius:6px;border:1px solid rgba(251,146,60,0.25);transition:all 0.15s;white-space:nowrap;font-weight:600;"
+               onmouseover="this.style.background='rgba(251,146,60,0.12)'"
+               onmouseout="this.style.background='transparent'">
+              Review
+            </a>
+            <a href="/clients/{{ tenant_id }}/pages/{{ p.id }}/preview"
+               target="_blank"
+               style="font-size:12px;color:rgba(255,255,255,0.4);text-decoration:none;padding:4px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);transition:color 0.15s,border-color 0.15s;white-space:nowrap;"
+               onmouseover="this.style.color='rgba(255,255,255,0.87)';this.style.borderColor='rgba(255,255,255,0.2)'"
+               onmouseout="this.style.color='rgba(255,255,255,0.4)';this.style.borderColor='rgba(255,255,255,0.08)'">
+              Preview
+            </a>
+            {% endif %}
+            {% if p.publish_url and p.publish_url.startswith('http') %}
+            <a href="{{ p.publish_url }}" target="_blank"
+               style="font-size:12px;color:#818cf8;text-decoration:none;padding:4px 10px;border-radius:6px;border:1px solid rgba(99,102,241,0.2);transition:color 0.15s;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis;display:inline-block;"
+               title="{{ p.publish_url }}"
+               onmouseover="this.style.color='#a5b4fc'" onmouseout="this.style.color='#818cf8'">
+              ↗ {{ p.publish_url | replace('https://', '') | replace('http://', '') | truncate(28) }}
+            </a>
+            {% elif p.status == 'published' %}
+            <span style="font-size:11px;color:rgba(255,255,255,0.2);padding:4px 8px;" title="Set Domain/Pages URL in Settings to generate live links">
+              no domain set
+            </span>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:20px;">
+  {% if page > 1 %}
+  <a href="?page={{ page - 1 }}&status={{ filters.status }}&type={{ filters.type }}"
+     style="display:flex;align-items:center;gap:4px;padding:7px 14px;font-size:13px;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:8px;text-decoration:none;transition:color 0.15s;"
+     onmouseover="this.style.color='rgba(255,255,255,0.87)'" onmouseout="this.style.color='rgba(255,255,255,0.5)'">
+    <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+    </svg>
+    Previous
+  </a>
+  {% endif %}
+
+  {% for p_num in range([1, page - 2] | max, [total_pages + 1, page + 3] | min) %}
+  <a href="?page={{ p_num }}&status={{ filters.status }}&type={{ filters.type }}"
+     style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:13px;border-radius:8px;border:1px solid;text-decoration:none;transition:all 0.15s;
+       {% if p_num == page %}background:#6366f1;border-color:#6366f1;color:#fff;font-weight:600;
+       {% else %}background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.08);color:rgba(255,255,255,0.5);{% endif %}">
+    {{ p_num }}
+  </a>
+  {% endfor %}
+
+  {% if page < total_pages %}
+  <a href="?page={{ page + 1 }}&status={{ filters.status }}&type={{ filters.type }}"
+     style="display:flex;align-items:center;gap:4px;padding:7px 14px;font-size:13px;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:8px;text-decoration:none;transition:color 0.15s;"
+     onmouseover="this.style.color='rgba(255,255,255,0.87)'" onmouseout="this.style.color='rgba(255,255,255,0.5)'">
+    Next
+    <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+    </svg>
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endif %}
+
+{% endblock %}
