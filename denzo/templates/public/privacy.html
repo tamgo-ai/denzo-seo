@@ -1,0 +1,99 @@
+{% extends "public/legal_base.html" %}
+
+{% block legal_content %}
+<h1>Privacy Policy</h1>
+<p class="subhead">Last updated: {{ effective_date }}</p>
+
+<div class="toc">
+  <h2>What's in this document</h2>
+  <ol>
+    <li><a href="#summary">Plain-language summary</a></li>
+    <li><a href="#who">Who we are</a></li>
+    <li><a href="#data-collected">Data we collect</a></li>
+    <li><a href="#google">Google user data (OAuth)</a></li>
+    <li><a href="#how-used">How we use the data</a></li>
+    <li><a href="#shared">Who we share data with</a></li>
+    <li><a href="#retention">How long we keep it</a></li>
+    <li><a href="#rights">Your rights (GDPR, CCPA)</a></li>
+    <li><a href="#security">Security</a></li>
+    <li><a href="#contact">Contact</a></li>
+  </ol>
+</div>
+
+<h2 id="summary">1. Plain-language summary</h2>
+<p>Denzo is a multi-tenant SEO platform. We store the data <em>you</em> give us (your business info, keywords, generated pages) and the data <em>your Google account</em> chooses to share with us when you click "Connect" (your Search Console reports, your Business Profile reviews and locations). We use it only to operate your dashboard. We do not sell it. We do not show it to other clients. You can delete it at any time.</p>
+
+<h2 id="who">2. Who we are</h2>
+<p>Denzo SEO ("Denzo", "we") is operated by Denzo Studios. Contact: <a href="mailto:hello@denzostudios.com">hello@denzostudios.com</a>.</p>
+
+<h2 id="data-collected">3. Data we collect</h2>
+<h3>Account data</h3>
+<ul>
+  <li>Email address (login + billing notifications)</li>
+  <li>Hashed password</li>
+  <li>Subscription plan + Stripe customer ID</li>
+  <li>Login timestamps and IP address (for fraud / security audit)</li>
+</ul>
+
+<h3>Tenant data (the SEO data you fill in)</h3>
+<ul>
+  <li>Business name, services, certifications, service area</li>
+  <li>Keywords you research, competitors you track</li>
+  <li>Generated pages and their published URLs</li>
+  <li>API keys for third-party services you opt into (GitHub, WordPress, Apify, Anthropic) — encrypted at rest</li>
+</ul>
+
+<h2 id="google">4. Google user data (OAuth)</h2>
+<p>When you click <em>Connect Google Business Profile</em> or <em>Connect Search Console</em>, you authorize Denzo to read specific data on your behalf. We request only the scopes we need:</p>
+<ul>
+  <li><code>https://www.googleapis.com/auth/business.manage</code> — to read your GBP locations, reviews, posts, and Q&amp;A.</li>
+  <li><code>https://www.googleapis.com/auth/webmasters.readonly</code> — to read your Search Console clicks, impressions, queries, and pages.</li>
+</ul>
+<p>We store the access and refresh tokens encrypted in our database, scoped to the specific tenant you connected them to. Tokens are not shared across tenants. You can revoke access at any time from Settings → Google Integrations or from your Google account at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</p>
+<p><strong>Limited Use disclosure:</strong> Denzo's use of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements. We do not transfer Google user data to third parties except as needed to provide the service or comply with law, and we do not use Google user data to serve advertisements.</p>
+
+<h2 id="how-used">5. How we use the data</h2>
+<ul>
+  <li>To run the agent pipeline (research, draft, optimize, publish, track) for your tenants.</li>
+  <li>To show you dashboards, reports, and Mission Control.</li>
+  <li>To process payments via Stripe.</li>
+  <li>To improve Denzo, in aggregate and anonymized form (no per-customer data, no Google user data).</li>
+  <li>To send you product and security notifications.</li>
+</ul>
+
+<h2 id="shared">6. Who we share data with</h2>
+<p>We share data only with the processors required to deliver the service:</p>
+<ul>
+  <li><strong>Stripe</strong> (payment processing)</li>
+  <li><strong>Anthropic</strong> (AI model API for content generation)</li>
+  <li><strong>Apify</strong> (SERP scraping, when you provide your own Apify key)</li>
+  <li><strong>Google</strong> (Business Profile + Search Console APIs, on your authorization)</li>
+  <li><strong>Mailgun</strong> or similar (transactional email)</li>
+  <li><strong>Hosting provider</strong> (server infrastructure)</li>
+</ul>
+<p>We do not sell, rent, or trade personal data to advertisers or data brokers.</p>
+
+<h2 id="retention">7. How long we keep data</h2>
+<ul>
+  <li><strong>While your account is active:</strong> as long as you use Denzo.</li>
+  <li><strong>After you cancel:</strong> 30 days, then automatic deletion (you can request immediate deletion).</li>
+  <li><strong>Stripe billing records:</strong> retained per Stripe's policy and tax law requirements (typically 7 years).</li>
+</ul>
+
+<h2 id="rights">8. Your rights (GDPR, CCPA)</h2>
+<p>You can:</p>
+<ul>
+  <li>Request a copy of your data (<code>GET /me/export</code> or email us)</li>
+  <li>Correct inaccurate data via your Settings page</li>
+  <li>Delete your account and all associated data via Settings → Danger Zone, or by emailing <a href="mailto:hello@denzostudios.com">hello@denzostudios.com</a></li>
+  <li>Withdraw OAuth consent at any time from Google or from Settings → Google Integrations</li>
+  <li>Object to processing or request portability</li>
+  <li>File a complaint with your local data protection authority (e.g. AEPD in Spain, CNIL in France, ICO in the UK, your state AG in the US)</li>
+</ul>
+
+<h2 id="security">9. Security</h2>
+<p>We use industry-standard encryption (TLS 1.2+ in transit, AES-256 at rest where applicable), hashed passwords (bcrypt/Werkzeug), per-tenant data isolation, and OAuth refresh-token rotation. We do not have plaintext access to your passwords. Stripe and Google credentials are stored separately from application data. We will notify affected users within 72 hours of confirming any breach involving personal data.</p>
+
+<h2 id="contact">10. Contact</h2>
+<p>Questions, deletion requests, or complaints: <a href="mailto:hello@denzostudios.com">hello@denzostudios.com</a>.</p>
+{% endblock %}

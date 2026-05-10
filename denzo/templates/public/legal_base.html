@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{{ page_title }} · Denzo SEO</title>
+  <meta name="description" content="{{ page_description }}"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #07070b; --surface: #0e0f17; --card: #14151f;
+      --border: rgba(255,255,255,0.08); --text: #f4f4f5;
+      --muted: rgba(255,255,255,0.55); --accent: #818cf8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: Inter, system-ui, sans-serif;
+      margin: 0; min-height: 100vh; line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+    body::before {
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(99,102,241,0.08), transparent 60%);
+    }
+    .shell { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; padding: 32px 24px 96px; }
+    nav.top { display: flex; align-items: center; justify-content: space-between; padding-bottom: 32px; }
+    nav.top .brand {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 16px; font-weight: 700; letter-spacing: -0.02em;
+      color: var(--text); text-decoration: none;
+    }
+    nav.top .brand .logo {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 800; color: #fff;
+    }
+    nav.top a.cta {
+      font-size: 13px; font-weight: 600; color: var(--text);
+      padding: 9px 16px; border-radius: 9px;
+      border: 1px solid var(--border); text-decoration: none;
+    }
+    h1 {
+      font-size: 40px; font-weight: 800; letter-spacing: -0.03em;
+      margin: 32px 0 8px;
+      background: linear-gradient(135deg, #fff, rgba(255,255,255,0.55));
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .subhead {
+      color: var(--muted); font-size: 14px; margin: 0 0 32px;
+    }
+    h2 { font-size: 18px; font-weight: 700; margin: 32px 0 12px; letter-spacing: -0.01em; }
+    h3 { font-size: 14px; font-weight: 700; margin: 20px 0 8px; color: var(--accent); }
+    p { font-size: 15px; color: rgba(255,255,255,0.78); margin: 0 0 14px; }
+    ul { font-size: 15px; color: rgba(255,255,255,0.78); padding-left: 20px; }
+    li { margin: 6px 0; }
+    a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    code { background: var(--card); padding: 1px 6px; border-radius: 4px; font-size: 13px; font-family: ui-monospace, monospace; }
+
+    .footer {
+      margin-top: 80px; padding-top: 32px;
+      border-top: 1px solid var(--border);
+      text-align: center; font-size: 12px; color: rgba(255,255,255,0.35);
+    }
+    .footer a { color: var(--muted); text-decoration: none; margin: 0 12px; }
+    .footer a:hover { color: var(--text); }
+
+    .toc {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 18px 22px; margin: 24px 0 36px;
+    }
+    .toc h2 {
+      margin: 0 0 10px; font-size: 12px; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--muted);
+    }
+    .toc ol { margin: 0; padding-left: 20px; font-size: 13px; }
+    .toc ol li { margin: 4px 0; }
+    .toc ol li a { text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <nav class="top">
+      <a href="/" class="brand">
+        <span class="logo">D</span>
+        Denzo
+      </a>
+      <a href="/" class="cta">Back to site</a>
+    </nav>
+
+    {% block legal_content %}{% endblock %}
+
+    <div class="footer">
+      © {{ year }} Denzo SEO ·
+      <a href="/privacy">Privacy</a> ·
+      <a href="/terms">Terms</a> ·
+      <a href="/">Home</a>
+    </div>
+  </div>
+  {% include "public/_cookie_banner.html" %}
+</body>
+</html>

@@ -766,6 +766,34 @@ def upgrade_page():
                            legacy_template_url=url_for("public.upgrade_page_legacy"))
 
 
+# ── Legal pages ────────────────────────────────────────────────────────────────
+
+@bp.route("/privacy")
+def privacy():
+    from datetime import datetime
+    today = datetime.utcnow().strftime("%B %d, %Y")
+    return render_template(
+        "public/privacy.html",
+        page_title="Privacy Policy",
+        page_description="How Denzo SEO handles your data and your Google account information.",
+        effective_date=today,
+        year=datetime.utcnow().year,
+    )
+
+
+@bp.route("/terms")
+def terms():
+    from datetime import datetime
+    today = datetime.utcnow().strftime("%B %d, %Y")
+    return render_template(
+        "public/terms.html",
+        page_title="Terms of Service",
+        page_description="The terms governing your use of Denzo SEO.",
+        effective_date=today,
+        year=datetime.utcnow().year,
+    )
+
+
 @bp.route("/upgrade-legacy")
 def upgrade_page_legacy():
     """Original 10-agent upgrade page kept as a fallback during transition."""

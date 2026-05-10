@@ -1,0 +1,88 @@
+{% extends "public/legal_base.html" %}
+
+{% block legal_content %}
+<h1>Terms of Service</h1>
+<p class="subhead">Last updated: {{ effective_date }}</p>
+
+<div class="toc">
+  <h2>What's in this document</h2>
+  <ol>
+    <li><a href="#agreement">The agreement</a></li>
+    <li><a href="#account">Your account</a></li>
+    <li><a href="#use">Acceptable use</a></li>
+    <li><a href="#content">Content you publish</a></li>
+    <li><a href="#third-party">Third-party services</a></li>
+    <li><a href="#payments">Payments and refunds</a></li>
+    <li><a href="#availability">Service availability</a></li>
+    <li><a href="#disclaimers">Disclaimers</a></li>
+    <li><a href="#liability">Limitation of liability</a></li>
+    <li><a href="#termination">Termination</a></li>
+    <li><a href="#law">Governing law</a></li>
+    <li><a href="#contact">Contact</a></li>
+  </ol>
+</div>
+
+<h2 id="agreement">1. The agreement</h2>
+<p>By using Denzo SEO ("Denzo", "we", "us"), you agree to these terms. If you don't agree, don't use the service. If you're using Denzo on behalf of a company, you confirm you have authority to bind that company to these terms.</p>
+
+<h2 id="account">2. Your account</h2>
+<ul>
+  <li>You're responsible for keeping your password and API keys secret.</li>
+  <li>You're responsible for all activity under your account.</li>
+  <li>You must be at least 18 years old.</li>
+  <li>One paid plan = one logical account. Don't share logins.</li>
+</ul>
+
+<h2 id="use">3. Acceptable use</h2>
+<p>You agree not to:</p>
+<ul>
+  <li>Use Denzo to generate content that's illegal, defamatory, hateful, or violates someone else's intellectual property.</li>
+  <li>Use Denzo to spam, generate fake reviews, manipulate search engines beyond fair on-page SEO, or violate Google's Webmaster Guidelines.</li>
+  <li>Reverse-engineer, decompile, or extract the source code or models behind the service.</li>
+  <li>Resell access to Denzo without an Agency-tier subscription that explicitly includes white-label rights.</li>
+  <li>Bypass plan limits or rate limits.</li>
+  <li>Use Denzo to compete with Denzo by training a directly competing AI service.</li>
+</ul>
+
+<h2 id="content">4. Content you publish</h2>
+<p>Denzo generates draft pages, schema, and content suggestions. Before publishing to your domain, <strong>you</strong> are responsible for reviewing accuracy, claims, and compliance with the laws and codes of conduct that apply to your industry (medical disclaimers, legal advertising rules, automotive financing disclosures, etc.). Generated content is your content once published — you own it.</p>
+<p>You grant Denzo a limited license to store and process your content to deliver the service. We don't claim ownership of anything you create with Denzo.</p>
+
+<h2 id="third-party">5. Third-party services</h2>
+<p>Denzo integrates with Google, Stripe, Anthropic, Apify, and others. Your use of those services is governed by their own terms. When you connect an account (e.g. Google OAuth), the third party's terms apply to that data. Denzo is not responsible for outages, breaking changes, or pricing changes from third parties.</p>
+
+<h2 id="payments">6. Payments and refunds</h2>
+<ul>
+  <li>Subscriptions are monthly and billed via Stripe.</li>
+  <li>Plans renew automatically on the same calendar day each month.</li>
+  <li>You can cancel anytime; cancellation takes effect at the end of the current billing period.</li>
+  <li>We don't offer prorated refunds for partial months. We will refund obvious billing errors on request.</li>
+  <li>If a payment fails, we'll retry per Stripe's standard schedule. After 7 days of failed payment, the account drops to the Free tier.</li>
+  <li>We may change pricing with 30 days' notice. Changes apply at the start of your next billing period.</li>
+</ul>
+
+<h2 id="availability">7. Service availability</h2>
+<p>We aim for 99.5% uptime. There is no formal SLA on Free or Starter plans. Pro and Agency plans receive best-effort support response within 1 business day.</p>
+
+<h2 id="disclaimers">8. Disclaimers</h2>
+<p>Denzo provides AI-generated SEO drafts and tools, not guarantees. We don't guarantee:</p>
+<ul>
+  <li>That you'll rank #1, get more traffic, or generate revenue.</li>
+  <li>That generated content is factually accurate without your review.</li>
+  <li>That third-party APIs (Google, Stripe, Anthropic) will be continuously available.</li>
+  <li>That any specific keyword volume, position, or conversion estimate is correct.</li>
+</ul>
+<p>The service is provided "as is" and "as available." We disclaim all warranties to the maximum extent permitted by law.</p>
+
+<h2 id="liability">9. Limitation of liability</h2>
+<p>To the maximum extent permitted by law, Denzo's total liability to you for any claim arising out of or relating to these terms or the service is limited to the amount you paid Denzo in the twelve months preceding the claim. We are not liable for indirect, consequential, incidental, special, exemplary, or punitive damages, or for lost profits, lost data, or business interruption.</p>
+
+<h2 id="termination">10. Termination</h2>
+<p>You may cancel anytime from Settings → Manage Billing or by emailing us. We may suspend or terminate accounts that violate these terms or that pose a security or abuse risk. On termination, your data is deleted within 30 days unless you ask for sooner deletion.</p>
+
+<h2 id="law">11. Governing law</h2>
+<p>These terms are governed by the laws of the State of California, USA, without regard to conflict-of-law principles. Disputes will be resolved in the state or federal courts located in Los Angeles County, California.</p>
+
+<h2 id="contact">12. Contact</h2>
+<p>Questions or notices: <a href="mailto:hello@denzostudios.com">hello@denzostudios.com</a>.</p>
+{% endblock %}
