@@ -74,8 +74,9 @@ def create_app():
     from denzo.routes.oauth       import bp as oauth_bp
     from denzo.routes.mission_control import bp as mission_control_bp
     from denzo.routes.billing     import bp as billing_bp
+    from denzo.routes.jarvis      import bp as jarvis_bp
 
-    for bp in [public_bp, auth_bp, dash_bp, clients_bp, pipeline_bp, keywords_bp, pages_bp, competitors_bp, settings_bp, api_bp, audit_bp, images_bp, brand_voice_bp, data_intel_bp, geo_bp, reviews_bp, lite_bp, reporting_bp, oauth_bp, mission_control_bp, billing_bp]:
+    for bp in [public_bp, auth_bp, dash_bp, clients_bp, pipeline_bp, keywords_bp, pages_bp, competitors_bp, settings_bp, api_bp, audit_bp, images_bp, brand_voice_bp, data_intel_bp, geo_bp, reviews_bp, lite_bp, reporting_bp, oauth_bp, mission_control_bp, billing_bp, jarvis_bp]:
         app.register_blueprint(bp)
 
     with app.app_context():
