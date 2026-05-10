@@ -1,0 +1,675 @@
+{% extends "base.html" %}
+
+{% block title %}Mission Control · {{ client.name }}{% endblock %}
+
+{% block breadcrumb %}
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+  <a href="/" style="color:var(--muted);text-decoration:none;">Overview</a>
+  <span style="color:var(--muted2)">/</span>
+  <a href="/clients/{{ client.tenant_id }}/edit" style="color:var(--muted);text-decoration:none;">{{ client.name }}</a>
+  <span style="color:var(--muted2)">/</span>
+  <span style="color:var(--text);font-weight:600;">Mission Control</span>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ── Star-field background ───────────────────────────────────────────────── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 0%, rgba(99,102,241,0.10), transparent 60%),
+      radial-gradient(ellipse 60% 60% at 100% 100%, rgba(139,92,246,0.07), transparent 70%),
+      radial-gradient(ellipse 70% 50% at 0% 100%, rgba(34,211,238,0.05), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .mc-shell {
+    position: relative;
+    z-index: 1;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 0 24px 48px;
+  }
+
+  /* ── Hero ────────────────────────────────────────────────────────────────── */
+  .mc-hero {
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    padding: 28px 0 24px;
+    flex-wrap: wrap;
+  }
+  .mc-title-block h1 {
+    font-size: 32px; font-weight: 700; letter-spacing: -0.03em; margin: 0 0 4px;
+    background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.6) 100%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .mc-title-block h1 .live-pill {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+    color: #0a0a0a; padding: 4px 10px; border-radius: 999px;
+    -webkit-text-fill-color: #0a0a0a;
+    display: inline-flex; align-items: center; gap: 6px;
+    box-shadow: 0 0 24px rgba(74,222,128,0.4);
+    animation: live-glow 2.4s ease-in-out infinite;
+  }
+  .mc-title-block h1 .live-pill::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: #0a0a0a; animation: live-blink 1.2s ease-in-out infinite;
+  }
+  .mc-title-block p {
+    margin: 0; font-size: 14px; color: rgba(255,255,255,0.5);
+    letter-spacing: -0.005em;
+  }
+  @keyframes live-glow {
+    0%, 100% { box-shadow: 0 0 24px rgba(74,222,128,0.4); }
+    50%      { box-shadow: 0 0 32px rgba(74,222,128,0.7); }
+  }
+  @keyframes live-blink {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0; }
+  }
+
+  /* ── KPI strip ───────────────────────────────────────────────────────────── */
+  .mc-kpis {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  @media (max-width: 1100px) { .mc-kpis { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 640px)  { .mc-kpis { grid-template-columns: repeat(2, 1fr); } }
+
+  .mc-kpi {
+    background: linear-gradient(180deg, rgba(20,22,32,0.85) 0%, rgba(15,17,28,0.85) 100%);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+    padding: 16px 18px;
+    position: relative; overflow: hidden;
+    backdrop-filter: blur(8px);
+  }
+  .mc-kpi::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent, rgba(99,102,241,0.4)), transparent);
+  }
+  .mc-kpi-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
+    color: rgba(255,255,255,0.4); font-weight: 600;
+    margin: 0 0 6px;
+  }
+  .mc-kpi-value {
+    font-size: 28px; font-weight: 700; letter-spacing: -0.025em;
+    color: #fff; margin: 0; line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .mc-kpi-sub {
+    font-size: 11px; color: rgba(255,255,255,0.4); margin: 4px 0 0;
+  }
+
+  /* ── Layout: stage + activity ──────────────────────────────────────────── */
+  .mc-grid {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 20px;
+    align-items: stretch;
+  }
+  @media (max-width: 1280px) { .mc-grid { grid-template-columns: 1fr; } }
+
+  .mc-stage {
+    background: linear-gradient(180deg, rgba(12,14,22,0.7) 0%, rgba(8,9,15,0.85) 100%);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 18px;
+    padding: 28px 24px;
+    position: relative;
+    overflow: hidden;
+    min-height: 720px;
+  }
+  .mc-stage::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background:
+      radial-gradient(circle at 50% 0%, rgba(99,102,241,0.08), transparent 50%);
+    pointer-events: none;
+  }
+
+  .mc-stage-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 24px; position: relative; z-index: 2;
+  }
+  .mc-stage-header h2 {
+    font-size: 14px; font-weight: 600; letter-spacing: 0.04em;
+    text-transform: uppercase; color: rgba(255,255,255,0.6);
+    margin: 0; display: flex; align-items: center; gap: 10px;
+  }
+  .mc-stage-header .legend {
+    display: flex; align-items: center; gap: 18px;
+    font-size: 11px; color: rgba(255,255,255,0.5);
+  }
+  .mc-stage-header .legend span {
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .mc-stage-header .legend .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+
+  /* ── The constellation ─────────────────────────────────────────────────── */
+  .mc-constellation {
+    position: relative;
+    display: flex; flex-direction: column; gap: 28px;
+    z-index: 2;
+  }
+
+  .mc-layer {
+    position: relative;
+  }
+  .mc-layer-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.18em;
+    color: rgba(255,255,255,0.3); font-weight: 700;
+    margin: 0 0 10px; padding-left: 4px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .mc-layer-label::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent);
+  }
+
+  .mc-layer-row {
+    display: flex; flex-wrap: wrap; gap: 12px;
+  }
+
+  /* ── Agent node ────────────────────────────────────────────────────────── */
+  .mc-agent {
+    --agent-color: rgba(99,102,241,1);
+    background: linear-gradient(135deg, rgba(20,22,32,0.95) 0%, rgba(14,16,24,0.95) 100%);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+    padding: 14px 16px 12px 16px;
+    min-width: 200px;
+    flex: 1 1 200px;
+    max-width: 280px;
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.3s;
+    overflow: hidden;
+  }
+  .mc-agent:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255,255,255,0.15);
+  }
+  .mc-agent.is-director {
+    flex: 0 0 auto; min-width: 280px;
+    margin: 0 auto;
+    background: linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(139,92,246,0.10) 100%);
+    border-color: rgba(99,102,241,0.25);
+  }
+  .mc-agent.is-working {
+    border-color: var(--agent-color);
+    box-shadow: 0 0 0 1px var(--agent-color),
+                0 8px 32px -4px var(--agent-color);
+  }
+  .mc-agent.is-working::before {
+    content: ''; position: absolute; inset: -1px;
+    border-radius: 14px;
+    border: 1px solid var(--agent-color);
+    opacity: 0;
+    animation: agent-pulse-ring 1.8s ease-out infinite;
+    pointer-events: none;
+  }
+  .mc-agent.is-done {
+    border-color: rgba(74,222,128,0.35);
+  }
+  .mc-agent.is-error {
+    border-color: rgba(248,113,113,0.45);
+  }
+
+  @keyframes agent-pulse-ring {
+    0%   { opacity: 0.8; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.08); }
+  }
+
+  .mc-agent-head {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 6px;
+  }
+  .mc-agent-icon {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: var(--agent-color); opacity: 0.18;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .mc-agent.is-working .mc-agent-icon {
+    opacity: 1;
+  }
+  .mc-agent.is-working .mc-agent-icon::after {
+    content: ''; position: absolute; inset: -3px;
+    border-radius: 50%;
+    border: 1.5px solid var(--agent-color);
+    border-right-color: transparent;
+    animation: spin 1.2s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .mc-agent-icon-letter {
+    font-size: 13px; font-weight: 700; color: #fff;
+    text-transform: uppercase;
+    z-index: 1;
+  }
+  .mc-agent-name {
+    font-size: 13px; font-weight: 600; color: #fff;
+    letter-spacing: -0.01em; flex: 1; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .mc-agent-status {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 3px 7px; border-radius: 999px;
+    flex-shrink: 0;
+  }
+  .mc-agent-status.idle    { background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.4); }
+  .mc-agent-status.working { background: var(--agent-color); color: #0a0a0a; box-shadow: 0 0 12px var(--agent-color); }
+  .mc-agent-status.done    { background: rgba(74,222,128,0.15); color: #4ade80; }
+  .mc-agent-status.error   { background: rgba(248,113,113,0.15); color: #f87171; }
+
+  .mc-agent-task {
+    font-size: 11px; color: rgba(255,255,255,0.5);
+    margin: 0; line-height: 1.4;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    min-height: 16px;
+  }
+  .mc-agent.is-working .mc-agent-task {
+    color: rgba(255,255,255,0.85);
+  }
+
+  /* ── Color tokens (matches registry colors) ────────────────────────────── */
+  .c-blue     { --agent-color: #60a5fa; }
+  .c-cyan     { --agent-color: #22d3ee; }
+  .c-purple   { --agent-color: #a78bfa; }
+  .c-gray     { --agent-color: #9ca3af; }
+  .c-teal     { --agent-color: #5eead4; }
+  .c-indigo   { --agent-color: #818cf8; }
+  .c-green    { --agent-color: #4ade80; }
+  .c-violet   { --agent-color: #a78bfa; }
+  .c-fuchsia  { --agent-color: #e879f9; }
+  .c-orange   { --agent-color: #fb923c; }
+  .c-yellow   { --agent-color: #facc15; }
+  .c-pink     { --agent-color: #f472b6; }
+  .c-lime     { --agent-color: #a3e635; }
+  .c-slate    { --agent-color: #94a3b8; }
+  .c-sky      { --agent-color: #38bdf8; }
+  .c-emerald  { --agent-color: #34d399; }
+  .c-rose     { --agent-color: #fb7185; }
+  .c-amber    { --agent-color: #fbbf24; }
+
+  /* ── Connection lines ──────────────────────────────────────────────────── */
+  .mc-connections {
+    position: absolute; inset: 0; pointer-events: none;
+    z-index: 1;
+  }
+
+  /* ── Activity panel ────────────────────────────────────────────────────── */
+  .mc-activity {
+    background: linear-gradient(180deg, rgba(12,14,22,0.7) 0%, rgba(8,9,15,0.85) 100%);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 18px;
+    padding: 0;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    min-height: 720px;
+    max-height: 720px;
+  }
+  .mc-activity-head {
+    padding: 22px 22px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .mc-activity-head h3 {
+    font-size: 14px; font-weight: 600; letter-spacing: 0.04em;
+    text-transform: uppercase; color: rgba(255,255,255,0.6);
+    margin: 0; display: flex; align-items: center; gap: 10px;
+  }
+  .mc-activity-head .live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #4ade80; box-shadow: 0 0 12px #4ade80;
+    animation: live-blink 1.6s ease-in-out infinite;
+  }
+  .mc-activity-feed {
+    flex: 1; overflow-y: auto;
+    padding: 12px 4px 12px 0;
+    scroll-behavior: smooth;
+  }
+  .mc-activity-feed::-webkit-scrollbar { width: 6px; }
+  .mc-activity-feed::-webkit-scrollbar-track { background: transparent; }
+  .mc-activity-feed::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.08); border-radius: 3px;
+  }
+
+  .mc-activity-item {
+    padding: 10px 22px 10px 22px;
+    border-left: 2px solid transparent;
+    display: flex; gap: 12px;
+    transition: background 0.15s;
+  }
+  .mc-activity-item:hover { background: rgba(255,255,255,0.02); }
+  .mc-activity-item.lvl-success { border-left-color: rgba(74,222,128,0.6); }
+  .mc-activity-item.lvl-warning { border-left-color: rgba(251,191,36,0.6); }
+  .mc-activity-item.lvl-error   { border-left-color: rgba(248,113,113,0.6); }
+  .mc-activity-item.lvl-info    { border-left-color: rgba(99,102,241,0.4); }
+
+  .mc-activity-meta {
+    flex: 1; min-width: 0;
+  }
+  .mc-activity-agent {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.85);
+    margin: 0 0 2px;
+  }
+  .mc-activity-agent .agent-pip {
+    width: 6px; height: 6px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .mc-activity-agent .ts {
+    margin-left: auto; font-size: 10px; font-weight: 500;
+    color: rgba(255,255,255,0.3); font-variant-numeric: tabular-nums;
+  }
+  .mc-activity-msg {
+    font-size: 12px; color: rgba(255,255,255,0.55); margin: 0;
+    line-height: 1.5; word-wrap: break-word;
+  }
+
+  .mc-activity-empty {
+    padding: 60px 22px; text-align: center;
+    font-size: 12px; color: rgba(255,255,255,0.3);
+  }
+
+  /* ── Active flow packets (data passing between agents) ────────────────── */
+  .mc-flow-banner {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    padding: 12px 24px;
+    margin: 14px 0 0;
+    background: rgba(99,102,241,0.04);
+    border: 1px solid rgba(99,102,241,0.12);
+    border-radius: 12px;
+    position: relative; z-index: 2;
+    align-items: center;
+  }
+  .mc-flow-banner .flow-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
+    color: #a5b4fc; font-weight: 700;
+  }
+  .mc-flow-pill {
+    font-size: 11px; color: rgba(255,255,255,0.7);
+    padding: 5px 10px; border-radius: 999px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    display: inline-flex; align-items: center; gap: 8px;
+    font-weight: 500;
+  }
+  .mc-flow-pill .arrow {
+    color: rgba(99,102,241,0.7);
+    animation: arrow-flow 1.6s ease-in-out infinite;
+  }
+  @keyframes arrow-flow {
+    0%, 100% { transform: translateX(0); opacity: 0.5; }
+    50%      { transform: translateX(3px); opacity: 1; }
+  }
+
+  /* ── Tooltip on agent hover ────────────────────────────────────────────── */
+  [data-tip] { position: relative; }
+  [data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+    background: rgba(20,22,32,0.97); color: #fff;
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 6px 10px; border-radius: 6px;
+    font-size: 11px; font-weight: 500; white-space: nowrap;
+    z-index: 100; pointer-events: none;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mc-shell" x-data="missionControl('{{ client.tenant_id }}')" x-init="init()">
+
+  {# ─── HERO ──────────────────────────────────────────────────── #}
+  <div class="mc-hero">
+    <div class="mc-title-block">
+      <h1>
+        Mission Control
+        <span class="live-pill">LIVE</span>
+      </h1>
+      <p>{{ client.name }} · 26 agents · 7 layers · refreshing every 2 seconds</p>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <a href="/clients/{{ client.tenant_id }}/agents"
+         style="display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 16px;border-radius:10px;font-size:12px;font-weight:600;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);text-decoration:none;transition:all 0.15s;"
+         onmouseover="this.style.borderColor='rgba(255,255,255,0.2)';this.style.color='#fff'"
+         onmouseout="this.style.borderColor='rgba(255,255,255,0.08)';this.style.color='rgba(255,255,255,0.7)'">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        Pipeline View
+      </a>
+      <button @click="refresh()"
+              :disabled="loading"
+              style="display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 16px;border-radius:10px;font-size:12px;font-weight:600;background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;color:#fff;cursor:pointer;transition:all 0.15s;"
+              onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 8px 24px rgba(99,102,241,0.4)'"
+              onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='none'">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" :class="{ 'spin-on-load': loading }"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  {# ─── KPI STRIP ─────────────────────────────────────────────── #}
+  <div class="mc-kpis">
+    <div class="mc-kpi" style="--accent: rgba(99,102,241,0.5);">
+      <p class="mc-kpi-label">Pages Published</p>
+      <p class="mc-kpi-value" x-text="kpis.pages_published"></p>
+      <p class="mc-kpi-sub"><span x-text="kpis.pages_total"></span> total · <span x-text="kpis.pages_ready"></span> ready</p>
+    </div>
+    <div class="mc-kpi" style="--accent: rgba(34,211,238,0.5);">
+      <p class="mc-kpi-label">Keywords</p>
+      <p class="mc-kpi-value" x-text="kpis.keywords_total"></p>
+      <p class="mc-kpi-sub"><span x-text="kpis.keywords_high"></span> high priority</p>
+    </div>
+    <div class="mc-kpi" style="--accent: rgba(168,85,247,0.5);">
+      <p class="mc-kpi-label">Competitors</p>
+      <p class="mc-kpi-value" x-text="kpis.competitors"></p>
+      <p class="mc-kpi-sub">analyzed</p>
+    </div>
+    <div class="mc-kpi" style="--accent: rgba(74,222,128,0.5);">
+      <p class="mc-kpi-label">GEO Citations</p>
+      <p class="mc-kpi-value" x-text="kpis.geo_citations"></p>
+      <p class="mc-kpi-sub">of <span x-text="kpis.geo_queries_total"></span> queries</p>
+    </div>
+    <div class="mc-kpi" style="--accent: rgba(251,146,60,0.5);">
+      <p class="mc-kpi-label">In Flight</p>
+      <p class="mc-kpi-value" x-text="inProgressCount"></p>
+      <p class="mc-kpi-sub">agents working now</p>
+    </div>
+    <div class="mc-kpi" style="--accent: rgba(248,113,113,0.5);">
+      <p class="mc-kpi-label">Last Update</p>
+      <p class="mc-kpi-value" style="font-size:18px;letter-spacing:-0.01em;" x-text="lastUpdateLabel"></p>
+      <p class="mc-kpi-sub">auto refresh active</p>
+    </div>
+  </div>
+
+  {# ─── ACTIVE FLOW BANNER (when data is moving between agents) ── #}
+  <template x-if="activeFlows.length > 0">
+    <div class="mc-flow-banner">
+      <span class="flow-label">⚡ Live data flow</span>
+      <template x-for="flow in activeFlows" :key="flow.from + '→' + flow.to">
+        <span class="mc-flow-pill">
+          <span x-text="flow.from"></span>
+          <span class="arrow">→</span>
+          <span x-text="flow.to"></span>
+        </span>
+      </template>
+    </div>
+  </template>
+
+  {# ─── MAIN GRID ─────────────────────────────────────────────── #}
+  <div class="mc-grid" style="margin-top:20px;">
+
+    {# ─── STAGE: agent constellation ──────────────────────── #}
+    <div class="mc-stage">
+      <div class="mc-stage-header">
+        <h2>
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Agent Constellation
+        </h2>
+        <div class="legend">
+          <span><span class="dot" style="background:rgba(255,255,255,0.2)"></span> idle</span>
+          <span><span class="dot" style="background:#22d3ee;box-shadow:0 0 8px #22d3ee"></span> working</span>
+          <span><span class="dot" style="background:#4ade80"></span> done</span>
+          <span><span class="dot" style="background:#f87171"></span> error</span>
+        </div>
+      </div>
+
+      <div class="mc-constellation">
+        {% for layer_id, label in layer_labels.items() %}
+          <div class="mc-layer">
+            <p class="mc-layer-label">
+              <span style="color:rgba(255,255,255,0.55);">L{{ layer_id }}</span>
+              <span>{{ label }}</span>
+            </p>
+            <div class="mc-layer-row" {% if layer_id == 0 %}style="justify-content:center;"{% endif %}>
+              {% for agent in agents_by_layer[layer_id] %}
+                {% set normalized = agent.name|replace(' ', '_')|replace('-', '_')|replace('.','')|lower %}
+                <div class="mc-agent c-{{ agent.color }} {% if layer_id == 0 %}is-director{% endif %}"
+                     :class="{
+                       'is-working': agentMap['{{ agent.name }}'] && agentMap['{{ agent.name }}'].status === 'working',
+                       'is-done':    agentMap['{{ agent.name }}'] && agentMap['{{ agent.name }}'].status === 'done',
+                       'is-error':   agentMap['{{ agent.name }}'] && agentMap['{{ agent.name }}'].status === 'error',
+                     }"
+                     data-agent="{{ agent.name }}"
+                     :data-tip="agentMap['{{ agent.name }}'] ? (agentMap['{{ agent.name }}'].current_task || agentMap['{{ agent.name }}'].last_message || 'idle') : 'idle'">
+                  <div class="mc-agent-head">
+                    <div class="mc-agent-icon">
+                      <span class="mc-agent-icon-letter">{{ agent.name[0] }}</span>
+                    </div>
+                    <span class="mc-agent-name">{{ agent.name }}</span>
+                    <span class="mc-agent-status idle"
+                          :class="agentMap['{{ agent.name }}'] ? agentMap['{{ agent.name }}'].status : 'idle'"
+                          x-text="agentMap['{{ agent.name }}'] ? agentMap['{{ agent.name }}'].status : 'idle'"></span>
+                  </div>
+                  <p class="mc-agent-task"
+                     x-text="agentMap['{{ agent.name }}'] && (agentMap['{{ agent.name }}'].current_task || agentMap['{{ agent.name }}'].last_message) ? (agentMap['{{ agent.name }}'].current_task || agentMap['{{ agent.name }}'].last_message) : '—'"></p>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {# ─── ACTIVITY FEED ────────────────────────────────────── #}
+    <div class="mc-activity">
+      <div class="mc-activity-head">
+        <h3>
+          <span class="live-dot"></span>
+          Live Activity
+        </h3>
+      </div>
+      <div class="mc-activity-feed" x-ref="feed">
+        <template x-if="activity.length === 0">
+          <div class="mc-activity-empty">No activity yet — start the pipeline to see agents talking.</div>
+        </template>
+        <template x-for="(item, idx) in activity" :key="idx + ':' + item.created_at + ':' + item.message">
+          <div class="mc-activity-item" :class="'lvl-' + (item.level || 'info')">
+            <div class="mc-activity-meta">
+              <p class="mc-activity-agent">
+                <span class="agent-pip" :style="'background:' + agentColor(item.agent)"></span>
+                <span x-text="item.agent || 'system'"></span>
+                <span class="ts" x-text="formatTs(item.created_at)"></span>
+              </p>
+              <p class="mc-activity-msg" x-text="item.message"></p>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ─── ALPINE CONTROLLER ────────────────────────────────────── #}
+<script>
+  const AGENT_COLORS = {{ agent_colors_json|safe }};
+  const COLOR_HEX = {
+    blue: '#60a5fa', cyan: '#22d3ee', purple: '#a78bfa', gray: '#9ca3af',
+    teal: '#5eead4', indigo: '#818cf8', green: '#4ade80', violet: '#a78bfa',
+    fuchsia: '#e879f9', orange: '#fb923c', yellow: '#facc15', pink: '#f472b6',
+    lime: '#a3e635', slate: '#94a3b8', sky: '#38bdf8', emerald: '#34d399',
+    rose: '#fb7185', amber: '#fbbf24',
+  };
+
+  function missionControl(tenantId) {
+    return {
+      tenantId,
+      agents: [],
+      agentMap: {},
+      activity: [],
+      activeFlows: [],
+      kpis: {
+        pages_total: 0, pages_published: 0, pages_ready: 0,
+        keywords_total: 0, keywords_high: 0,
+        competitors: 0, geo_citations: 0, geo_queries_total: 0,
+      },
+      inProgressCount: 0,
+      loading: false,
+      lastUpdateLabel: 'just now',
+      _lastUpdate: null,
+      _interval: null,
+
+      async init() {
+        await this.refresh();
+        this._interval = setInterval(() => this.refresh(), 2000);
+        // Update "last update" label every second
+        setInterval(() => this._tickLabel(), 1000);
+      },
+
+      async refresh() {
+        if (this.loading) return;
+        this.loading = true;
+        try {
+          const r = await fetch(`/clients/${this.tenantId}/mission-control/state`,
+                                {credentials: 'same-origin'});
+          if (!r.ok) throw new Error('fetch failed');
+          const data = await r.json();
+          this.agents = data.agents || [];
+          this.agentMap = Object.fromEntries(this.agents.map(a => [a.name, a]));
+          this.activity = data.activity || [];
+          this.activeFlows = data.active_flows || [];
+          this.kpis = data.kpis || this.kpis;
+          this.inProgressCount = data.in_progress_count || 0;
+          this._lastUpdate = Date.now();
+          this._tickLabel();
+        } catch (e) {
+          console.warn('Mission Control refresh failed:', e);
+        } finally {
+          this.loading = false;
+        }
+      },
+
+      _tickLabel() {
+        if (!this._lastUpdate) { this.lastUpdateLabel = '—'; return; }
+        const dt = Math.floor((Date.now() - this._lastUpdate) / 1000);
+        if (dt < 2) this.lastUpdateLabel = 'just now';
+        else if (dt < 60) this.lastUpdateLabel = dt + 's ago';
+        else this.lastUpdateLabel = Math.floor(dt/60) + 'm ago';
+      },
+
+      agentColor(name) {
+        const c = AGENT_COLORS[name];
+        return c ? COLOR_HEX[c] || '#888' : '#888';
+      },
+
+      formatTs(ts) {
+        if (!ts) return '';
+        const d = new Date(ts.includes('T') ? ts : ts.replace(' ', 'T') + 'Z');
+        if (isNaN(d.getTime())) return '';
+        const h = String(d.getHours()).padStart(2,'0');
+        const m = String(d.getMinutes()).padStart(2,'0');
+        const s = String(d.getSeconds()).padStart(2,'0');
+        return `${h}:${m}:${s}`;
+      },
+    };
+  }
+</script>
+{% endblock %}
