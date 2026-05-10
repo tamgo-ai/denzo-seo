@@ -281,6 +281,67 @@ def init_db():
     CREATE INDEX IF NOT EXISTS idx_pipeline_runs_tenant ON pipeline_runs(tenant_id);
     CREATE INDEX IF NOT EXISTS idx_pipeline_runs_status ON pipeline_runs(tenant_id, status);
     CREATE INDEX IF NOT EXISTS idx_settings_tenant ON settings(tenant_id);
+
+    -- OAuth tokens for Google integrations (GBP, GSC, GA4, ...) ─────────────────
+    CREATE TABLE IF NOT EXISTS oauth_tokens (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        tenant_id       TEXT NOT NULL,
+        provider        TEXT NOT NULL,
+        access_token    TEXT NOT NULL,
+        refresh_token   TEXT,
+        expires_at      TIMESTAMP,
+        scopes          TEXT,
+        account_email   TEXT,
+        account_id      TEXT,
+        location_id     TEXT,
+        site_url        TEXT,
+        created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(tenant_id, provider),
+        FOREIGN KEY (tenant_id) REFERENCES clients(tenant_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_oauth_tokens_tenant ON oauth_tokens(tenant_id);
+
+    -- Google Business Profile locations (synced from Business Profile API) ──────
+    CREATE TABLE IF NOT EXISTS gbp_locations (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        tenant_id        TEXT NOT NULL,
+        location_id      TEXT NOT NULL,
+        name             TEXT,
+        address          TEXT,
+        phone            TEXT,
+        website          TEXT,
+        primary_category TEXT,
+        rating           REAL,
+        review_count     INTEGER DEFAULT 0,
+        photos_count     INTEGER DEFAULT 0,
+        posts_count      INTEGER DEFAULT 0,
+        raw_json         TEXT,
+        last_synced_at   TIMESTAMP,
+        created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(tenant_id, location_id),
+        FOREIGN KEY (tenant_id) REFERENCES clients(tenant_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_gbp_locations_tenant ON gbp_locations(tenant_id);
+
+    -- Google Search Console query data (per query, page, day) ───────────────────
+    CREATE TABLE IF NOT EXISTS gsc_queries (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        tenant_id   TEXT NOT NULL,
+        date        TEXT NOT NULL,
+        query       TEXT NOT NULL,
+        page        TEXT NOT NULL,
+        clicks      INTEGER DEFAULT 0,
+        impressions INTEGER DEFAULT 0,
+        ctr         REAL    DEFAULT 0,
+        position    REAL    DEFAULT 0,
+        fetched_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(tenant_id, date, query, page),
+        FOREIGN KEY (tenant_id) REFERENCES clients(tenant_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_gsc_queries_tenant_date ON gsc_queries(tenant_id, date);
+    CREATE INDEX IF NOT EXISTS idx_gsc_queries_query       ON gsc_queries(tenant_id, query);
+    CREATE INDEX IF NOT EXISTS idx_gsc_queries_page        ON gsc_queries(tenant_id, page);
     """)
 
     # Seed admin from env vars on first install — never hardcode credentials
