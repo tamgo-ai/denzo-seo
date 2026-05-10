@@ -186,12 +186,24 @@ def webhook():
     secret = os.getenv("STRIPE_WEBHOOK_SECRET")
     payload = request.get_data(as_text=False)
 
+    # Strict in production: when STRIPE_SECRET_KEY is live (not test) and there
+    # is no webhook secret, refuse to process — otherwise an attacker could spoof
+    # checkout.session.completed events and grant themselves a paid plan.
+    flask_env = (os.getenv("FLASK_ENV") or "").lower()
+    is_live = (os.getenv("STRIPE_SECRET_KEY", "")).startswith("sk_live_")
+    if not secret and (is_live or flask_env == "production"):
+        logger.error("STRIPE_WEBHOOK_SECRET missing in production — rejecting webhook.")
+        return jsonify({"error": "webhook secret not configured"}), 503
+
     try:
         if secret:
             event = stripe.Webhook.construct_event(payload, sig, secret)
         else:
-            # Dev mode — accept unverified payloads but warn.
-            logger.warning("STRIPE_WEBHOOK_SECRET not set — accepting unverified webhook payload.")
+            # Dev / test mode only — accept unverified payloads but warn loudly.
+            logger.warning(
+                "STRIPE_WEBHOOK_SECRET not set — accepting unverified webhook payload "
+                "(allowed because key is test mode)."
+            )
             event = json.loads(payload.decode())
     except Exception as e:
         logger.warning("Webhook signature verification failed: %s", e)

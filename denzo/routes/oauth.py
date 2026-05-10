@@ -12,11 +12,18 @@ Routes:
        Deletes the token row.
   POST /oauth/google/select/<tenant_id>/<provider>
        Bind the token to a specific GSC site_url or GBP location_id.
+
+CSRF defense: every authorize URL embeds a per-session nonce in `state`.
+The callback rejects any state whose nonce does not match the one stored
+in the user's session. Combined with can_access_tenant() that's defense
+in depth: even an admin can't be tricked into connecting their Google
+account to a tenant via a forged URL.
 """
 import logging
+import secrets
 from urllib.parse import urlparse
 
-from flask import Blueprint, request, redirect, url_for, flash, jsonify, abort
+from flask import Blueprint, request, redirect, url_for, flash, jsonify, abort, session
 
 from denzo.auth import login_required, can_access_tenant
 from denzo.agents.utils import google_oauth
@@ -46,8 +53,18 @@ def connect(tenant_id):
         return redirect(url_for("clients.edit_client", tenant_id=tenant_id))
 
     next_url = request.args.get("next") or url_for("clients.edit_client", tenant_id=tenant_id)
+
+    # Generate a fresh per-flow nonce, stash in session, embed in state.
+    # The callback compares state.nonce to session_oauth_nonce — mismatched
+    # → reject. Stops CSRF where an attacker tricks a logged-in admin into
+    # following a connect URL for a tenant the attacker controls.
+    nonce = secrets.token_urlsafe(24)
+    session["oauth_nonce"] = nonce
+
     try:
-        auth_url = google_oauth.build_authorize_url(tenant_id, provider, next_url=next_url)
+        auth_url = google_oauth.build_authorize_url(
+            tenant_id, provider, next_url=next_url, nonce=nonce,
+        )
     except OAuthError as e:
         flash(f"Could not build Google authorization URL: {e}", "error")
         return redirect(next_url)
@@ -76,13 +93,22 @@ def callback():
     tenant_id = st.get("tenant_id")
     provider  = st.get("provider")
     next_url  = st.get("next") or "/"
+    nonce     = st.get("nonce") or ""
 
     if not tenant_id or not provider:
         return _render_callback_error("Invalid state payload.")
 
-    # Tenant access check — if a logged-in user lands here, only allow them to
-    # connect a token to a tenant they actually own. Anonymous callbacks are
-    # rejected.
+    # ── CSRF defense: state.nonce must match the one we stashed at /connect ──
+    expected_nonce = session.pop("oauth_nonce", None)
+    if not nonce or nonce != expected_nonce:
+        return _render_callback_error(
+            "Security check failed: this connection request didn't originate "
+            "from your browser. Please start the connect flow again from Settings."
+        )
+
+    # Tenant access check — even though nonce already proves the flow started
+    # in this session, verify the session user still has access to the tenant
+    # they originally requested.
     if not can_access_tenant(tenant_id):
         return _render_callback_error(
             "You do not have access to this tenant. Log in with the correct account "

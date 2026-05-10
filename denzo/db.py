@@ -360,6 +360,31 @@ def init_db():
     );
     CREATE INDEX IF NOT EXISTS idx_subscriptions_user     ON subscriptions(user_id);
     CREATE INDEX IF NOT EXISTS idx_subscriptions_customer ON subscriptions(stripe_customer_id);
+
+    -- Tenant cascade cleanup: when a client is deleted, drop all their data.
+    -- We do this with a trigger because SQLite cannot ALTER TABLE existing FK
+    -- constraints to add ON DELETE CASCADE, and the existing tables predate
+    -- this concern. Trigger is idempotent — safe to re-create on every boot.
+    CREATE TRIGGER IF NOT EXISTS trg_cleanup_tenant_data
+    AFTER DELETE ON clients
+    FOR EACH ROW
+    BEGIN
+        DELETE FROM agents          WHERE tenant_id = OLD.tenant_id;
+        DELETE FROM activity        WHERE tenant_id = OLD.tenant_id;
+        DELETE FROM keywords        WHERE tenant_id = OLD.tenant_id;
+        DELETE FROM pages           WHERE tenant_id = OLD.tenant_id;
+        DELETE FROM competitors     WHERE tenant_id = OLD.tenant_id;
+        DELETE FROM client_context  WHERE tenant_id = OLD.tenant_id;
+        DELETE FROM settings        WHERE tenant_id = OLD.tenant_id;
+        DELETE FROM locations       WHERE tenant_id = OLD.tenant_id;
+        DELETE FROM site_images     WHERE tenant_id = OLD.tenant_id;
+        DELETE FROM pipeline_runs   WHERE tenant_id = OLD.tenant_id;
+        DELETE FROM oauth_tokens    WHERE tenant_id = OLD.tenant_id;
+        DELETE FROM gbp_locations   WHERE tenant_id = OLD.tenant_id;
+        DELETE FROM gsc_queries     WHERE tenant_id = OLD.tenant_id;
+        DELETE FROM geo_queries     WHERE tenant_id = OLD.tenant_id;
+        DELETE FROM geo_query_bank  WHERE tenant_id = OLD.tenant_id;
+    END;
     """)
 
     # Seed admin from env vars on first install — never hardcode credentials

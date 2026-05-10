@@ -286,7 +286,7 @@ def authed_request(
 # ── Authorization URL & code exchange ──────────────────────────────────────────
 
 def build_authorize_url(tenant_id: str, provider: str, redirect_uri: str | None = None,
-                        next_url: str | None = None) -> str:
+                        next_url: str | None = None, nonce: str | None = None) -> str:
     cid, _ = get_credentials()
     redirect = redirect_uri or get_redirect_uri()
     if provider not in PROVIDER_SCOPES:
@@ -296,6 +296,7 @@ def build_authorize_url(tenant_id: str, provider: str, redirect_uri: str | None 
         "tenant_id": tenant_id,
         "provider":  provider,
         "next":      next_url or "",
+        "nonce":     nonce or "",
     })
     params = {
         "client_id":     cid,
