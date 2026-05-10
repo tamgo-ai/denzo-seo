@@ -22,7 +22,7 @@ def index(tenant_id):
     if not client:
         db.close()
         flash("Client not found.", "error")
-        return redirect(url_for("clients.index"))
+        return redirect(url_for("clients.list_clients"))
 
     saved = False
 

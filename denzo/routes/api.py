@@ -6,7 +6,7 @@ import time
 import threading
 from flask import Blueprint, jsonify, request, session, redirect, url_for
 from denzo import sock
-from denzo.auth import login_required
+from denzo.auth import login_required, can_access_tenant
 from denzo.db import get_db
 from denzo.agents.registry import get_agent, AGENT_REGISTRY
 from denzo.context.builder import build_client_context
@@ -21,23 +21,7 @@ _stop_events: dict[str, dict[str, threading.Event]] = {}
 _lock = threading.Lock()
 
 
-def _is_logged_in():
-    return "user_id" in session
-
-
-def _can_access_tenant(tenant_id: str) -> bool:
-    """Admins can access any tenant; client users only their own."""
-    if not _is_logged_in():
-        return False
-    if session.get("role") == "admin":
-        return True
-    db = get_db()
-    row = db.execute(
-        "SELECT id FROM clients WHERE tenant_id=? AND owner_user_id=?",
-        (tenant_id, session["user_id"])
-    ).fetchone()
-    db.close()
-    return row is not None
+_can_access_tenant = can_access_tenant
 
 
 # ── Agent helpers ──────────────────────────────────────────────────────────────
@@ -187,6 +171,38 @@ def stop_pipeline(tenant_id):
     else:
         _mark_agent(tenant_id, agent_name, "idle", "")
         return jsonify({"status": "idle"})
+
+
+@bp.route("/<tenant_id>/pipeline/reset", methods=["POST"])
+@login_required
+def reset_pipeline(tenant_id):
+    """Reset ALL agents to idle without deleting any data. Emergency recovery button."""
+    if not _can_access_tenant(tenant_id):
+        return jsonify({"error": "Access denied"}), 403
+
+    # Signal all running stop events
+    with _lock:
+        for evt in _stop_events.get(tenant_id, {}).values():
+            evt.set()
+        _stop_events[tenant_id] = {}
+        _agent_threads[tenant_id] = {}
+
+    # Reset all agents to idle in DB
+    db = get_db()
+    db.execute(
+        """UPDATE agents SET status='idle', current_task='Reset by user',
+           next_task='', updated_at=CURRENT_TIMESTAMP
+           WHERE tenant_id=?""",
+        (tenant_id,)
+    )
+    db.execute(
+        "INSERT INTO activity (tenant_id, type, message, agent, level) VALUES (?,?,?,?,?)",
+        (tenant_id, "system", "Pipeline reset by user — all agents set to idle.", "System", "warning")
+    )
+    db.commit()
+    db.close()
+
+    return jsonify({"status": "reset", "message": "All agents reset to idle"})
 
 
 # ── Agent control endpoints ────────────────────────────────────────────────────

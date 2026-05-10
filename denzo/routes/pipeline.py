@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, abort
-from denzo.auth import login_required
+from denzo.auth import login_required, can_access_tenant
 from denzo.db import get_db
 from denzo.agents.registry import LAYER_LABELS
 from denzo.routes.competitors import _table_exists
@@ -27,6 +27,8 @@ def _get_sidebar_clients():
 @bp.route("/pipeline")
 @login_required
 def index(tenant_id):
+    if not can_access_tenant(tenant_id):
+        abort(403)
     db = get_db()
 
     client = db.execute(
@@ -184,6 +186,8 @@ def index(tenant_id):
 @bp.route("/agents")
 @login_required
 def agents_page(tenant_id):
+    if not can_access_tenant(tenant_id):
+        abort(403)
     db = get_db()
     client = db.execute("SELECT * FROM clients WHERE tenant_id=?", (tenant_id,)).fetchone()
     if not client:

@@ -2,7 +2,7 @@ import csv
 import io
 import json
 from flask import Blueprint, render_template, request, abort, Response, jsonify
-from denzo.auth import login_required
+from denzo.auth import login_required, can_access_tenant
 from denzo.db import get_db
 
 bp = Blueprint("competitors", __name__, url_prefix="/clients/<tenant_id>")
@@ -50,6 +50,8 @@ def _parse_competitor(r: dict) -> dict:
 @bp.route("/competitors")
 @login_required
 def index(tenant_id):
+    if not can_access_tenant(tenant_id):
+        abort(403)
     # Pagination query params
     comp_page = request.args.get('cp', 1, type=int)    # competitor (tier2) page
     can_page  = request.args.get('canp', 1, type=int)  # cannibalization page

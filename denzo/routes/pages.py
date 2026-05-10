@@ -1,7 +1,7 @@
 import csv
 import io
 from flask import Blueprint, render_template, request, abort, Response, redirect, url_for, flash, jsonify
-from denzo.auth import login_required
+from denzo.auth import login_required, can_access_tenant
 from denzo.db import get_db
 
 
@@ -42,6 +42,8 @@ def _get_sidebar_clients():
 @bp.route("/pages")
 @login_required
 def index(tenant_id):
+    if not can_access_tenant(tenant_id):
+        abort(403)
     db = get_db()
 
     client = db.execute(
