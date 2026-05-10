@@ -70,8 +70,9 @@ def create_app():
     from denzo.routes.reviews     import bp as reviews_bp
     from denzo.routes.lite        import bp as lite_bp
     from denzo.routes.public      import bp as public_bp
+    from denzo.routes.reporting   import bp as reporting_bp
 
-    for bp in [public_bp, auth_bp, dash_bp, clients_bp, pipeline_bp, keywords_bp, pages_bp, competitors_bp, settings_bp, api_bp, audit_bp, images_bp, brand_voice_bp, data_intel_bp, geo_bp, reviews_bp, lite_bp]:
+    for bp in [public_bp, auth_bp, dash_bp, clients_bp, pipeline_bp, keywords_bp, pages_bp, competitors_bp, settings_bp, api_bp, audit_bp, images_bp, brand_voice_bp, data_intel_bp, geo_bp, reviews_bp, lite_bp, reporting_bp]:
         app.register_blueprint(bp)
 
     with app.app_context():
@@ -87,17 +88,22 @@ def _reset_stale_agents():
     try:
         from denzo.db import get_db
         db = get_db()
-        result = db.execute(
-            "UPDATE agents SET status='idle', current_task=NULL, last_message=NULL "
-            "WHERE status='working'"
-        )
-        if result.rowcount:
+        # Find agents stuck in 'working' BEFORE resetting them
+        stale = db.execute(
+            "SELECT tenant_id, name FROM agents WHERE status='working'"
+        ).fetchall()
+        if stale:
             db.execute(
-                "INSERT INTO activity (tenant_id, type, message, agent, level) "
-                "SELECT tenant_id, 'system', "
-                "'Agent reset to idle after server restart (was stuck in working).', "
-                "name, 'warning' FROM agents WHERE status='idle' AND last_run_at IS NOT NULL"
+                "UPDATE agents SET status='idle', current_task=NULL, last_message=NULL "
+                "WHERE status='working'"
             )
+            for row in stale:
+                db.execute(
+                    "INSERT INTO activity (tenant_id, type, message, agent, level) VALUES (?,?,?,?,?)",
+                    (row["tenant_id"], "system",
+                     "Agent reset to idle after server restart (was stuck in working).",
+                     row["name"], "warning")
+                )
         db.commit()
         db.close()
     except Exception as e:

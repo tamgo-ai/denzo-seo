@@ -1,0 +1,580 @@
+{% extends "base.html" %}
+
+{% block title %}Executive Dashboard — {{ client.name }}{% endblock %}
+
+{% block breadcrumb %}
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+  <a href="/" style="color:var(--muted);text-decoration:none;">Overview</a>
+  <span style="color:var(--muted2)">/</span>
+  <a href="/clients" style="color:var(--muted);text-decoration:none;">Clients</a>
+  <span style="color:var(--muted2)">/</span>
+  <a href="/clients/{{ tenant_id }}/pipeline" style="color:var(--muted);text-decoration:none;">{{ client.name }}</a>
+  <span style="color:var(--muted2)">/</span>
+  <span style="color:var(--text);font-weight:600;">Executive Dashboard</span>
+</div>
+{% endblock %}
+
+{% block topbar_actions %}
+<a href="/clients/{{ tenant_id }}/pipeline"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Dashboard</a>
+<a href="/clients/{{ tenant_id }}/agents"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Agents</a>
+<a href="/clients/{{ tenant_id }}/pages"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Pages</a>
+<a href="/clients/{{ tenant_id }}/executive-dashboard"
+   style="font-size:12px;color:var(--text);font-weight:600;text-decoration:none;padding:6px 10px;border-radius:6px;border-bottom:2px solid #6366f1;">Executive</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ── Executive KPI card ─────────────────────────────────────────── */
+.exec-kpi {
+  background: #111111;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 14px;
+  padding: 24px;
+  transition: border-color 0.2s;
+}
+.exec-kpi:hover { border-color: rgba(255,255,255,0.14); }
+.exec-kpi-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.35);
+  margin: 0 0 10px 0;
+}
+.exec-kpi-value {
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #fff;
+  line-height: 1;
+  margin: 0 0 8px 0;
+}
+.exec-kpi-delta {
+  font-size: 12px;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* ── Section card ───────────────────────────────────────────────── */
+.exec-section {
+  background: #111111;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 14px;
+  padding: 24px;
+}
+.exec-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.35);
+  margin: 0 0 20px 0;
+}
+
+/* ── Quality gauge (CSS only) ────────────────────────────────────── */
+.gauge-wrap {
+  position: relative;
+  width: 96px;
+  height: 48px;
+  overflow: hidden;
+  margin: 0 auto;
+}
+.gauge-track {
+  position: absolute;
+  inset: 0;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 8px solid rgba(255,255,255,0.08);
+  top: 0;
+}
+.gauge-fill {
+  position: absolute;
+  inset: 0;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 8px solid transparent;
+  border-top-color: #10b981;
+  border-right-color: #10b981;
+  transform-origin: center center;
+  top: 0;
+}
+
+/* ── Pipeline status badge ─────────────────────────────────────── */
+.pipeline-badge-running        { background: rgba(249,115,22,0.12); color: #fb923c; border: 1px solid rgba(249,115,22,0.25); }
+.pipeline-badge-complete       { background: rgba(74,222,128,0.10); color: #4ade80; border: 1px solid rgba(74,222,128,0.2); }
+.pipeline-badge-needs_attention{ background: rgba(239,68,68,0.10);  color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
+.pipeline-badge-setup          { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.4); border: 1px solid rgba(255,255,255,0.1); }
+
+/* ── Recent wins ───────────────────────────────────────────────── */
+.recent-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.recent-item:last-child { border-bottom: none; }
+
+/* ── Top pages table ───────────────────────────────────────────── */
+.exec-table { width: 100%; border-collapse: collapse; }
+.exec-table th {
+  text-align: left;
+  padding: 0 0 12px 0;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.3);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.exec-table th:not(:first-child) { text-align: right; }
+.exec-table td {
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  font-size: 13px;
+}
+.exec-table tr:last-child td { border-bottom: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:1200px;margin:0 auto;">
+
+  {# ── PAGE HEADER ─────────────────────────────────────────────────────── #}
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:32px;gap:16px;">
+    <div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+        <h1 style="font-size:28px;font-weight:800;letter-spacing:-0.03em;color:#fff;margin:0;">{{ client.name }}</h1>
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;
+                     padding:4px 12px;border-radius:999px;
+                     class: pipeline-badge-{{ pipeline_status }};"
+              class="pipeline-badge-{{ pipeline_status }}">
+          {% if pipeline_status == 'running' %}Running
+          {% elif pipeline_status == 'complete' %}Complete
+          {% elif pipeline_status == 'needs_attention' %}Needs Attention
+          {% else %}Setup{% endif %}
+        </span>
+      </div>
+      <p style="font-size:13px;color:rgba(255,255,255,0.35);margin:0;">
+        {{ client.business_type | replace('_',' ') | title }}
+        {% if client.city %} · {{ client.city }}{% if client.state %}, {{ client.state }}{% endif %}{% endif %}
+        {% if client.website_url %}
+        · <a href="{{ client.website_url }}" target="_blank" style="color:#818cf8;text-decoration:none;">{{ client.website_url | replace('https://','') | replace('http://','') }}</a>
+        {% endif %}
+      </p>
+    </div>
+    <div style="display:flex;gap:8px;flex-shrink:0;">
+      <a href="/clients/{{ tenant_id }}/agents"
+         style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;background:rgba(99,102,241,0.12);color:#818cf8;border:1px solid rgba(99,102,241,0.2);text-decoration:none;transition:all 0.15s;"
+         onmouseover="this.style.background='rgba(99,102,241,0.2)'" onmouseout="this.style.background='rgba(99,102,241,0.12)'">
+        <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+        Pipeline
+      </a>
+      <a href="/clients/{{ tenant_id }}/pages"
+         style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;background:transparent;color:rgba(255,255,255,0.5);border:1px solid rgba(255,255,255,0.1);text-decoration:none;transition:all 0.15s;"
+         onmouseover="this.style.background='rgba(255,255,255,0.05)';this.style.color='rgba(255,255,255,0.87)'" onmouseout="this.style.background='transparent';this.style.color='rgba(255,255,255,0.5)'">
+        All Pages
+      </a>
+    </div>
+  </div>
+
+  {# ── ACTION ITEMS (top priority, shown first) ────────────────────────── #}
+  {% if action_items %}
+  <div style="background:rgba(251,191,36,0.04);border:1px solid rgba(251,191,36,0.18);border-radius:14px;padding:20px 24px;margin-bottom:28px;">
+    <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#fbbf24;margin:0 0 14px 0;">Action Required</h3>
+    <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px;">
+      {% for item in action_items %}
+      <li style="display:flex;align-items:flex-start;gap:10px;font-size:13px;color:rgba(255,255,255,0.75);">
+        <span style="color:#fbbf24;margin-top:2px;font-size:16px;line-height:1;">•</span>
+        {{ item }}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {# ── KPI CARDS ───────────────────────────────────────────────────────── #}
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:28px;">
+
+    {# 1. Pages Live #}
+    <div class="exec-kpi">
+      <p class="exec-kpi-label">Pages Live</p>
+      <p class="exec-kpi-value" style="color:#4ade80;">{{ page_stats.published or 0 }}</p>
+      <p class="exec-kpi-delta" style="color:rgba(255,255,255,0.3);">
+        {{ page_stats.total or 0 }} total &nbsp;·&nbsp;
+        <span style="color:#818cf8;">{{ page_stats.ready or 0 }} ready</span>
+      </p>
+    </div>
+
+    {# 2. Keywords Tracked #}
+    <div class="exec-kpi">
+      <p class="exec-kpi-label">Keywords Tracked</p>
+      <p class="exec-kpi-value" style="color:#818cf8;">{{ kw_stats.total or 0 }}</p>
+      <p class="exec-kpi-delta" style="color:#fb923c;">
+        {{ kw_stats.high_priority or 0 }} high priority
+      </p>
+    </div>
+
+    {# 3. Avg Quality Score — gauge CSS #}
+    <div class="exec-kpi" style="text-align:center;">
+      <p class="exec-kpi-label" style="text-align:left;">Avg Quality Score</p>
+      <div style="margin:4px 0 8px;">
+        {# CSS semicircle gauge using conic-gradient trick #}
+        <div style="position:relative;width:80px;height:40px;overflow:hidden;margin:0 auto;">
+          <div style="position:absolute;width:80px;height:80px;border-radius:50%;
+               background: conic-gradient(
+                 {% if avg_score >= 80 %}#10b981{% elif avg_score >= 60 %}#fbbf24{% else %}#ef4444{% endif %} 0deg,
+                 {% if avg_score >= 80 %}#10b981{% elif avg_score >= 60 %}#fbbf24{% else %}#ef4444{% endif %} {{ (avg_score * 1.8)|int }}deg,
+                 rgba(255,255,255,0.06) {{ (avg_score * 1.8)|int }}deg,
+                 rgba(255,255,255,0.06) 180deg,
+                 transparent 180deg
+               );
+               transform:rotate(-90deg) scaleX(-1);">
+          </div>
+          <div style="position:absolute;width:54px;height:54px;border-radius:50%;background:#111111;top:13px;left:13px;"></div>
+        </div>
+      </div>
+      <p style="font-size:26px;font-weight:800;letter-spacing:-0.03em;margin:0;
+           color:{% if avg_score >= 80 %}#10b981{% elif avg_score >= 60 %}#fbbf24{% else %}#ef4444{% endif %};">
+        {{ avg_score }}<span style="font-size:14px;font-weight:500;color:rgba(255,255,255,0.3);">/100</span>
+      </p>
+    </div>
+
+    {# 4. GEO Citation Rate #}
+    <div class="exec-kpi">
+      <p class="exec-kpi-label">GEO Citation Rate</p>
+      <p class="exec-kpi-value" style="color:{% if geo_citation_rate >= 50 %}#06b6d4{% elif geo_citation_rate >= 25 %}#fbbf24{% elif geo_citation_rate > 0 %}#f87171{% else %}rgba(255,255,255,0.2){% endif %};">
+        {{ geo_citation_rate }}<span style="font-size:20px;font-weight:400;color:rgba(255,255,255,0.3);">%</span>
+      </p>
+      <p class="exec-kpi-delta" style="color:rgba(255,255,255,0.3);">
+        {% if geo_total_queries > 0 %}
+        {{ geo_citations_count }} / {{ geo_total_queries }} queries
+        {% else %}
+        No queries tracked yet
+        {% endif %}
+      </p>
+    </div>
+
+    {# 5. Pipeline Status #}
+    <div class="exec-kpi" style="display:flex;flex-direction:column;justify-content:space-between;">
+      <p class="exec-kpi-label">Pipeline Status</p>
+      <div>
+        <div style="display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:10px;margin-bottom:10px;"
+             class="pipeline-badge-{{ pipeline_status }}">
+          {% if pipeline_status == 'running' %}
+          <span style="width:8px;height:8px;border-radius:50%;background:#fb923c;animation:pulse-anim 1.5s ease-in-out infinite;flex-shrink:0;"></span>
+          <span style="font-size:13px;font-weight:700;">Running</span>
+          {% elif pipeline_status == 'complete' %}
+          <span style="font-size:13px;">✓</span>
+          <span style="font-size:13px;font-weight:700;">Complete</span>
+          {% elif pipeline_status == 'needs_attention' %}
+          <span style="font-size:13px;">⚠</span>
+          <span style="font-size:13px;font-weight:700;">Needs Attention</span>
+          {% else %}
+          <span style="font-size:13px;">○</span>
+          <span style="font-size:13px;font-weight:700;">Setup</span>
+          {% endif %}
+        </div>
+        {% if working_agents %}
+        <p style="font-size:11px;color:rgba(255,255,255,0.3);margin:0;">{{ working_agents | join(', ') | truncate(40) }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+  {# ── TWO-COLUMN: Distribution + GEO ─────────────────────────────────── #}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:28px;">
+
+    {# Page Type Distribution #}
+    <div class="exec-section">
+      <p class="exec-section-title">Page Distribution</p>
+      {% if page_distribution %}
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        {% for page_type, count in page_distribution.items() %}
+        <div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
+            <span style="font-size:13px;color:rgba(255,255,255,0.65);">{{ page_type | replace('_',' ') | title }}</span>
+            <span style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.87);">{{ count }}</span>
+          </div>
+          <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden;">
+            <div style="height:100%;background:#6366f1;border-radius:99px;width:{{ (count / total_pages * 100)|int if total_pages > 0 else 0 }}%;transition:width 0.5s;"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p style="font-size:13px;color:rgba(255,255,255,0.25);margin:0;">No published pages yet.</p>
+      {% endif %}
+    </div>
+
+    {# GEO Citation Detail #}
+    <div class="exec-section">
+      <p class="exec-section-title">GEO AI Visibility</p>
+      <div style="margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+          <div style="flex:1;height:12px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden;">
+            <div style="height:100%;background:linear-gradient(90deg,#06b6d4,#3b82f6);border-radius:99px;transition:width 0.6s;width:{{ geo_citation_rate }}%;"></div>
+          </div>
+          <span style="font-size:24px;font-weight:800;color:#fff;min-width:56px;text-align:right;">{{ geo_citation_rate }}%</span>
+        </div>
+        <p style="font-size:12px;color:rgba(255,255,255,0.3);margin:0;">
+          Cited in {{ geo_citations_count }} of {{ geo_total_queries }} AI queries tracked
+        </p>
+      </div>
+
+      <div style="border-top:1px solid rgba(255,255,255,0.06);padding-top:16px;">
+        <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.25);margin:0 0 10px;">Benchmark</p>
+        {% for label, pct, color in [
+          ('Excellent', 60, '#10b981'),
+          ('Good', 40, '#fbbf24'),
+          ('Needs Work', 20, '#fb923c'),
+          ('Not Started', 0, 'rgba(255,255,255,0.2)')
+        ] %}
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <div style="width:6px;height:6px;border-radius:50%;background:{{ color }};flex-shrink:0;"></div>
+          <span style="font-size:12px;color:rgba(255,255,255,0.5);flex:1;">{{ label }}</span>
+          <span style="font-size:12px;font-weight:600;color:{{ color }};">{{ pct }}%+</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% if geo_total_queries == 0 %}
+      <div style="margin-top:14px;padding:12px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:8px;">
+        <p style="font-size:12px;color:#818cf8;margin:0;">
+          GEO Monitor not active.
+          <a href="/clients/{{ tenant_id }}/geo" style="color:#a5b4fc;text-decoration:none;font-weight:600;">Configure now →</a>
+        </p>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+  {# ── TWO-COLUMN: Top Pages + Recent Wins ─────────────────────────────── #}
+  <div style="display:grid;grid-template-columns:3fr 2fr;gap:14px;margin-bottom:28px;">
+
+    {# Top Pages by Quality Score #}
+    <div class="exec-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <p class="exec-section-title" style="margin:0;">Top Pages by Quality</p>
+        <a href="/clients/{{ tenant_id }}/pages?sort=quality_score"
+           style="font-size:12px;color:#818cf8;text-decoration:none;"
+           onmouseover="this.style.color='#a5b4fc'" onmouseout="this.style.color='#818cf8'">
+          View all →
+        </a>
+      </div>
+      {% if top_pages %}
+      <table class="exec-table">
+        <thead>
+          <tr>
+            <th>Page</th>
+            <th>Quality</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for page in top_pages %}
+          <tr>
+            <td style="vertical-align:top;">
+              <p style="margin:0 0 2px;font-weight:500;color:rgba(255,255,255,0.87);
+                        max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                {% if page.publish_url %}
+                <a href="{{ page.publish_url }}" target="_blank"
+                   style="color:rgba(255,255,255,0.87);text-decoration:none;transition:color 0.15s;"
+                   onmouseover="this.style.color='#a5b4fc'" onmouseout="this.style.color='rgba(255,255,255,0.87)'">
+                  {{ page.title or page.slug }}
+                </a>
+                {% else %}
+                {{ page.title or page.slug }}
+                {% endif %}
+              </p>
+              {% if page.target_keyword %}
+              <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.3);
+                        max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                {{ page.target_keyword }}
+              </p>
+              {% endif %}
+            </td>
+            <td style="text-align:right;vertical-align:top;">
+              <span style="font-size:16px;font-weight:800;
+                   color:{% if page.quality_score >= 80 %}#4ade80{% elif page.quality_score >= 70 %}#fbbf24{% elif page.quality_score %}#f87171{% else %}rgba(255,255,255,0.2){% endif %};">
+                {{ page.quality_score or '—' }}
+              </span>
+            </td>
+            <td style="text-align:right;vertical-align:top;">
+              <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;
+                   {% if page.status == 'published' %}background:rgba(74,222,128,0.1);color:#4ade80;
+                   {% elif page.status == 'ready' %}background:rgba(99,102,241,0.1);color:#818cf8;
+                   {% else %}background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);{% endif %}">
+                {{ page.status }}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="font-size:13px;color:rgba(255,255,255,0.25);margin:0;">
+        No pages with quality scores yet — run the Content Optimizer agent.
+      </p>
+      {% endif %}
+    </div>
+
+    {# Recent Published Pages #}
+    <div class="exec-section">
+      <p class="exec-section-title">Recent Wins</p>
+      {% if recent_pages %}
+      <div>
+        {% for page in recent_pages %}
+        <div class="recent-item">
+          <div style="width:32px;height:32px;border-radius:8px;background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg style="width:14px;height:14px;color:#4ade80;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <p style="margin:0 0 2px;font-size:13px;font-weight:500;color:rgba(255,255,255,0.8);
+                      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+              {% if page.publish_url %}
+              <a href="{{ page.publish_url }}" target="_blank"
+                 style="color:rgba(255,255,255,0.8);text-decoration:none;"
+                 onmouseover="this.style.color='#a5b4fc'" onmouseout="this.style.color='rgba(255,255,255,0.8)'">
+                {{ page.title or page.slug }}
+              </a>
+              {% else %}
+              {{ page.title or page.slug }}
+              {% endif %}
+            </p>
+            <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.3);">
+              {{ page.type | replace('_',' ') | title if page.type else '' }}
+              {% if page.updated_at %}· {{ page.updated_at[:10] }}{% endif %}
+            </p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p style="font-size:13px;color:rgba(255,255,255,0.25);margin:0;">
+        No published pages yet. Run the publisher agent to go live.
+      </p>
+      {% endif %}
+
+      {# Quick stats below recent wins #}
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.06);">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;text-align:center;">
+            <p style="font-size:20px;font-weight:700;color:#4ade80;margin:0;">{{ page_stats.published or 0 }}</p>
+            <p style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.3);margin:4px 0 0;">Published</p>
+          </div>
+          <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;text-align:center;">
+            <p style="font-size:20px;font-weight:700;color:#818cf8;margin:0;">{{ page_stats.ready or 0 }}</p>
+            <p style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.3);margin:4px 0 0;">Ready</p>
+          </div>
+          <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;text-align:center;">
+            <p style="font-size:20px;font-weight:700;color:rgba(255,255,255,0.5);margin:0;">{{ page_stats.draft or 0 }}</p>
+            <p style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.3);margin:4px 0 0;">Draft</p>
+          </div>
+          <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;text-align:center;">
+            <p style="font-size:20px;font-weight:700;color:#fbbf24;margin:0;">{{ kw_stats.total or 0 }}</p>
+            <p style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.3);margin:4px 0 0;">Keywords</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  {# ── PUBLICATION PROGRESS BAR ────────────────────────────────────────── #}
+  {% set total_p = page_stats.total or 0 %}
+  {% set pub_p   = page_stats.published or 0 %}
+  {% set ready_p = page_stats.ready or 0 %}
+  {% set draft_p = page_stats.draft or 0 %}
+  {% if total_p > 0 %}
+  <div class="exec-section" style="margin-bottom:28px;">
+    <p class="exec-section-title">Publication Progress</p>
+    <div style="height:16px;background:rgba(255,255,255,0.04);border-radius:99px;overflow:hidden;display:flex;margin-bottom:12px;">
+      <div style="height:100%;background:#4ade80;width:{{ (pub_p / total_p * 100)|int }}%;transition:width 0.6s;"
+           title="{{ pub_p }} published"></div>
+      <div style="height:100%;background:#6366f1;width:{{ (ready_p / total_p * 100)|int }}%;transition:width 0.6s;"
+           title="{{ ready_p }} ready"></div>
+      <div style="height:100%;background:rgba(255,255,255,0.12);width:{{ (draft_p / total_p * 100)|int }}%;transition:width 0.6s;"
+           title="{{ draft_p }} draft"></div>
+    </div>
+    <div style="display:flex;gap:20px;font-size:12px;">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <div style="width:10px;height:10px;border-radius:2px;background:#4ade80;"></div>
+        <span style="color:rgba(255,255,255,0.5);">Published</span>
+        <span style="font-weight:700;color:#4ade80;">{{ pub_p }}</span>
+        <span style="color:rgba(255,255,255,0.25);">({{ (pub_p / total_p * 100)|int }}%)</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <div style="width:10px;height:10px;border-radius:2px;background:#6366f1;"></div>
+        <span style="color:rgba(255,255,255,0.5);">Ready</span>
+        <span style="font-weight:700;color:#818cf8;">{{ ready_p }}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <div style="width:10px;height:10px;border-radius:2px;background:rgba(255,255,255,0.15);"></div>
+        <span style="color:rgba(255,255,255,0.5);">Draft</span>
+        <span style="font-weight:700;color:rgba(255,255,255,0.5);">{{ draft_p }}</span>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+        <span style="color:rgba(255,255,255,0.3);">Total</span>
+        <span style="font-weight:700;color:rgba(255,255,255,0.7);">{{ total_p }}</span>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── FOOTER LINKS ────────────────────────────────────────────────────── #}
+  <div style="display:flex;gap:8px;flex-wrap:wrap;padding-bottom:8px;">
+    <a href="/clients/{{ tenant_id }}/pipeline"
+       style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;font-size:12px;color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.08);text-decoration:none;transition:all 0.15s;"
+       onmouseover="this.style.color='rgba(255,255,255,0.8)';this.style.borderColor='rgba(255,255,255,0.15)'"
+       onmouseout="this.style.color='rgba(255,255,255,0.4)';this.style.borderColor='rgba(255,255,255,0.08)'">
+      Pipeline Dashboard
+    </a>
+    <a href="/clients/{{ tenant_id }}/keywords"
+       style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;font-size:12px;color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.08);text-decoration:none;transition:all 0.15s;"
+       onmouseover="this.style.color='rgba(255,255,255,0.8)';this.style.borderColor='rgba(255,255,255,0.15)'"
+       onmouseout="this.style.color='rgba(255,255,255,0.4)';this.style.borderColor='rgba(255,255,255,0.08)'">
+      Keywords
+    </a>
+    <a href="/clients/{{ tenant_id }}/competitors"
+       style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;font-size:12px;color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.08);text-decoration:none;transition:all 0.15s;"
+       onmouseover="this.style.color='rgba(255,255,255,0.8)';this.style.borderColor='rgba(255,255,255,0.15)'"
+       onmouseout="this.style.color='rgba(255,255,255,0.4)';this.style.borderColor='rgba(255,255,255,0.08)'">
+      Competitors
+    </a>
+    <a href="/clients/{{ tenant_id }}/geo"
+       style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;font-size:12px;color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.08);text-decoration:none;transition:all 0.15s;"
+       onmouseover="this.style.color='rgba(255,255,255,0.8)';this.style.borderColor='rgba(255,255,255,0.15)'"
+       onmouseout="this.style.color='rgba(255,255,255,0.4)';this.style.borderColor='rgba(255,255,255,0.08)'">
+      GEO Monitor
+    </a>
+    <a href="/clients/{{ tenant_id }}/audit"
+       style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;font-size:12px;color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.08);text-decoration:none;transition:all 0.15s;"
+       onmouseover="this.style.color='rgba(255,255,255,0.8)';this.style.borderColor='rgba(255,255,255,0.15)'"
+       onmouseout="this.style.color='rgba(255,255,255,0.4)';this.style.borderColor='rgba(255,255,255,0.08)'">
+      Site Audit
+    </a>
+    <a href="/clients/{{ tenant_id }}/edit"
+       style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;font-size:12px;color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.08);text-decoration:none;transition:all 0.15s;"
+       onmouseover="this.style.color='rgba(255,255,255,0.8)';this.style.borderColor='rgba(255,255,255,0.15)'"
+       onmouseout="this.style.color='rgba(255,255,255,0.4)';this.style.borderColor='rgba(255,255,255,0.08)'">
+      Settings
+    </a>
+  </div>
+
+</div>
+{% endblock %}
