@@ -11,6 +11,50 @@ class ROIAttribution(TenantAwareBaseAgent):
     def __init__(self, ctx: ClientContext):
         super().__init__("ROI Attribution", ctx, layer=6, color="amber")
 
+    def _collect_gsc_metrics(self) -> dict | None:
+        """Pull organic traffic + ranking metrics from Search Console (last 28 days).
+
+        Returns None if GSC is not connected. Never raises — best-effort.
+        """
+        try:
+            from denzo.agents.utils import google_oauth
+            if not google_oauth.is_connected(self.ctx.tenant_id, "gsc"):
+                return None
+            from denzo.agents.utils.gsc_client import (
+                sync_last_n_days, top_queries, top_pages,
+            )
+            try:
+                sync_last_n_days(self.ctx.tenant_id, n_days=28,
+                                 log=lambda m: self.log(m, "info"))
+            except Exception as e:
+                self.log(f"GSC sync skipped: {e}", "info")
+
+            queries = top_queries(self.ctx.tenant_id, days=28, limit=20)
+            pages   = top_pages(self.ctx.tenant_id, days=28, limit=20)
+            if not queries and not pages:
+                return None
+
+            total_clicks      = sum(int(q["clicks"] or 0) for q in queries)
+            total_impressions = sum(int(q["impressions"] or 0) for q in queries)
+            avg_ctr   = (total_clicks / total_impressions) if total_impressions else 0
+            avg_pos   = (
+                sum(float(q["position"] or 0) for q in queries) / len(queries)
+                if queries else 0
+            )
+
+            return {
+                "total_clicks":      total_clicks,
+                "total_impressions": total_impressions,
+                "avg_ctr_pct":       round(avg_ctr * 100, 2),
+                "avg_position":      round(avg_pos, 1),
+                "top_queries":       queries[:10],
+                "top_pages":         pages[:10],
+                "window_days":       28,
+            }
+        except Exception as e:
+            self.log(f"GSC metrics collection failed (non-fatal): {e}", "info")
+            return None
+
     def run(self):
         self.log("Generating ROI attribution report...")
         self.set_status("working", "Collecting pipeline metrics")
@@ -71,6 +115,29 @@ class ROIAttribution(TenantAwareBaseAgent):
             "citation_rate_pct": round((geo_cited / geo_total * 100) if geo_total else 0),
         }
 
+        # ── Real organic traffic from Google Search Console (if connected) ────
+        gsc_metrics = self._collect_gsc_metrics()
+        if gsc_metrics:
+            metrics["gsc"] = gsc_metrics
+            self.log(
+                f"GSC (28d): {gsc_metrics['total_clicks']} clicks · "
+                f"{gsc_metrics['total_impressions']:,} impressions · "
+                f"CTR {gsc_metrics['avg_ctr_pct']}% · "
+                f"avg position {gsc_metrics['avg_position']}",
+                "success",
+            )
+            for tp in gsc_metrics["top_pages"][:3]:
+                self.log(
+                    f"  Top page: {tp['page'][:80]} — {tp['clicks']} clicks "
+                    f"@ pos {round(tp['position'], 1)}",
+                    "info",
+                )
+        else:
+            self.log(
+                "Search Console not connected — organic traffic metrics unavailable.",
+                "info",
+            )
+
         # Log factual pipeline metrics — these are real numbers, not estimates
         self.log(f"Keywords researched: {kw_count}", "info")
         self.log(f"Pages total / published / ready: {pages_total} / {pages_published} / {pages_ready}", "info")
@@ -128,11 +195,12 @@ Return JSON only:
         if milestone:
             self.log(f"Next milestone: {milestone}", "success")
 
-        self.log(
-            "NOTE: Revenue and traffic projections require connecting Google Analytics / Search Console. "
-            "This report shows pipeline metrics only.",
-            "warning",
-        )
+        if not metrics.get("gsc"):
+            self.log(
+                "NOTE: Connect Google Search Console in Settings to see real organic clicks, "
+                "impressions, and ranking positions for this domain.",
+                "info",
+            )
 
         # Save report — only factual metrics + strategic recommendations, no invented numbers
         db_write(
