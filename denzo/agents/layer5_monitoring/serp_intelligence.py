@@ -73,7 +73,7 @@ Return ONLY valid JSON.
 
         keywords = db_execute(
             "SELECT keyword, location, category FROM keywords "
-            "WHERE tenant_id=? ORDER BY priority DESC LIMIT 20",
+            "WHERE tenant_id=? ORDER BY CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END ASC LIMIT 20",
             (self.ctx.tenant_id,)
         )
         if not keywords:

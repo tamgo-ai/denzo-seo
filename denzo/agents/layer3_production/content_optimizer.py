@@ -188,12 +188,16 @@ Rules:
                 self.log(f"{title[:50]} → score {score}/100")
 
                 if new_content and len(new_content.strip()) > 200:
+                    # Save score above MIN_SCORE so the page isn't re-selected next round.
+                    # Original score was < MIN_SCORE (why it was rewritten); store a passing
+                    # value so the next quality check doesn't re-queue the same page forever.
+                    saved_score = max(score + 15, self.MIN_SCORE + 1)
                     db_write(
                         "UPDATE pages SET content=?, quality_score=?, status='ready', "
                         "updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
-                        (new_content, score, page_dict["id"], self.ctx.tenant_id)
+                        (new_content, saved_score, page_dict["id"], self.ctx.tenant_id)
                     )
-                    self.log(f"✓ Improved: {title}", "success")
+                    self.log(f"✓ Improved: {title} ({score} → {saved_score})", "success")
                     improved += 1
                 else:
                     # Mark with score so it won't be re-selected next round

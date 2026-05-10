@@ -7,7 +7,8 @@ import json
 import re
 from denzo.agents.base_agent import TenantAwareBaseAgent, ClientContext, db_execute, db_write, strip_json_fences
 
-PLAN_BATCH = 15   # pages per Claude call — keep batches small to avoid truncated JSON
+PLAN_BATCH = 15        # initial batch size
+PLAN_BATCH_RETRY = 5   # sub-batch size on retry after JSON parse failure
 
 
 class InternalLinker(TenantAwareBaseAgent):
@@ -16,13 +17,23 @@ class InternalLinker(TenantAwareBaseAgent):
         super().__init__("Internal Linker", ctx, layer=4, color="green")
 
     def _plan_batch(self, batch: list, total: int) -> list:
-        """Ask Claude to plan links for one batch of pages. Returns list of instructions."""
-        prompt = f"""{self.ctx.to_prompt_block()}
+        """Ask Claude to plan links for a batch of pages. Retries with smaller sub-batches on failure."""
+
+        def _try(sub_batch: list) -> list | None:
+                # Build dynamic example anchor text from actual business context
+            industry = self.ctx.industry_vertical or "general"
+            primary_svc = (self.ctx.services[0] if self.ctx.services else "service").lower()
+            city1 = self.ctx.primary_city or "our city"
+            city2 = (self.ctx.service_cities[0] if self.ctx.service_cities else city1)
+            ex_anchor1 = f"{primary_svc} {city1}"
+            ex_anchor2 = f"{primary_svc} near {city2}"
+
+            prompt = f"""{self.ctx.to_prompt_block()}
 
 I have {total} pages total. Build a hub-and-spoke internal linking strategy for this batch.
 
 Pages in this batch:
-{json.dumps(batch, ensure_ascii=False)}
+{json.dumps(sub_batch, ensure_ascii=False)}
 
 Design:
 - Hub pages (most authoritative — service main pages, homepage)
@@ -35,23 +46,42 @@ Return a JSON array of linking instructions:
   {{
     "page_id": 1,
     "add_links_to": [
-      {{"target_id": 2, "anchor_text": "auto body repair North Hollywood", "target_slug": "/services/auto-body"}},
-      {{"target_id": 3, "anchor_text": "collision repair Burbank", "target_slug": "/locations/burbank"}}
+      {{"target_id": 2, "anchor_text": "{ex_anchor1}", "target_slug": "/services/main-service"}},
+      {{"target_id": 3, "anchor_text": "{ex_anchor2}", "target_slug": "/locations/city"}}
     ]
   }}
 ]
 
-Return ONLY valid JSON array. Max 3 links per page. Use natural anchor text.
+Return ONLY valid JSON array. Max 3 links per page. Use natural anchor text relevant to {industry}.
 """
-        for attempt in range(2):
-            raw = self.call_claude(prompt, max_tokens=6000, model="claude-sonnet-4-6")
-            if not raw:
-                self.log(f"Empty response from Claude on attempt {attempt+1}", "warning")
-                continue
-            try:
-                return json.loads(strip_json_fences(raw, "["))
-            except Exception as e:
-                self.log(f"JSON parse error (attempt {attempt+1}): {e} — raw[:200]: {raw[:200]}", "warning")
+            for attempt in range(2):
+                raw = self.call_claude(prompt, max_tokens=6000, model="claude-sonnet-4-6")
+                if not raw:
+                    self.log(f"Empty response on attempt {attempt + 1}", "warning")
+                    continue
+                try:
+                    return json.loads(strip_json_fences(raw, "["))
+                except Exception as e:
+                    self.log(f"JSON parse error (attempt {attempt + 1}): {e} — raw[:200]: {raw[:200]}", "warning")
+            return None
+
+        result = _try(batch)
+        if result is not None:
+            return result
+
+        # Full batch failed — retry in smaller sub-batches to avoid token/truncation issues
+        if len(batch) > PLAN_BATCH_RETRY:
+            self.log(
+                f"Batch of {len(batch)} failed JSON parse — retrying as sub-batches of {PLAN_BATCH_RETRY}",
+                "warning",
+            )
+            all_links: list = []
+            for i in range(0, len(batch), PLAN_BATCH_RETRY):
+                sub_result = _try(batch[i : i + PLAN_BATCH_RETRY])
+                if sub_result:
+                    all_links.extend(sub_result)
+            return all_links
+
         return []
 
     def run(self):
@@ -102,8 +132,16 @@ Return ONLY valid JSON array. Max 3 links per page. Use natural anchor text.
             self.set_status("done", "0 internal links — Claude returned no plan (pages may lack enough content for linking)")
             return
 
-        # Build a page_id → content map
-        page_map = {r["id"]: {"content": r["content"], "slug": r["slug"]} for r in pages}
+        # Re-fetch fresh content from DB before injecting links.
+        # Content Optimizer may have rewritten pages while we were planning — using
+        # the stale copy from the initial SELECT would silently overwrite those rewrites.
+        fresh_rows = db_execute(
+            "SELECT id, content, slug FROM pages "
+            "WHERE tenant_id=? AND content IS NOT NULL AND content != '' "
+            "AND status IN ('ready', 'published') ORDER BY id",
+            (self.ctx.tenant_id,)
+        )
+        page_map = {r["id"]: {"content": r["content"], "slug": r["slug"]} for r in (fresh_rows or [])}
 
         injected = 0
         self.set_status("working", "Injecting links into pages")

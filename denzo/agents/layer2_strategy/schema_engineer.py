@@ -144,5 +144,148 @@ Return ONLY valid JSON array.
         for faq in faqs[:3]:
             self.log(f"Q: {faq.get('question','')}", "info")
 
-        self.log(f"Schema complete: LocalBusiness ({schema_type}) + {len(faqs)} FAQ entries saved.", "success")
-        self.set_status("done", f"Schema generated: {schema_type} + FAQ ({len(faqs)} Q&As)")
+        # ── Generate additional world-class schemas via Claude ────────────────
+        self.set_status("working", "Generating Review + Service + HowTo + Speakable schemas")
+
+        all_cities = ctx.all_cities
+        services_list = ctx.services[:6] if ctx.services else ["our services"]
+        certifications_list = ctx.certifications[:6] if ctx.certifications else []
+
+        additional_prompt = f"""{ctx.to_prompt_block()}
+
+You are a Schema.org structured data specialist. Generate the following 4 schemas for this business.
+Return a JSON array with exactly 4 objects in this order: [review, breadcrumb, service, howto_list, speakable].
+Actually return a JSON object with these 5 keys.
+
+Services: {json.dumps(services_list)}
+Cities served: {json.dumps(all_cities[:8])}
+Certifications: {json.dumps(certifications_list)}
+Primary domain: {ctx.domain or ctx.website_url}
+Primary city: {ctx.primary_city}
+Industry vertical: {ctx.industry_vertical}
+
+Return a JSON object with exactly these 5 keys:
+
+{{
+  "review": {{
+    "@context": "https://schema.org",
+    "@type": "Review",
+    "itemReviewed": {{
+      "@type": "LocalBusiness",
+      "name": "{ctx.client_name}"
+    }},
+    "reviewRating": {{
+      "@type": "Rating",
+      "ratingValue": "5",
+      "bestRating": "5"
+    }},
+    "author": {{"@type": "Person", "name": "Satisfied Customer"}},
+    "reviewBody": "<WRITE an authentic 2-3 sentence review specific to this business vertical and services>"
+  }},
+  "breadcrumb": {{
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {{"@type": "ListItem", "position": 1, "name": "Home", "item": "<domain>/"}},
+      {{"@type": "ListItem", "position": 2, "name": "<primary_service>", "item": "<domain>/services/<slug>"}}
+    ]
+  }},
+  "service": {{
+    "@context": "https://schema.org",
+    "@type": "Service",
+    "serviceType": "<primary service name>",
+    "provider": {{
+      "@type": "LocalBusiness",
+      "name": "{ctx.client_name}"
+    }},
+    "areaServed": [<list of {{"@type": "City", "name": "..."}} objects for each city>],
+    "hasOfferCatalog": {{
+      "@type": "OfferCatalog",
+      "name": "<primary service> Services"
+    }}
+  }},
+  "howto_list": [
+    {{
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      "name": "How to <action relevant to {ctx.industry_vertical}>",
+      "description": "<2 sentences>",
+      "step": [
+        {{"@type": "HowToStep", "name": "Step 1", "text": "..."}},
+        {{"@type": "HowToStep", "name": "Step 2", "text": "..."}},
+        {{"@type": "HowToStep", "name": "Step 3", "text": "..."}}
+      ]
+    }}
+  ],
+  "speakable": {{
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "speakable": {{
+      "@type": "SpeakableSpecification",
+      "cssSelector": ["h1", ".hero-lead", ".schema-speakable"]
+    }}
+  }}
+}}
+
+Rules:
+- Fill in ALL placeholder values with real, specific content for this business
+- howto_list must have 2-3 HowTo schemas relevant to the industry vertical
+- For auto body: "How to file an insurance claim", "How to choose a body shop"
+- For dental: "How to prepare for a root canal", "How to choose a dentist"
+- For law firms: "How to find a personal injury attorney", "How to file a claim"
+- breadcrumb item should use the actual domain and primary service slug
+- service areaServed must list all cities provided
+- Return ONLY valid JSON. No markdown fences, no extra text.
+"""
+
+        raw_extra = self.call_claude(additional_prompt, max_tokens=3000, model="claude-sonnet-4-6")
+
+        schema_review   = {}
+        schema_breadcrumb = {}
+        schema_service  = {}
+        howto_list      = []
+        schema_speakable = {}
+
+        if raw_extra:
+            try:
+                extra = json.loads(strip_json_fences(raw_extra, "{"))
+                schema_review      = extra.get("review", {})
+                schema_breadcrumb  = extra.get("breadcrumb", {})
+                schema_service     = extra.get("service", {})
+                howto_list         = extra.get("howto_list", [])
+                schema_speakable   = extra.get("speakable", {})
+            except Exception as e:
+                self.log(f"Extra schemas parse error: {str(e)[:80]}", "warning")
+
+        # Save all additional schemas to DB settings
+        db_write(
+            "INSERT OR REPLACE INTO settings (tenant_id, key, value) VALUES (?,?,?)",
+            (ctx.tenant_id, "schema_review", json.dumps(schema_review, ensure_ascii=False))
+        )
+        db_write(
+            "INSERT OR REPLACE INTO settings (tenant_id, key, value) VALUES (?,?,?)",
+            (ctx.tenant_id, "schema_breadcrumb_template", json.dumps(schema_breadcrumb, ensure_ascii=False))
+        )
+        db_write(
+            "INSERT OR REPLACE INTO settings (tenant_id, key, value) VALUES (?,?,?)",
+            (ctx.tenant_id, "schema_service", json.dumps(schema_service, ensure_ascii=False))
+        )
+        db_write(
+            "INSERT OR REPLACE INTO settings (tenant_id, key, value) VALUES (?,?,?)",
+            (ctx.tenant_id, "schema_howto", json.dumps(howto_list, ensure_ascii=False))
+        )
+        db_write(
+            "INSERT OR REPLACE INTO settings (tenant_id, key, value) VALUES (?,?,?)",
+            (ctx.tenant_id, "schema_speakable", json.dumps(schema_speakable, ensure_ascii=False))
+        )
+
+        n_howto = len(howto_list)
+        self.log(
+            f"Schema complete: LocalBusiness ({schema_type}) + FAQ ({len(faqs)} Q&As) "
+            f"+ Review + Service + {n_howto} HowTo + SpeakableSpecification",
+            "success"
+        )
+        self.set_status(
+            "done",
+            f"Schema generated: {schema_type} + FAQ ({len(faqs)} Q&As) + Review + Service + {n_howto} HowTo + Speakable"
+        )

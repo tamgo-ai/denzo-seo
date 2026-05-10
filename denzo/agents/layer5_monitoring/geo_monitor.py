@@ -162,6 +162,8 @@ class GEOMonitor(TenantAwareBaseAgent):
     def _seed_query_bank(self):
         ctx    = self.ctx
         cities = ctx.service_cities[:5] if ctx.service_cities else [ctx.primary_city or ""]
+        primary_svc = (ctx.services[0] if ctx.services else "service").lower()
+        city_ex     = ctx.primary_city or (cities[0] if cities else "our city")
         prompt = f"""{ctx.to_prompt_block()}
 
 Generate 25 search queries that real customers would type into ChatGPT, Perplexity, or Google AI to find this business.
@@ -170,12 +172,12 @@ Cover:
 - branded (2-3): include "{ctx.client_name}" directly
 - service (6-8): specific services + cities
 - location (4-5): "best [service] in [city]" for: {', '.join(cities[:4])}
-- problem (4-5): customer pain points after an accident or needing this service
-- comparison (3-4): vs competitors or vs chain shops
-- certification (2-3): brand-specific certifications
+- problem (4-5): customer pain points and needs relevant to this industry
+- comparison (3-4): vs competitors or alternatives
+- certification (2-3): certifications or specializations specific to this business
 
-Return JSON array: [{{"query": "best BMW certified body shop Los Angeles", "category": "service"}}]
-Return ONLY valid JSON. Make queries sound natural.
+Return JSON array: [{{"query": "best {primary_svc} near {city_ex}", "category": "service"}}]
+Return ONLY valid JSON. Make queries sound natural and specific to this business's industry.
 """
         raw = self.call_claude(prompt, max_tokens=1500, model="claude-sonnet-4-6")
         if not raw:

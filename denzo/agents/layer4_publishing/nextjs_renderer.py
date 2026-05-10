@@ -108,7 +108,8 @@ def render_nextjs_page(page: dict, ctx: ClientContext, assets: dict) -> str:
     ])
     cta_label  = assets.get("cta_label", "Get Free Estimate")
     cta_link   = assets.get("cta_link",  "/contact-us")
-    gallery_df = assets.get("gallery_default", [[dflt_hero, "Collision repair"]])
+    _default_alt = (ctx.services[0] if ctx.services else ctx.industry_vertical or "service")
+    gallery_df = assets.get("gallery_default", [[dflt_hero, _default_alt]])
 
     # Page data
     slug         = (page.get("slug") or "").strip("/")
@@ -119,7 +120,7 @@ def render_nextjs_page(page: dict, ctx: ClientContext, assets: dict) -> str:
     content_html = page.get("content") or ""
     title        = page.get("title") or meta_title
 
-    domain       = ctx.pages_domain or f"https://www.{ctx.domain}" if ctx.domain else ""
+    domain       = ctx.pages_domain or (f"https://www.{ctx.domain}" if ctx.domain else "")
 
     # H1 from AI content
     h1_match = re.search(r'<h1[^>]*>(.*?)</h1>', content_html, re.DOTALL | re.IGNORECASE)
@@ -270,7 +271,7 @@ export default function {fn_name}() {{
       <section className="relative bg-[{primary}] overflow-hidden">
         <div className="relative w-full h-[50vh] md:h-[60vh]">
           <Image src={json.dumps(hero_img)}
-                 alt={json.dumps(f"Collision repair in {{location}} - {{ctx.client_name}}")}
+                 alt={json.dumps(f"{ctx.services[0] if ctx.services else 'Service'} in {{location}} - {{ctx.client_name}}")}
                  fill className="object-cover opacity-50" priority />
           <div className="absolute inset-0 flex flex-col justify-center items-center px-6 text-center">
             <p className="text-[{secondary}] font-bold text-sm uppercase tracking-widest mb-3">

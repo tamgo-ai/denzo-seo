@@ -25,7 +25,7 @@ class GEOQueryGenerator(TenantAwareBaseAgent):
         """Convert top-priority keywords into natural AI search queries."""
         rows = db_execute(
             """SELECT keyword, location, category FROM keywords
-               WHERE tenant_id=? AND priority IN ('high','alta')
+               WHERE tenant_id=? AND priority = 'high'
                ORDER BY CAST(volume AS INTEGER) DESC LIMIT 60""",
             (self.ctx.tenant_id,)
         )
@@ -42,23 +42,30 @@ class GEOQueryGenerator(TenantAwareBaseAgent):
             for r in rows
         ]
 
+        # Build one industry-specific example to guide Claude without contaminating outputs
+        industry = self.ctx.industry_vertical or "general"
+        primary_svc = (self.ctx.services[0] if self.ctx.services else "our service").lower()
+        city = self.ctx.primary_city or "our city"
+        kw_example = f"{primary_svc} {city}"
+        query_example = f"best {primary_svc} near {city}"
+
         prompt = f"""{self.ctx.to_prompt_block()}
 
-I have these high-priority SEO keywords for this business:
+I have these high-priority SEO keywords for this business (industry: {industry}):
 {json.dumps(kw_list[:40], ensure_ascii=False)}
 
 Convert them into natural conversational queries — exactly how a person would type into Perplexity, ChatGPT, or Google AI.
 
 Rules:
 - Make them sound like real questions or natural searches, NOT like SEO keyword strings
-- "BMW certified body shop Los Angeles" → "Where can I find a BMW certified collision center in Los Angeles?"
-- "Tesla repair Whittier" → "best Tesla accident repair shop near Whittier CA"
+- Example: "{kw_example}" → "{query_example}"
 - Include a mix of question format ("where", "what", "who", "best") and statement format
 - Keep location when present
 - Group by category: branded, service, location, problem, comparison, certification
+- CRITICAL: Every query must be relevant to the "{industry}" industry — never reference other industries
 
 Return JSON array:
-[{{"query": "best BMW certified body shop in Los Angeles", "category": "service", "source": "keyword"}}]
+[{{"query": "{query_example}", "category": "service", "source": "keyword"}}]
 
 Return ONLY valid JSON. Max 30 queries.
 """
@@ -152,18 +159,22 @@ Return ONLY valid JSON.
                 return []
             comp_names = [r["name"] for r in comp_rows]
 
+            industry = self.ctx.industry_vertical or "general"
+            primary_svc = (self.ctx.services[0] if self.ctx.services else "service").lower()
+            comp_example = comp_names[0] if comp_names else "a competitor"
+
             prompt = f"""{self.ctx.to_prompt_block()}
 
-These are the main competitors of {self.ctx.client_name}:
+These are the main competitors of {self.ctx.client_name} (industry: {industry}):
 {json.dumps(comp_names, ensure_ascii=False)}
 
 Generate 10 queries that someone would ask when comparing these competitors or looking for alternatives.
 These are queries where competitors likely get cited — we want to monitor them and eventually outrank.
 
-Examples:
-- "Caliber Collision vs independent body shop"
-- "alternatives to Service King collision repair"
-- "best collision repair shop besides Caliber"
+Examples relevant to this industry:
+- "{comp_example} vs {self.ctx.client_name}"
+- "alternatives to {comp_example} for {primary_svc}"
+- "best {primary_svc} besides {comp_example}"
 
 Return JSON array:
 [{{"query": "...", "category": "comparison", "source": "competitor"}}]

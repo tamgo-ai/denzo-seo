@@ -68,6 +68,20 @@ Apply these GEO techniques:
 4. Add an "Expert perspective" block: <blockquote>"According to [business name]'s team: [specific authoritative statement relevant to this page's topic]"</blockquote>
 5. Include the full business NAP (Name, Address, Phone) once in a structured paragraph
 
+GEO OPTIMIZATION RULES FOR AI ANSWER ENGINES (ChatGPT, Perplexity, Google AI Overviews):
+
+6. DIRECT ANSWER SENTENCES (Direct Answer): For every key topic on this page, add a single sentence that directly answers the question in full. Format: "[Question] Answer: [direct answer]." These sentences are what AI models extract as citations.
+
+7. DEFINITION BLOCKS (Definition Block): Add a clear 2-sentence definition of the main service/topic near the top. AI models prefer pages with explicit definitions.
+
+8. STATISTICS & SPECIFICS (Statistics): Include at least 2 specific data points (timeframes, percentages, measurements). "Most bumper repairs take 2-4 hours" is 10x more citable than "repairs are fast".
+
+9. STRUCTURED COMPARISON: Add a short section comparing this business to alternatives. AI models use these to recommend businesses.
+
+10. SPEAKABLE CONTENT (Speakable): The first paragraph after H1 must be readable aloud in 15 seconds or less. Voice assistants prioritize this for "near me" queries.
+
+11. ENTITY ASSOCIATIONS (Entity Association): Mention 2-3 nearby landmarks, neighborhoods, or well-known local entities. This helps AI models associate the business with the geographic area.
+
 Return the FULL improved HTML content. Return ONLY HTML, no explanation.
 """
         return self.call_claude(prompt, max_tokens=3000, model="claude-sonnet-4-6")
@@ -113,6 +127,7 @@ Return the FULL improved HTML content. Return ONLY HTML, no explanation.
             pages = db_execute(
                 "SELECT id, title, slug, target_keyword, content FROM pages "
                 "WHERE tenant_id=? AND status='ready' AND content IS NOT NULL AND content != '' "
+                "AND (notes NOT LIKE '%[GEO]%' OR notes IS NULL) "
                 "ORDER BY id LIMIT ?",
                 (self.ctx.tenant_id, self.BATCH)
             )
@@ -136,7 +151,7 @@ Return the FULL improved HTML content. Return ONLY HTML, no explanation.
                 improved = self._inject_geo(page_dict, brand_voice=brand_voice)
                 if improved:
                     db_write(
-                        "UPDATE pages SET content=?, updated_at=CURRENT_TIMESTAMP "
+                        "UPDATE pages SET content=?, notes=COALESCE(notes||' ','')|| '[GEO]', updated_at=CURRENT_TIMESTAMP "
                         "WHERE id=? AND tenant_id=?",
                         (improved, pid, self.ctx.tenant_id)
                     )

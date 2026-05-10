@@ -32,7 +32,8 @@ class EEATArchitect(TenantAwareBaseAgent):
 
         # Load top keywords from DB
         kw_rows = db_execute(
-            "SELECT keyword, intent, category, priority FROM keywords WHERE tenant_id=? ORDER BY priority DESC LIMIT 50",
+            "SELECT keyword, intent, category, priority FROM keywords WHERE tenant_id=? "
+            "ORDER BY CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END ASC LIMIT 50",
             (ctx.tenant_id,)
         )
         keywords_summary = [dict(r) for r in kw_rows] if kw_rows else []
@@ -189,6 +190,36 @@ Return ONLY valid JSON. Do not add any text outside the JSON object.
 
         for pillar in pillars:
             self.log(f"Pillar: {pillar.get('pillar')} — {len(pillar.get('pages', []))} pages", "info")
+
+        # Guard: cap total pages per client to prevent explosion on retries.
+        # Default: 500 pages. Override per-client via settings key 'max_pages_cap'.
+        cap_row = db_execute(
+            "SELECT value FROM settings WHERE tenant_id=? AND key='max_pages_cap'",
+            (ctx.tenant_id,)
+        )
+        MAX_PAGES_PER_CLIENT = int(cap_row[0]["value"]) if cap_row else 500
+        existing_pages = db_execute(
+            "SELECT COUNT(*) AS n FROM pages WHERE tenant_id=? AND status IN ('draft','ready','published')",
+            (ctx.tenant_id,)
+        )
+        current_page_count = existing_pages[0]["n"] if existing_pages else 0
+        remaining_slots = MAX_PAGES_PER_CLIENT - current_page_count
+
+        if remaining_slots <= 0:
+            self.log(
+                f"Page cap reached ({current_page_count}/{MAX_PAGES_PER_CLIENT}). "
+                "Increase cap in Settings (max_pages_cap) or run Programmatic SEO first.",
+                "warning",
+            )
+            self.set_status("done", f"{len(pillars)} pillars · page cap reached ({current_page_count}/{MAX_PAGES_PER_CLIENT})")
+            return
+
+        if remaining_slots < len(priorities):
+            self.log(
+                f"Limiting to {remaining_slots} new pages (cap: {MAX_PAGES_PER_CLIENT}, "
+                f"existing: {current_page_count})", "warning"
+            )
+            priorities = priorities[:remaining_slots]
 
         # Create page stubs from content priorities
         all_cities = ctx.all_cities  # includes primary_city + service_cities

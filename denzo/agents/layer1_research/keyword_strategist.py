@@ -52,10 +52,27 @@ class KeywordStrategist(TenantAwareBaseAgent):
         )
         existing_count = existing[0][0] if existing else 0
 
-        # Build prompt
-        cities_str  = ", ".join(ctx.service_cities[:10]) if ctx.service_cities else ctx.primary_city
-        services_str = ", ".join(ctx.services[:10]) if ctx.services else "general services"
-        certs_str   = ", ".join(ctx.certifications[:5]) if ctx.certifications else ""
+        # Build prompt — cap cities/services to prevent runaway keyword explosion
+        # 15 cities × 5 services × intent variants = 375+ keywords already. Cap hard.
+        MAX_CITIES    = 15
+        MAX_SERVICES  = 12
+        service_cities = ctx.service_cities[:MAX_CITIES]
+        services       = ctx.services[:MAX_SERVICES]
+        if len(ctx.service_cities) > MAX_CITIES:
+            self.log(
+                f"Capped service cities to {MAX_CITIES} (client has {len(ctx.service_cities)}) "
+                "to prevent keyword explosion. Edit client settings to adjust.",
+                "warning"
+            )
+        if len(ctx.services) > MAX_SERVICES:
+            self.log(
+                f"Capped services to {MAX_SERVICES} (client has {len(ctx.services)}) "
+                "for focused keyword research.", "warning"
+            )
+
+        cities_str   = ", ".join(service_cities) if service_cities else ctx.primary_city
+        services_str = ", ".join(services) if services else "general services"
+        certs_str    = ", ".join(ctx.certifications[:5]) if ctx.certifications else ""
 
         # Build industry-aware keyword categories
         industry = ctx.industry_vertical or "general"

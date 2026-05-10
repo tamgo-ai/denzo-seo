@@ -71,65 +71,53 @@ class ROIAttribution(TenantAwareBaseAgent):
             "citation_rate_pct": round((geo_cited / geo_total * 100) if geo_total else 0),
         }
 
+        # Log factual pipeline metrics — these are real numbers, not estimates
+        self.log(f"Keywords researched: {kw_count}", "info")
+        self.log(f"Pages total / published / ready: {pages_total} / {pages_published} / {pages_ready}", "info")
+        self.log(f"Competitors analyzed: {competitors}", "info")
+        self.log(f"GEO citation rate: {metrics['citation_rate_pct']}% ({geo_cited}/{geo_total} queries)", "info")
+
+        progress_pct = round((pages_published / max(pages_total, 1)) * 100)
+        self.log(f"Pipeline progress: {progress_pct}% of pages published", "info")
+
+        # Use Claude for strategic recommendations ONLY — no revenue/traffic hallucination
         prompt = f"""{ctx.to_prompt_block()}
 
-You are a Senior Digital Marketing ROI Analyst with 12 years of experience measuring and attributing organic search value for local service businesses.
-
-Pipeline metrics:
+SEO pipeline metrics (verified factual data — do NOT estimate or invent numbers beyond these):
 {json.dumps(metrics, indent=2)}
 
-Generate a conservative, data-driven ROI attribution report for this SEO campaign.
+Based on these factual metrics, provide ONLY:
+1. Campaign progress assessment (% complete based on pages published vs total)
+2. Realistic time-to-first-rankings estimate (cite typical SEO timelines for this industry — label clearly as estimate)
+3. Top 3 specific, actionable priority tasks to improve rankings fastest
+4. Next 30-day milestone based on current state
 
-Estimate (conservatively):
-1. Monthly organic traffic potential based on keywords + pages
-2. Estimated leads/month from organic traffic (use industry conversion rates)
-3. Estimated revenue impact (use typical deal values for this industry)
-4. Time to results (when should rankings start appearing?)
-5. Priority actions to maximize ROI fastest
+DO NOT estimate traffic, leads, or revenue — you have no conversion or analytics data. Only recommend actions.
 
-Return a JSON report:
+Return JSON only:
 {{
-  "traffic_estimate_monthly": 0,
-  "leads_estimate_monthly": 0,
-  "revenue_impact_monthly_usd": 0,
-  "time_to_results_weeks": 0,
-  "roi_summary": "One paragraph executive summary",
-  "top_priorities": ["Priority action 1", "action 2", "action 3"],
-  "next_milestone": "What to achieve in next 30 days"
-}}
+  "campaign_progress_pct": {progress_pct},
+  "time_to_first_rankings_weeks": 12,
+  "time_note": "Explanation of why this timeline applies",
+  "top_priorities": ["Specific action 1", "Specific action 2", "Specific action 3"],
+  "next_milestone": "Concrete measurable goal for next 30 days",
+  "summary": "2-3 sentence campaign status summary using only the factual data above"
+}}"""
 
-Return ONLY valid JSON.
-"""
-        self.set_status("working", "Calculating ROI with AI")
-        raw = self.call_claude(prompt, max_tokens=1500)
+        self.set_status("working", "Generating strategic recommendations")
+        raw = self.call_claude(prompt, max_tokens=800)
 
-        if not raw:
-            self.log("Could not generate ROI report.", "error")
-            self.set_status("error", "No response")
-            return
+        report = {}
+        if raw:
+            try:
+                report = json.loads(strip_json_fences(raw))
+            except Exception:
+                pass
 
-        try:
-            raw = strip_json_fences(raw)
-            report = json.loads(raw)
-        except Exception:
-            report = {}
+        weeks = int(report.get("time_to_first_rankings_weeks", 12) or 12)
+        self.log(f"Estimated time to first rankings: ~{weeks} weeks (industry estimate — not guaranteed)", "info")
 
-        # Log key metrics
-        self.log(f"Keywords researched: {kw_count}", "info")
-        self.log(f"Pages published: {pages_published} / {pages_total}", "info")
-        self.log(f"GEO citation rate: {metrics['citation_rate_pct']}%", "info")
-
-        traffic = report.get("traffic_estimate_monthly", 0)
-        leads   = report.get("leads_estimate_monthly", 0)
-        revenue = report.get("revenue_impact_monthly_usd", 0)
-        weeks   = report.get("time_to_results_weeks", 12)
-
-        self.log(f"Estimated monthly traffic: {traffic:,} visits", "success")
-        self.log(f"Estimated monthly leads: {leads}", "success")
-        self.log(f"Estimated revenue impact: ${revenue:,}/month", "success")
-        self.log(f"Time to results: {weeks} weeks", "info")
-
-        summary = report.get("roi_summary", "")
+        summary = report.get("summary", "")
         if summary:
             self.log(summary, "info")
 
@@ -140,11 +128,17 @@ Return ONLY valid JSON.
         if milestone:
             self.log(f"Next milestone: {milestone}", "success")
 
-        # Save report
+        self.log(
+            "NOTE: Revenue and traffic projections require connecting Google Analytics / Search Console. "
+            "This report shows pipeline metrics only.",
+            "warning",
+        )
+
+        # Save report — only factual metrics + strategic recommendations, no invented numbers
         db_write(
             "INSERT OR REPLACE INTO settings (tenant_id, key, value) VALUES (?,?,?)",
-            (ctx.tenant_id, "roi_report", json.dumps({**metrics, **report}, ensure_ascii=False))
+            (ctx.tenant_id, "roi_report", json.dumps({**metrics, **report, "disclaimer": "Traffic/revenue projections require Analytics integration"}, ensure_ascii=False))
         )
 
         self.log("ROI Attribution report complete.", "success")
-        self.set_status("done", f"${revenue:,}/mo estimated — {leads} leads/mo")
+        self.set_status("done", f"{pages_published} pages published · {metrics['citation_rate_pct']}% GEO citation rate")

@@ -62,7 +62,7 @@ Return ONLY valid JSON array.
 
         keywords = db_execute(
             "SELECT id, keyword, location FROM keywords "
-            "WHERE tenant_id=? AND priority IN ('high','alta') ORDER BY id LIMIT 30",
+            "WHERE tenant_id=? AND priority = 'high' ORDER BY id LIMIT 30",
             (self.ctx.tenant_id,)
         )
         if not keywords:

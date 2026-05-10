@@ -331,7 +331,6 @@ Return ONLY a JSON object mapping filename → alt text:
 
                     # Apply visual fixes
                     new_html = self._apply_visual_fixes(html, page_dict, alt_map, fixes_needed)
-                    new_html = self._add_og_image(new_html, page_dict)
 
                     if new_html != html:
                         db_write(

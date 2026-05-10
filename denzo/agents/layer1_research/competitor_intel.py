@@ -166,6 +166,51 @@ _NEARBY_CITIES: dict[str, list[str]] = {
     # Whittier / SGV
     "whittier":        ["la habra", "la mirada", "norwalk", "downey",
                         "pico rivera", "santa fe springs", "hacienda heights"],
+    # San Diego
+    "san diego":       ["chula vista", "el cajon", "la mesa", "santee", "national city",
+                        "escondido", "oceanside", "carlsbad", "vista", "san marcos"],
+    "el cajon":        ["san diego", "la mesa", "santee", "spring valley", "lemon grove"],
+    # Bay Area
+    "san francisco":   ["oakland", "berkeley", "daly city", "san mateo", "burlingame",
+                        "south san francisco", "san jose"],
+    "san jose":        ["santa clara", "sunnyvale", "mountain view", "palo alto",
+                        "cupertino", "milpitas", "fremont", "san francisco"],
+    "oakland":         ["berkeley", "san francisco", "fremont", "hayward", "emeryville"],
+    # Texas
+    "houston":         ["pasadena", "pearland", "sugar land", "katy", "baytown",
+                        "the woodlands", "spring", "humble", "friendswood"],
+    "dallas":          ["fort worth", "arlington", "plano", "garland", "irving",
+                        "mesquite", "carrollton", "grand prairie", "richardson"],
+    "austin":          ["round rock", "cedar park", "pflugerville", "kyle", "buda",
+                        "georgetown", "leander", "san marcos"],
+    "san antonio":     ["leon valley", "converse", "universal city", "schertz", "new braunfels"],
+    # Florida
+    "miami":           ["hialeah", "coral gables", "kendall", "north miami", "aventura",
+                        "doral", "miami gardens", "homestead"],
+    "orlando":         ["kissimmee", "altamonte springs", "sanford", "ocoee",
+                        "winter park", "lake mary", "longwood"],
+    "tampa":           ["st. petersburg", "clearwater", "brandon", "lakeland",
+                        "new port richey", "largo", "dunedin"],
+    # New York / Northeast
+    "new york":        ["brooklyn", "queens", "bronx", "staten island", "newark",
+                        "jersey city", "yonkers", "stamford"],
+    "brooklyn":        ["new york", "queens", "staten island", "jersey city", "newark"],
+    "manhattan":       ["brooklyn", "queens", "bronx", "hoboken", "jersey city"],
+    # Chicago
+    "chicago":         ["evanston", "oak park", "cicero", "schaumburg", "naperville",
+                        "aurora", "joliet", "elgin", "waukegan"],
+    # Phoenix
+    "phoenix":         ["scottsdale", "tempe", "mesa", "chandler", "glendale",
+                        "peoria", "gilbert", "surprise", "avondale"],
+    "scottsdale":      ["phoenix", "tempe", "mesa", "chandler", "fountain hills"],
+    # Pacific Northwest
+    "seattle":         ["bellevue", "kirkland", "redmond", "renton", "kent",
+                        "federal way", "auburn", "tacoma", "everett"],
+    "portland":        ["beaverton", "hillsboro", "gresham", "lake oswego",
+                        "tigard", "vancouver wa", "tualatin"],
+    # Denver
+    "denver":          ["aurora", "lakewood", "arvada", "westminster", "thornton",
+                        "centennial", "highlands ranch", "littleton", "englewood"],
     # Fallback: empty list means no nearby city expansion
 }
 

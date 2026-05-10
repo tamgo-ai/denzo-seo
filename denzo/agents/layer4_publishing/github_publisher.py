@@ -12,7 +12,7 @@ import requests
 from denzo.agents.base_agent import TenantAwareBaseAgent, ClientContext, db_execute, db_write
 
 
-def _build_html_page(title, meta_description, content, style_guide=None, ctx=None):
+def _build_html_page(title, meta_description, content, style_guide=None, ctx=None, canonical_url=None):
     """
     Build a fully-styled, brand-aware HTML page.
     Uses style_guide (from site_style_guide setting) for brand colors/fonts.
@@ -61,6 +61,7 @@ def _build_html_page(title, meta_description, content, style_guide=None, ctx=Non
     # Certifications line for footer bottom
     certs_line = " · ".join(certifications[:3]) if certifications else ""
 
+    canonical = canonical_url or ""
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -68,8 +69,19 @@ def _build_html_page(title, meta_description, content, style_guide=None, ctx=Non
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{title} | {client_name}</title>
   <meta name="description" content="{meta_description}">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
+  {f'<link rel="canonical" href="{canonical}">' if canonical else ''}
+  <meta property="og:title" content="{title} | {client_name}">
+  <meta property="og:description" content="{meta_description}">
+  {f'<meta property="og:url" content="{canonical}">' if canonical else ''}
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="{title} | {client_name}">
+  <meta name="twitter:description" content="{meta_description}">
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="font" type="font/woff2" href="https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2" crossorigin>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"></noscript>
   <style>
     :root {{
       --primary:   {c1};
@@ -81,12 +93,14 @@ def _build_html_page(title, meta_description, content, style_guide=None, ctx=Non
       --bg2:       #f8fafc;
       --border:    #e2e8f0;
       --radius:    10px;
+      font-display: swap;
     }}
     *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
     body {{ font-family: 'Inter', system-ui, sans-serif; color: var(--text); background: var(--bg); line-height: 1.7; }}
     a {{ color: var(--cta); text-decoration: none; }}
     a:hover {{ text-decoration: underline; }}
     img {{ max-width: 100%; height: auto; }}
+    /* CWV: all content images get loading: lazy via JS below */
 
     /* ── HEADER ── */
     .site-header {{
@@ -266,6 +280,11 @@ def _build_html_page(title, meta_description, content, style_guide=None, ctx=Non
     }}
     .footer-phone {{ color: var(--cta); font-weight: 600; }}
 
+    /* ── CORE WEB VITALS ── */
+    img, video {{ aspect-ratio: attr(width) / attr(height); }}
+    .hero-section {{ contain: layout style; }}
+    .hero-section h1 {{ text-rendering: optimizeSpeed; }}
+
     /* ── RESPONSIVE ── */
     @media (max-width: 768px) {{
       .site-nav {{ display: none; }}
@@ -324,6 +343,10 @@ def _build_html_page(title, meta_description, content, style_guide=None, ctx=Non
   </div>
 </footer>
 
+<script>
+  // CWV: Apply loading: lazy (loading="lazy") to all content images
+  document.querySelectorAll('main img:not([loading])').forEach(function(img){{img.setAttribute('loading','lazy');}});
+</script>
 </body>
 </html>"""
 
@@ -460,15 +483,16 @@ class GitHubPublisher(TenantAwareBaseAgent):
                 file_path    = f"app/{slug}/page.jsx"
                 public_url   = f"{_base}/{slug}" if _base else f"/{slug}"
             else:
+                file_path  = f"{path_prefix}{ptype}s/{slug}.html"
+                public_url = f"{_base}/{ptype}s/{slug}.html" if _base else file_path
                 file_content = _build_html_page(
                     title=title,
                     meta_description=meta_desc,
                     content=content,
                     style_guide=style_guide,
                     ctx=ctx,
+                    canonical_url=public_url,
                 )
-                file_path  = f"{path_prefix}{ptype}s/{slug}.html"
-                public_url = f"{_base}/{ptype}s/{slug}.html" if _base else file_path
 
             content_b64 = base64.b64encode(file_content.encode("utf-8")).decode("utf-8")
             commit_msg  = f"SEO: {title}"
@@ -490,5 +514,120 @@ class GitHubPublisher(TenantAwareBaseAgent):
 
             time.sleep(0.5)
 
+        # Generate and publish sitemap.xml + robots.txt
+        if published > 0 and _base:
+            self._publish_sitemap(session, repo, branch, ctx, _base, path_prefix)
+            self._publish_llms_txt(session, repo, branch, ctx, _base, path_prefix)
+
         self.log(f"GitHub Publisher done: {published} published, {failed} failed.", "success")
         self.set_status("done", f"{published} pages published to GitHub")
+
+    def _publish_sitemap(self, session, repo, branch, ctx, base_url, path_prefix):
+        """Generate sitemap.xml from all published pages and push to GitHub."""
+        from datetime import datetime, timezone
+        published_pages = db_execute(
+            "SELECT slug, type, publish_url, updated_at FROM pages "
+            "WHERE tenant_id=? AND status='published' AND publish_url IS NOT NULL "
+            "ORDER BY type, slug",
+            (ctx.tenant_id,)
+        )
+        if not published_pages:
+            return
+
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        urls = []
+        for p in published_pages:
+            pub_url = p["publish_url"]
+            ptype   = p["type"] or "page"
+            priority = "1.0" if ptype in ("service", "location") else "0.8"
+            changefreq = "weekly" if ptype in ("service", "location") else "monthly"
+            urls.append(
+                f"  <url>\n"
+                f"    <loc>{pub_url}</loc>\n"
+                f"    <lastmod>{today}</lastmod>\n"
+                f"    <changefreq>{changefreq}</changefreq>\n"
+                f"    <priority>{priority}</priority>\n"
+                f"  </url>"
+            )
+
+        sitemap_xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            + "\n".join(urls)
+            + "\n</urlset>"
+        )
+
+        sm_b64 = base64.b64encode(sitemap_xml.encode("utf-8")).decode("utf-8")
+        sm_path = f"{path_prefix}sitemap.xml" if path_prefix else "sitemap.xml"
+        ok = self._publish_file(session, repo, branch, sm_path, sm_b64, "SEO: update sitemap.xml")
+        if ok:
+            self.log(f"✓ sitemap.xml ({len(published_pages)} URLs)", "success")
+        else:
+            self.log("✗ sitemap.xml publish failed", "warning")
+
+        # robots.txt — only create if it doesn't already exist
+        robots_content = (
+            f"User-agent: *\nAllow: /\n\nSitemap: {base_url}/sitemap.xml\n"
+        )
+        rb_b64  = base64.b64encode(robots_content.encode("utf-8")).decode("utf-8")
+        rb_path = f"{path_prefix}robots.txt" if path_prefix else "robots.txt"
+        self._publish_file(session, repo, branch, rb_path, rb_b64, "SEO: update robots.txt")
+
+    def _publish_llms_txt(self, session, repo, branch, ctx, base_url, path_prefix):
+        """Generate and publish llms.txt — structured business data for AI crawlers
+        (ChatGPT, Perplexity, Claude, Gemini) per the emerging llms.txt standard."""
+        services_list = "\n".join(f"- {s}" for s in (ctx.services or []))
+        cities = ([ctx.primary_city] if getattr(ctx, "primary_city", None) else []) + \
+                 (getattr(ctx, "service_cities", None) or [])
+        cities_list = "\n".join(f"- {c}" for c in cities if c)
+        certs_list  = "\n".join(f"- {c}" for c in (getattr(ctx, "certifications", None) or []))
+        diffs_list  = "\n".join(f"- {d}" for d in (getattr(ctx, "differentiators", None) or []))
+        ins_list    = "\n".join(f"- {i}" for i in (getattr(ctx, "insurance_partners", None) or []))
+
+        primary_city = getattr(ctx, "primary_city", "") or ""
+        state        = getattr(ctx, "state", "") or ""
+        address      = getattr(ctx, "address", "") or (f"{primary_city}, {state}".strip(", "))
+        tagline      = getattr(ctx, "tagline", "") or ""
+        description  = getattr(ctx, "description", "") or \
+                       f"{ctx.client_name} is a trusted local business serving {primary_city} and surrounding areas."
+
+        services_preview = ", ".join((ctx.services or [])[:2])
+        default_tagline  = f"Professional {services_preview} services in {primary_city}, {state}".strip(", .")
+
+        content = f"""# {ctx.client_name}
+
+> {tagline or default_tagline}
+
+## About
+{description}
+
+## Services
+{services_list or '- Professional services'}
+
+## Locations Served
+{cities_list or f'- {primary_city}'}
+
+## Certifications & Credentials
+{certs_list or '- Licensed and insured'}
+
+## Why Choose Us
+{diffs_list or '- Quality service'}
+
+## Contact
+- Phone: {ctx.phone or 'Call for info'}
+- Website: {ctx.domain or base_url}
+- Address: {address}
+"""
+
+        if ins_list:
+            content += f"\n## Insurance Partners\n{ins_list}\n"
+
+        content += f"\n## Sitemap\n- {base_url}/sitemap.xml\n"
+
+        txt_b64  = base64.b64encode(content.encode("utf-8")).decode("utf-8")
+        txt_path = f"{path_prefix}llms.txt" if path_prefix else "llms.txt"
+        ok = self._publish_file(session, repo, branch, txt_path, txt_b64, "SEO: update llms.txt")
+        if ok:
+            self.log(f"✓ llms.txt published ({len(content)} chars)", "success")
+        else:
+            self.log("✗ llms.txt publish failed", "warning")

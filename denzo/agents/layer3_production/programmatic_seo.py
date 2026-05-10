@@ -98,20 +98,33 @@ BRAND STYLE GUIDE:
                 img_lines.append(f'  - {url} | alt="{alt}" | context={ctx_label}')
             image_block = "\nAVAILABLE REAL IMAGES FROM CLIENT WEBSITE (use these in the content):\n" + "\n".join(img_lines)
 
-        # Industry-aware CTA labels
+        # Industry-aware CTA labels — covers 14 verticals
         industry = ctx.industry_vertical or "general"
-        if industry in ("automotive_dealership", "car_dealership"):
-            cta_map = {"service": "Schedule a Test Drive →", "about": "Contact Our Team →", "location": "Get Directions →"}
-        elif industry in ("auto_body_shop", "collision_repair"):
-            cta_map = {"service": "Get a Free Estimate →", "about": "Contact Us →", "location": "Get Directions →"}
-        elif industry in ("saas_tech", "agency"):
-            cta_map = {"service": "Get a Free Demo →", "about": "Talk to Our Team →", "location": "Contact Us →"}
-        elif industry in ("restaurant",):
-            cta_map = {"service": "Reserve a Table →", "about": "Contact Us →", "location": "Get Directions →"}
-        elif industry in ("law_firm",):
-            cta_map = {"service": "Get a Free Consultation →", "about": "Contact Our Firm →", "location": "Get Directions →"}
-        else:
-            cta_map = {"service": "Get a Free Consultation →", "about": "Contact Us Today →", "location": "Get Directions →"}
+        _cta_by_industry = {
+            "automotive_dealership":  {"service": "Schedule a Test Drive →",       "about": "Contact Our Team →",      "location": "Get Directions →"},
+            "car_dealership":         {"service": "Schedule a Test Drive →",       "about": "Contact Our Team →",      "location": "Get Directions →"},
+            "auto_body_shop":         {"service": "Get a Free Estimate →",         "about": "Contact Us →",            "location": "Get Directions →"},
+            "collision_repair":       {"service": "Get a Free Estimate →",         "about": "Contact Us →",            "location": "Get Directions →"},
+            "saas_tech":              {"service": "Get a Free Demo →",             "about": "Talk to Our Team →",      "location": "Contact Us →"},
+            "agency":                 {"service": "Get a Free Strategy Call →",    "about": "Meet Our Team →",         "location": "Contact Us →"},
+            "restaurant":             {"service": "Reserve a Table →",             "about": "Contact Us →",            "location": "Get Directions →"},
+            "law_firm":               {"service": "Get a Free Consultation →",     "about": "Contact Our Firm →",      "location": "Get Directions →"},
+            "dental_clinic":          {"service": "Book an Appointment →",         "about": "Meet Our Dentists →",     "location": "Get Directions →"},
+            "medical_clinic":         {"service": "Book an Appointment →",         "about": "Meet Our Doctors →",      "location": "Get Directions →"},
+            "insurance_agency":       {"service": "Get a Free Quote →",            "about": "Meet Our Team →",         "location": "Get Directions →"},
+            "real_estate":            {"service": "Schedule a Showing →",          "about": "Meet Our Agents →",       "location": "Get Directions →"},
+            "home_services":          {"service": "Get a Free Quote →",            "about": "Contact Us →",            "location": "Get Directions →"},
+            "veterinary":             {"service": "Book an Appointment →",         "about": "Meet Our Vets →",         "location": "Get Directions →"},
+            "education_academy":      {"service": "Apply Now →",                   "about": "Learn More →",            "location": "Visit Our Campus →"},
+            "online_courses":         {"service": "Enroll Now →",                  "about": "Meet the Instructor →",   "location": "Contact Us →"},
+            "coaching":               {"service": "Book a Discovery Call →",       "about": "Meet Your Coach →",       "location": "Contact Us →"},
+            "ecommerce":              {"service": "Shop Now →",                    "about": "Our Story →",             "location": "Contact Us →"},
+            "gym":                    {"service": "Start Your Free Trial →",       "about": "Meet Our Team →",         "location": "Get Directions →"},
+            "hotel":                  {"service": "Check Availability →",          "about": "About Our Hotel →",       "location": "Get Directions →"},
+            "spa":                    {"service": "Book a Treatment →",            "about": "Meet Our Team →",         "location": "Get Directions →"},
+            "financial_services":     {"service": "Get a Free Consultation →",     "about": "Meet Our Advisors →",     "location": "Get Directions →"},
+        }
+        cta_map = _cta_by_industry.get(industry, {"service": "Get a Free Consultation →", "about": "Contact Us Today →", "location": "Get Directions →"})
         cta_label = cta_map.get(ptype, cta_map.get("service", "Contact Us →"))
 
         # Build Reviews Intelligence block
@@ -210,7 +223,32 @@ WRITING RULES:
                 if candidate.startswith("html"):
                     candidate = candidate[4:].strip()
                 if candidate.startswith("<"):
-                    return candidate, meta_desc
+                    cleaned = candidate
+                    break
+
+        # Strip full HTML document wrappers — Claude occasionally generates these
+        # even when told to output only fragments. If these reach WordPress they break the layout.
+        import re as _re
+        cleaned = _re.sub(r'<!DOCTYPE[^>]*>', '', cleaned, flags=_re.IGNORECASE)
+        cleaned = _re.sub(r'<html[^>]*>', '', cleaned, flags=_re.IGNORECASE)
+        cleaned = _re.sub(r'</html>', '', cleaned, flags=_re.IGNORECASE)
+        cleaned = _re.sub(r'<head>.*?</head>', '', cleaned, flags=_re.IGNORECASE | _re.DOTALL)
+        cleaned = _re.sub(r'<body[^>]*>', '', cleaned, flags=_re.IGNORECASE)
+        cleaned = _re.sub(r'</body>', '', cleaned, flags=_re.IGNORECASE)
+        cleaned = cleaned.strip()
+
+        # Enforce no H1 tags — WordPress/site theme provides the H1 from the page title.
+        # Claude ignores this instruction ~40% of the time, so post-process unconditionally.
+        cleaned = _re.sub(r'<h1(\s|>)', lambda m: '<h2' + m.group(1), cleaned)
+        cleaned = _re.sub(r'</h1>', '</h2>', cleaned)
+
+        # Fallback meta description: extract first <p> text if Claude didn't include META_DESC
+        if not meta_desc:
+            p_match = _re.search(r'<p[^>]*>([^<]{30,})</p>', cleaned)
+            if p_match:
+                raw_text = _re.sub(r'<[^>]+>', '', p_match.group(1))
+                meta_desc = raw_text.strip()[:155]
+
         return cleaned, meta_desc
 
     def run(self):
@@ -244,7 +282,16 @@ WRITING RULES:
             self.set_status("idle", "Waiting for Layer 2 agents")
             return
 
-        MAX_PAGES = 500
+        MAX_PAGES = 200  # Hard cap: E-E-A-T Architect is capped at 150; this is a safety floor
+        # Load LocalBusiness schema once — embedded in every page's schema_markup
+        lb_row = db_execute(
+            "SELECT value FROM settings WHERE tenant_id=? AND key='schema_local_business'",
+            (self.ctx.tenant_id,)
+        )
+        schema_local_business = lb_row[0]["value"] if lb_row else None
+        if schema_local_business:
+            self.log("LocalBusiness schema loaded for page embedding.", "info")
+
         pages = db_execute(
             "SELECT id, title, slug, type, location, target_keyword, notes FROM pages WHERE tenant_id=? AND status='draft' ORDER BY id LIMIT ?",
             (self.ctx.tenant_id, MAX_PAGES)
@@ -344,8 +391,9 @@ WRITING RULES:
                 continue
 
             db_write(
-                "UPDATE pages SET content=?, meta_description=?, status='ready', updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
-                (content, meta_desc, page_dict["id"], self.ctx.tenant_id)
+                "UPDATE pages SET content=?, meta_description=?, quality_score=65, schema_markup=?, "
+                "status='ready', updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
+                (content, meta_desc, schema_local_business, page_dict["id"], self.ctx.tenant_id)
             )
             done += 1
             self.log(f"✓ {title} ({len(content)} chars)", "success")
