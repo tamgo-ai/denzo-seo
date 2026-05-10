@@ -3,8 +3,66 @@
 {% block title %}New Client — Denzo SEO{% endblock %}
 {% block page_title %}New Client{% endblock %}
 
+{% block extra_head %}
+<style>
+  .wizard-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .wizard-card-header {
+    padding: 28px 32px 22px;
+    border-bottom: 1px solid var(--border);
+  }
+  .wizard-card-body { padding: 28px 32px; }
+  .step-row { display:flex;align-items:flex-start;gap:16px;margin-bottom:20px; }
+  .step-row:last-child { margin-bottom:0; }
+  .field-grid-2 { display:grid;grid-template-columns:1fr 1fr;gap:16px; }
+  .field-grid-3 { display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px; }
+  .service-item {
+    display:flex;align-items:center;gap:12px;padding:12px 14px;
+    background:rgba(74,222,128,0.05);border:1px solid rgba(74,222,128,0.15);
+    border-radius:10px;transition:border-color 0.15s;
+  }
+  .service-item:hover { border-color:rgba(74,222,128,0.35); }
+  .dont-item {
+    display:flex;align-items:center;gap:10px;padding:10px 14px;
+    background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.12);
+    border-radius:10px;
+  }
+  .competitor-row {
+    display:flex;align-items:center;gap:10px;padding:10px 12px;
+    border:1px solid var(--border);border-radius:10px;
+    transition:border-color 0.15s;
+  }
+  .competitor-row:hover { border-color:var(--border2); }
+  .publisher-option {
+    padding:16px 18px;border:2px solid var(--border);border-radius:12px;
+    text-align:left;cursor:pointer;transition:all 0.15s;background:transparent;
+    color:var(--text);width:100%;
+  }
+  .publisher-option:hover { border-color:var(--border2);background:rgba(255,255,255,0.03); }
+  .publisher-option.active-wp  { border-color:#3b82f6;background:rgba(59,130,246,0.06); }
+  .publisher-option.active-gh  { border-color:#6366f1;background:rgba(99,102,241,0.06); }
+  .wizard-nav {
+    display:flex;align-items:center;justify-content:space-between;margin-top:24px;
+  }
+  .feature-cards { display:grid;grid-template-columns:repeat(3,1fr);gap:12px; }
+  .feature-card {
+    text-align:center;padding:14px 10px;
+    border:1px solid var(--border);border-radius:10px;
+    background:rgba(255,255,255,0.02);
+  }
+  .toggle-wrap {
+    display:flex;align-items:center;justify-content:space-between;padding:14px 16px;
+    border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.02);
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="max-w-2xl mx-auto pb-16"
+<div style="max-width:640px;margin:0 auto;padding-bottom:60px"
      x-data="{
        step: 1,
        totalSteps: 5,
@@ -38,7 +96,6 @@
          'Building your SEO profile…',
          'Done!'
        ],
-
        stepLabels: ['Website', 'Profile', 'Services', 'Competitors', 'Connect'],
 
        addService(name) {
@@ -60,8 +117,6 @@
        servicesJson() { return JSON.stringify(this.servicesList.map(s => s.name)); },
        dontSellJson() { return JSON.stringify(this.dontSellList); },
        competitorsJson() { return JSON.stringify(this.competitors.filter(c => c.name.trim())); },
-
-       get progressPct() { return ((this.step - 1) / (this.totalSteps - 1)) * 100; },
 
        async doAnalyze() {
          const url = this.fields.website_url.trim();
@@ -90,16 +145,15 @@
              setTimeout(() => { self.analyzing = false; self.step = 2; }, 2000);
              return;
            }
-           // Populate fields
-           if (data.business_name)   self.fields.name         = data.business_name;
+           if (data.business_name)   self.fields.name          = data.business_name;
            if (data.business_type)   self.fields.business_type = data.business_type;
-           if (data.tagline)         self.fields.tagline       = data.tagline;
-           if (data.description)     self.fields.description   = data.description;
-           if (data.phone)           self.fields.phone         = data.phone;
-           if (data.address)         self.fields.address       = data.address;
-           if (data.city)            self.fields.city          = data.city;
-           if (data.state)           self.fields.state         = data.state;
-           if (data.primary_city)    self.fields.primary_city  = data.primary_city;
+           if (data.tagline)         self.fields.tagline        = data.tagline;
+           if (data.description)     self.fields.description    = data.description;
+           if (data.phone)           self.fields.phone          = data.phone;
+           if (data.address)         self.fields.address        = data.address;
+           if (data.city)            self.fields.city           = data.city;
+           if (data.state)           self.fields.state          = data.state;
+           if (data.primary_city)    self.fields.primary_city   = data.primary_city;
            if (data.service_cities?.length)
              self.fields.service_cities = data.service_cities.join(', ');
            if (data.certifications?.length)
@@ -108,15 +162,11 @@
              self.fields.differentiators = data.differentiators.join('\n');
            if (data.insurance_partners?.length)
              self.fields.insurance_partners = data.insurance_partners.join(', ');
-           // Services list
-           if (data.services?.length) {
+           if (data.services?.length)
              self.servicesList = data.services.map((s, i) => ({name: s, priority: i+1}));
-           }
-           // Competitors
            const comps = data.suggested_competitors_tier1 || data.suggested_competitors || [];
-           if (comps.length) {
+           if (comps.length)
              self.competitors = comps.slice(0, 6).map(c => ({name: c.name || '', url: c.url || ''}));
-           }
            if (data.is_multilocation) self.isMultilocation = true;
            self.analysisData = data;
            self.analyzed = true;
@@ -133,71 +183,70 @@
 
   <!-- ── Analyze overlay ── -->
   <div x-show="analyzing" x-cloak
-       class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-8">
-      <div class="text-center mb-6">
-        <div class="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center mx-auto mb-4">
-          <svg class="w-7 h-7 text-orange-500 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+       style="position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);">
+    <div style="background:#0f0f0f;border:1px solid var(--border);border-radius:16px;width:100%;max-width:360px;margin:0 16px;padding:32px;">
+      <div style="text-align:center;margin-bottom:24px;">
+        <div style="width:56px;height:56px;border-radius:14px;background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.2);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+          <svg style="width:26px;height:26px;color:#f97316;animation:spin 1s linear infinite" fill="none" viewBox="0 0 24 24">
+            <circle style="opacity:0.25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>
+            <path style="opacity:0.8" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
           </svg>
         </div>
-        <h3 class="text-base font-bold text-gray-900">Analyzing your website</h3>
-        <p class="text-sm text-gray-400 mt-1 truncate" x-text="fields.website_url"></p>
+        <h3 style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px">Analyzing your website</h3>
+        <p style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" x-text="fields.website_url"></p>
       </div>
-      <div class="w-full bg-gray-100 rounded-full h-1.5 mb-5">
-        <div class="bg-orange-500 h-1.5 rounded-full transition-all duration-700" :style="'width:'+analyzeProgress+'%'"></div>
+      <div style="width:100%;background:var(--surface2);border-radius:9999px;height:3px;margin-bottom:20px;">
+        <div style="background:#f97316;height:3px;border-radius:9999px;transition:width 0.7s ease;" :style="'width:'+analyzeProgress+'%'"></div>
       </div>
-      <div class="space-y-2.5">
+      <div style="display:flex;flex-direction:column;gap:10px;">
         <template x-for="(s, i) in analyzeSteps" :key="i">
-          <div class="flex items-center gap-3">
-            <div class="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
-                 :class="i < currentAnalyzeStep ? 'bg-green-500' : i === currentAnalyzeStep ? 'bg-orange-500 animate-pulse' : 'bg-gray-100'">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.3s;"
+                 :style="i < currentAnalyzeStep ? 'background:#22c55e' : i === currentAnalyzeStep ? 'background:#f97316;animation:pulse-anim 1.5s ease-in-out infinite' : 'background:var(--surface2)'">
               <template x-if="i < currentAnalyzeStep">
-                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg style="width:11px;height:11px;color:#fff" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
                 </svg>
               </template>
             </div>
-            <span class="text-sm"
-                  :class="i < currentAnalyzeStep ? 'text-green-700 font-medium' : i === currentAnalyzeStep ? 'text-orange-600 font-semibold' : 'text-gray-300'"
+            <span style="font-size:13px;transition:color 0.2s;"
+                  :style="i < currentAnalyzeStep ? 'color:#4ade80;font-weight:500' : i === currentAnalyzeStep ? 'color:#f97316;font-weight:600' : 'color:var(--muted2)'"
                   x-text="s"></span>
           </div>
         </template>
       </div>
-      <div x-show="analyzeError" class="mt-4 p-3 bg-red-50 rounded-lg text-xs text-red-600" x-text="analyzeError"></div>
+      <div x-show="analyzeError" style="margin-top:16px;padding:10px 12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;font-size:12px;color:#f87171;" x-text="analyzeError"></div>
     </div>
   </div>
 
-  <!-- ── Progress bar ── -->
-  <div class="mb-8">
-    <div class="flex items-center justify-between mb-3">
-      <h1 class="text-xl font-bold text-gray-900">New Client</h1>
-      <span class="text-sm text-gray-400">Step <span x-text="step"></span> of <span x-text="totalSteps"></span></span>
+  <!-- ── Progress ── -->
+  <div style="margin-bottom:28px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <h1 style="font-size:20px;font-weight:700;color:var(--text);letter-spacing:-0.02em;">New Client</h1>
+      <span style="font-size:13px;color:var(--muted)">Step <span x-text="step"></span> of <span x-text="totalSteps"></span></span>
     </div>
-    <!-- Step dots -->
-    <div class="flex items-center gap-0">
+    <div style="display:flex;align-items:center;">
       <template x-for="(label, idx) in stepLabels" :key="idx">
-        <div class="flex items-center flex-1 last:flex-none">
-          <div class="flex flex-col items-center">
-            <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300"
-                 :class="(idx+1) < step ? 'bg-green-500 text-white' :
-                         (idx+1) === step ? 'bg-orange-500 text-white ring-4 ring-orange-100' :
-                         'bg-gray-100 text-gray-400'">
+        <div style="display:flex;align-items:center;flex:1;min-width:0;" :style="idx === stepLabels.length-1 ? 'flex:none' : ''">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+            <div style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;transition:all 0.3s;flex-shrink:0;"
+                 :style="(idx+1) < step ? 'background:#22c55e;color:#fff' :
+                         (idx+1) === step ? 'background:#f97316;color:#fff;box-shadow:0 0 0 4px rgba(249,115,22,0.2)' :
+                         'background:var(--surface2);color:var(--muted2)'">
               <template x-if="(idx+1) < step">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
                 </svg>
               </template>
               <template x-if="(idx+1) >= step"><span x-text="idx+1"></span></template>
             </div>
-            <span class="text-xs mt-1 font-medium"
-                  :class="(idx+1) === step ? 'text-orange-600' : (idx+1) < step ? 'text-green-600' : 'text-gray-300'"
+            <span style="font-size:10px;font-weight:500;white-space:nowrap;"
+                  :style="(idx+1) === step ? 'color:#f97316' : (idx+1) < step ? 'color:#4ade80' : 'color:var(--muted2)'"
                   x-text="label"></span>
           </div>
           <div x-show="idx < stepLabels.length - 1"
-               class="flex-1 h-0.5 mx-1 mb-4 transition-all duration-300"
-               :class="(idx+1) < step ? 'bg-green-400' : 'bg-gray-100'"></div>
+               style="flex:1;height:1px;margin:0 6px;margin-bottom:22px;transition:background 0.3s;"
+               :style="(idx+1) < step ? 'background:#22c55e' : 'background:var(--border)'"></div>
         </div>
       </template>
     </div>
@@ -205,7 +254,6 @@
 
   <!-- ── FORM ── -->
   <form method="POST" action="/clients/create" id="onboarding-form" novalidate>
-    <!-- Hidden fields populated by Alpine -->
     <input type="hidden" name="website_url"        :value="fields.website_url">
     <input type="hidden" name="business_type"      :value="fields.business_type">
     <input type="hidden" name="is_multilocation"   :value="isMultilocation ? '1' : '0'">
@@ -224,93 +272,80 @@
     <input type="hidden" name="github_format"      :value="publisherConfig.github_format">
     <input type="hidden" name="pages_domain"       :value="publisherConfig.pages_domain">
 
-    <!-- ════════════════════════════════════════
-         STEP 1 — WEBSITE URL
-    ════════════════════════════════════════ -->
+    <!-- ════ STEP 1 — WEBSITE ════ -->
     <div x-show="step === 1" x-cloak>
-      <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
-        <div class="text-center mb-8">
-          <div class="w-14 h-14 rounded-2xl bg-orange-50 flex items-center justify-center mx-auto mb-4">
-            <svg class="w-7 h-7 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div class="wizard-card">
+        <div class="wizard-card-header" style="text-align:center;padding:36px 32px 28px;">
+          <div style="width:52px;height:52px;border-radius:14px;background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.2);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+            <svg style="width:24px;height:24px;color:#f97316" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
             </svg>
           </div>
-          <h2 class="text-xl font-bold text-gray-900">Enter your website</h2>
-          <p class="text-sm text-gray-500 mt-2">Our AI will analyze it and fill in your business profile automatically in under 30 seconds.</p>
+          <h2 style="font-size:20px;font-weight:700;color:var(--text);letter-spacing:-0.02em;margin-bottom:6px;">Enter your website</h2>
+          <p style="font-size:14px;color:var(--muted);max-width:400px;margin:0 auto;line-height:1.5;">Our AI analyzes it and fills your business profile automatically — under 30 seconds.</p>
         </div>
-
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Website URL</label>
+        <div class="wizard-card-body">
+          <div style="margin-bottom:20px;">
+            <label class="form-label">Website URL</label>
             <input type="url" x-model="fields.website_url"
                    placeholder="https://yourbusiness.com"
-                   class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-orange-400 transition-colors"
+                   class="form-input" style="font-size:15px;padding:12px 16px;"
                    @keydown.enter.prevent="doAnalyze()">
-            <p class="text-xs text-gray-400 mt-2">We'll analyze services, competitors, location, and build your SEO profile.</p>
+            <p style="font-size:12px;color:var(--muted2);margin-top:6px;">We'll detect services, competitors, location, and build your SEO profile.</p>
           </div>
 
-          <!-- Features -->
-          <div class="grid grid-cols-3 gap-3 pt-2">
-            <div class="text-center p-3 bg-green-50 rounded-xl">
-              <div class="text-lg mb-1">⚡</div>
-              <p class="text-xs font-medium text-green-700">Auto-fill</p>
-              <p class="text-xs text-green-500">All fields</p>
+          <div class="feature-cards">
+            <div class="feature-card">
+              <div style="font-size:20px;margin-bottom:6px;">⚡</div>
+              <p style="font-size:12px;font-weight:600;color:var(--text);">Auto-fill</p>
+              <p style="font-size:11px;color:var(--muted2);">All fields</p>
             </div>
-            <div class="text-center p-3 bg-blue-50 rounded-xl">
-              <div class="text-lg mb-1">🎯</div>
-              <p class="text-xs font-medium text-blue-700">Detect</p>
-              <p class="text-xs text-blue-500">Services + Cities</p>
+            <div class="feature-card">
+              <div style="font-size:20px;margin-bottom:6px;">🎯</div>
+              <p style="font-size:12px;font-weight:600;color:var(--text);">Detect</p>
+              <p style="font-size:11px;color:var(--muted2);">Services + Cities</p>
             </div>
-            <div class="text-center p-3 bg-purple-50 rounded-xl">
-              <div class="text-lg mb-1">🔍</div>
-              <p class="text-xs font-medium text-purple-700">Find</p>
-              <p class="text-xs text-purple-500">Competitors</p>
+            <div class="feature-card">
+              <div style="font-size:20px;margin-bottom:6px;">🔍</div>
+              <p style="font-size:12px;font-weight:600;color:var(--text);">Find</p>
+              <p style="font-size:11px;color:var(--muted2);">Competitors</p>
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="mt-8 flex items-center justify-between">
-          <p class="text-xs text-gray-400">Or skip to fill everything manually</p>
-          <div class="flex gap-3">
-            <button type="button" @click="step = 2"
-                    class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">
-              Skip analysis →
-            </button>
-            <button type="button" @click="doAnalyze()"
-                    class="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl shadow-sm shadow-orange-200 transition-colors">
-              Analyze Website
-            </button>
-          </div>
+      <div class="wizard-nav">
+        <p style="font-size:12px;color:var(--muted2);">Or skip to fill everything manually</p>
+        <div style="display:flex;gap:10px;">
+          <button type="button" @click="step = 2" class="btn-ghost">Skip →</button>
+          <button type="button" @click="doAnalyze()" class="btn-primary" style="background:#f97316" onmouseover="this.style.background='#ea6c0a'" onmouseout="this.style.background='#f97316'">
+            Analyze Website
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- ════════════════════════════════════════
-         STEP 2 — BUSINESS PROFILE
-    ════════════════════════════════════════ -->
+    <!-- ════ STEP 2 — PROFILE ════ -->
     <div x-show="step === 2" x-cloak>
-      <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div class="px-8 pt-7 pb-5 border-b border-gray-100">
-          <h2 class="text-lg font-bold text-gray-900">Business Profile</h2>
-          <p class="text-sm text-gray-500 mt-1">
-            <template x-if="analyzed"><span class="text-green-600 font-medium">✓ Auto-filled from your website.</span> Review and adjust.</template>
+      <div class="wizard-card">
+        <div class="wizard-card-header">
+          <h2 style="font-size:18px;font-weight:700;color:var(--text);letter-spacing:-0.02em;margin-bottom:4px;">Business Profile</h2>
+          <p style="font-size:13px;color:var(--muted);">
+            <template x-if="analyzed"><span style="color:#4ade80;font-weight:500">✓ Auto-filled from your website.</span> Review and adjust.</template>
             <template x-if="!analyzed">Fill in your business details.</template>
           </p>
         </div>
-        <div class="p-8 space-y-5">
+        <div class="wizard-card-body" style="display:flex;flex-direction:column;gap:18px;">
 
-          <!-- Name + Type -->
-          <div class="grid grid-cols-2 gap-4">
+          <div class="field-grid-2">
             <div>
-              <label class="block text-sm font-semibold text-gray-700 mb-1.5">Business Name <span class="text-red-400">*</span></label>
+              <label class="form-label">Business Name <span style="color:#ef4444">*</span></label>
               <input type="text" name="name" x-model="fields.name" required
-                     placeholder="Your Business Name"
-                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent">
+                     placeholder="Your Business Name" class="form-input">
             </div>
             <div>
-              <label class="block text-sm font-semibold text-gray-700 mb-1.5">Business Type</label>
-              <select x-model="fields.business_type"
-                      class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent bg-white">
+              <label class="form-label">Business Type</label>
+              <select x-model="fields.business_type" class="form-input" style="cursor:pointer;">
                 <option value="auto_body_shop">Auto Body Shop</option>
                 <option value="dental_clinic">Dental Clinic</option>
                 <option value="law_firm">Law Firm</option>
@@ -331,392 +366,356 @@
             </div>
           </div>
 
-          <!-- Tagline -->
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1.5">Tagline / Value Proposition</label>
+            <label class="form-label">Tagline / Value Proposition</label>
             <input type="text" name="tagline" x-model="fields.tagline"
-                   placeholder="We Fight For You. Not The Insurance Company."
-                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent">
+                   placeholder="We Fight For You. Not The Insurance Company." class="form-input">
           </div>
 
-          <!-- Description -->
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1.5">Business Description</label>
+            <label class="form-label">Business Description</label>
             <textarea name="description" x-model="fields.description" rows="3"
                       placeholder="Describe what you do, who you serve, and what makes you unique…"
-                      class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent resize-none"></textarea>
+                      class="form-input" style="resize:none;"></textarea>
           </div>
 
-          <!-- Phone + City -->
-          <div class="grid grid-cols-2 gap-4">
+          <div class="field-grid-2">
             <div>
-              <label class="block text-sm font-semibold text-gray-700 mb-1.5">Phone</label>
+              <label class="form-label">Phone</label>
               <input type="text" name="phone" x-model="fields.phone"
-                     placeholder="(555) 123-4567"
-                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent">
+                     placeholder="(555) 123-4567" class="form-input">
             </div>
             <div>
-              <label class="block text-sm font-semibold text-gray-700 mb-1.5">Primary City</label>
+              <label class="form-label">Primary City</label>
               <input type="text" name="primary_city" x-model="fields.primary_city"
-                     placeholder="Los Angeles"
-                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent">
+                     placeholder="Los Angeles" class="form-input">
             </div>
           </div>
 
-          <!-- Address + State -->
-          <div class="grid grid-cols-3 gap-4">
-            <div class="col-span-2">
-              <label class="block text-sm font-semibold text-gray-700 mb-1.5">Address</label>
+          <div class="field-grid-3">
+            <div style="grid-column:span 2">
+              <label class="form-label">Address</label>
               <input type="text" name="address" x-model="fields.address"
-                     placeholder="123 Main St, City, CA"
-                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent">
+                     placeholder="123 Main St, City, CA" class="form-input">
             </div>
             <div>
-              <label class="block text-sm font-semibold text-gray-700 mb-1.5">State</label>
+              <label class="form-label">State</label>
               <input type="text" name="state" x-model="fields.state"
-                     placeholder="CA"
-                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent">
+                     placeholder="CA" class="form-input">
             </div>
           </div>
 
-          <!-- Service cities -->
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1.5">Service Cities</label>
+            <label class="form-label">Service Cities</label>
             <input type="text" name="service_cities" x-model="fields.service_cities"
-                   placeholder="Los Angeles, Whittier, Gardena, Ontario…"
-                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent">
-            <p class="text-xs text-gray-400 mt-1">Comma-separated cities you serve</p>
+                   placeholder="Los Angeles, Whittier, Gardena, Ontario…" class="form-input">
+            <p style="font-size:11px;color:var(--muted2);margin-top:5px;">Comma-separated cities you serve</p>
           </div>
 
-          <!-- Multi-location toggle -->
-          <div class="flex items-center justify-between p-4 bg-purple-50 rounded-xl">
+          <div class="toggle-wrap">
             <div>
-              <p class="text-sm font-semibold text-gray-800">Multi-location business</p>
-              <p class="text-xs text-gray-500">Franchise, chain, or multiple branches</p>
+              <p style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:2px;">Multi-location business</p>
+              <p style="font-size:12px;color:var(--muted);">Franchise, chain, or multiple branches</p>
             </div>
             <button type="button" @click="isMultilocation = !isMultilocation"
-                    class="relative w-11 h-6 rounded-full transition-colors focus:outline-none"
-                    :class="isMultilocation ? 'bg-purple-600' : 'bg-gray-200'">
-              <span class="absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform"
-                    :class="isMultilocation ? 'translate-x-5' : 'translate-x-0'"></span>
+                    style="position:relative;width:44px;height:24px;border-radius:9999px;border:none;cursor:pointer;transition:background 0.2s;flex-shrink:0;"
+                    :style="isMultilocation ? 'background:#6366f1' : 'background:var(--surface2)'">
+              <span style="position:absolute;top:3px;width:18px;height:18px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.4);transition:left 0.2s;"
+                    :style="isMultilocation ? 'left:23px' : 'left:3px'"></span>
             </button>
           </div>
 
-          <!-- Certifications -->
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1.5">Certifications / Specialties</label>
+            <label class="form-label">Certifications / Specialties</label>
             <input type="text" name="certifications" x-model="fields.certifications"
-                   placeholder="Tesla, BMW, Mercedes-Benz, State Farm…"
-                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent">
+                   placeholder="Tesla, BMW, Mercedes-Benz, State Farm…" class="form-input">
           </div>
 
-          <!-- Differentiators -->
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1.5">Key Differentiators</label>
+            <label class="form-label">Key Differentiators</label>
             <textarea name="differentiators" x-model="fields.differentiators" rows="2"
                       placeholder="Lifetime warranty, OEM parts only, free towing 24/7…"
-                      class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent resize-none"></textarea>
+                      class="form-input" style="resize:none;"></textarea>
           </div>
 
         </div>
       </div>
 
-      <div class="flex justify-between mt-6">
-        <button type="button" @click="step = 1"
-                class="px-5 py-2.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl transition-colors">
-          ← Back
-        </button>
+      <div class="wizard-nav">
+        <button type="button" @click="step = 1" class="btn-ghost">← Back</button>
         <button type="button" @click="fields.name.trim() ? step = 3 : null"
-                :class="fields.name.trim() ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-gray-100 text-gray-300 cursor-not-allowed'"
-                class="px-6 py-2.5 text-sm font-semibold rounded-xl transition-colors">
+                class="btn-primary"
+                :style="fields.name.trim() ? '' : 'opacity:0.4;cursor:not-allowed;'">
           Next: Services →
         </button>
       </div>
     </div>
 
-    <!-- ════════════════════════════════════════
-         STEP 3 — SERVICES PRIORITY
-    ════════════════════════════════════════ -->
+    <!-- ════ STEP 3 — SERVICES ════ -->
     <div x-show="step === 3" x-cloak>
-      <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div class="px-8 pt-7 pb-5 border-b border-gray-100">
-          <h2 class="text-lg font-bold text-gray-900">What do you offer?</h2>
-          <p class="text-sm text-gray-500 mt-1">Order by priority — we'll focus content on your top services first.</p>
+      <div class="wizard-card">
+        <div class="wizard-card-header">
+          <h2 style="font-size:18px;font-weight:700;color:var(--text);letter-spacing:-0.02em;margin-bottom:4px;">What do you offer?</h2>
+          <p style="font-size:13px;color:var(--muted);">Order by priority — we'll focus content on your top services first.</p>
         </div>
-        <div class="p-8 space-y-6">
+        <div class="wizard-card-body" style="display:flex;flex-direction:column;gap:24px;">
 
           <!-- What you sell -->
           <div>
-            <div class="flex items-center justify-between mb-3">
-              <div class="flex items-center gap-2">
-                <span class="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                  <svg class="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="width:20px;height:20px;background:rgba(74,222,128,0.15);border:1px solid rgba(74,222,128,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <svg style="width:11px;height:11px;color:#4ade80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
                   </svg>
                 </span>
-                <span class="text-sm font-bold text-gray-800">What You Sell</span>
+                <span style="font-size:14px;font-weight:700;color:var(--text);">What You Sell</span>
               </div>
-              <span class="text-xs text-gray-400">Drag ↕ to reorder priority</span>
+              <span style="font-size:11px;color:var(--muted2);">↕ Reorder to set priority</span>
             </div>
 
-            <div class="space-y-2" id="services-sortable">
+            <div style="display:flex;flex-direction:column;gap:8px;" id="services-sortable">
               <template x-for="(svc, i) in servicesList" :key="i">
-                <div class="flex items-center gap-3 p-3 bg-green-50 border border-green-100 rounded-xl group hover:border-green-300 transition-colors">
-                  <div class="flex flex-col gap-0.5 cursor-move text-gray-300">
+                <div class="service-item">
+                  <div style="display:flex;flex-direction:column;gap:2px;cursor:pointer;">
                     <button type="button" @click="moveService(i, -1)" :disabled="i===0"
-                            class="hover:text-gray-600 disabled:opacity-20 disabled:cursor-not-allowed leading-none">▲</button>
+                            style="background:none;border:none;color:var(--muted2);line-height:1;cursor:pointer;padding:1px 4px;border-radius:3px;font-size:12px;"
+                            :style="i===0 ? 'opacity:0.2;cursor:not-allowed' : 'hover:color:var(--text)'">▲</button>
                     <button type="button" @click="moveService(i, 1)" :disabled="i===servicesList.length-1"
-                            class="hover:text-gray-600 disabled:opacity-20 disabled:cursor-not-allowed leading-none">▼</button>
+                            style="background:none;border:none;color:var(--muted2);line-height:1;cursor:pointer;padding:1px 4px;border-radius:3px;font-size:12px;"
+                            :style="i===servicesList.length-1 ? 'opacity:0.2;cursor:not-allowed' : ''">▼</button>
                   </div>
-                  <span class="w-5 h-5 rounded-full bg-green-500 text-white text-xs font-bold flex items-center justify-center shrink-0"
+                  <span style="width:22px;height:22px;border-radius:50%;background:rgba(74,222,128,0.2);color:#4ade80;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;"
                         x-text="i+1"></span>
-                  <span class="flex-1 text-sm font-medium text-gray-800" x-text="svc.name"></span>
-                  <span x-show="i===0" class="text-xs bg-green-600 text-white px-2 py-0.5 rounded-full font-medium">Top priority</span>
+                  <span style="flex:1;font-size:14px;font-weight:500;color:var(--text);" x-text="svc.name"></span>
+                  <template x-if="i===0">
+                    <span style="font-size:10px;background:rgba(74,222,128,0.15);color:#4ade80;padding:2px 8px;border-radius:9999px;font-weight:600;white-space:nowrap;">Top priority</span>
+                  </template>
                   <button type="button" @click="removeService(i)"
-                          class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all text-lg leading-none">×</button>
+                          style="background:none;border:none;color:#ef4444;font-size:18px;line-height:1;cursor:pointer;padding:2px 6px;border-radius:4px;opacity:0.6;transition:opacity 0.15s;"
+                          onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">×</button>
                 </div>
               </template>
             </div>
 
-            <!-- Add service -->
-            <div class="mt-3 flex gap-2" x-data="{newService:''}">
+            <div style="margin-top:10px;display:flex;gap:8px;" x-data="{newService:''}">
               <input type="text" x-model="newService" placeholder="Add a service…"
-                     class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                     class="form-input" style="flex:1;"
                      @keydown.enter.prevent="if(newService.trim()){addService(newService.trim());newService=''}">
               <button type="button" @click="if(newService.trim()){addService(newService.trim());newService=''}"
-                      class="px-3 py-2 bg-green-500 text-white text-sm rounded-xl hover:bg-green-600 font-medium">+ Add</button>
+                      style="padding:0 16px;background:rgba(74,222,128,0.15);color:#4ade80;font-size:13px;font-weight:600;border:1px solid rgba(74,222,128,0.2);border-radius:7px;cursor:pointer;white-space:nowrap;transition:background 0.15s;"
+                      onmouseover="this.style.background='rgba(74,222,128,0.25)'" onmouseout="this.style.background='rgba(74,222,128,0.15)'">+ Add</button>
             </div>
 
-            <div x-show="!servicesList.length" class="mt-3 p-4 bg-gray-50 rounded-xl text-center text-sm text-gray-400">
+            <div x-show="!servicesList.length" style="margin-top:10px;padding:16px;border:1px solid var(--border);border-radius:10px;text-align:center;font-size:13px;color:var(--muted2);">
               No services detected. Add them manually above.
             </div>
           </div>
 
           <!-- What you don't sell -->
           <div>
-            <div class="flex items-center gap-2 mb-3">
-              <span class="w-5 h-5 bg-red-100 rounded-full flex items-center justify-center">
-                <svg class="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+              <span style="width:20px;height:20px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg style="width:10px;height:10px;color:#ef4444" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
               </span>
-              <span class="text-sm font-bold text-gray-800">What You <span class="text-red-500">Don't</span> Offer</span>
-              <span class="text-xs text-gray-400 ml-1">(helps AI avoid irrelevant content)</span>
+              <span style="font-size:14px;font-weight:700;color:var(--text);">What You <span style="color:#ef4444">Don't</span> Offer</span>
+              <span style="font-size:11px;color:var(--muted2);">(helps AI avoid irrelevant content)</span>
             </div>
-            <div class="space-y-2">
+            <div style="display:flex;flex-direction:column;gap:8px;">
               <template x-for="(item, i) in dontSellList" :key="i">
-                <div class="flex items-center gap-2 p-2.5 bg-red-50 border border-red-100 rounded-xl">
-                  <span class="w-4 h-4 text-red-400 shrink-0">✕</span>
-                  <span class="flex-1 text-sm text-gray-700" x-text="item"></span>
-                  <button type="button" @click="removeDontSell(i)" class="text-red-300 hover:text-red-500 text-lg leading-none">×</button>
+                <div class="dont-item">
+                  <span style="color:#ef4444;font-size:12px;flex-shrink:0;">✕</span>
+                  <span style="flex:1;font-size:13px;color:var(--muted);" x-text="item"></span>
+                  <button type="button" @click="removeDontSell(i)"
+                          style="background:none;border:none;color:#ef4444;font-size:16px;cursor:pointer;opacity:0.6;transition:opacity 0.15s;"
+                          onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">×</button>
                 </div>
               </template>
             </div>
-            <div class="mt-2 flex gap-2" x-data="{newDontSell:''}">
+            <div style="margin-top:10px;display:flex;gap:8px;" x-data="{newDontSell:''}">
               <input type="text" x-model="newDontSell" placeholder="e.g. Vehicle Sales, Routine Maintenance…"
-                     class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                     class="form-input" style="flex:1;"
                      @keydown.enter.prevent="if(newDontSell.trim()){addDontSell(newDontSell.trim());newDontSell=''}">
               <button type="button" @click="if(newDontSell.trim()){addDontSell(newDontSell.trim());newDontSell=''}"
-                      class="px-3 py-2 bg-red-100 text-red-600 text-sm rounded-xl hover:bg-red-200 font-medium">+ Add</button>
+                      style="padding:0 16px;background:rgba(239,68,68,0.1);color:#f87171;font-size:13px;font-weight:600;border:1px solid rgba(239,68,68,0.2);border-radius:7px;cursor:pointer;white-space:nowrap;transition:background 0.15s;"
+                      onmouseover="this.style.background='rgba(239,68,68,0.2)'" onmouseout="this.style.background='rgba(239,68,68,0.1)'">+ Add</button>
             </div>
           </div>
 
         </div>
       </div>
 
-      <div class="flex justify-between mt-6">
-        <button type="button" @click="step = 2"
-                class="px-5 py-2.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl transition-colors">
-          ← Back
-        </button>
-        <button type="button" @click="step = 4"
-                class="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-colors">
-          Next: Competitors →
-        </button>
+      <div class="wizard-nav">
+        <button type="button" @click="step = 2" class="btn-ghost">← Back</button>
+        <button type="button" @click="step = 4" class="btn-primary">Next: Competitors →</button>
       </div>
     </div>
 
-    <!-- ════════════════════════════════════════
-         STEP 4 — COMPETITORS
-    ════════════════════════════════════════ -->
+    <!-- ════ STEP 4 — COMPETITORS ════ -->
     <div x-show="step === 4" x-cloak>
-      <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div class="px-8 pt-7 pb-5 border-b border-gray-100">
-          <h2 class="text-lg font-bold text-gray-900">Your Competitors</h2>
-          <p class="text-sm text-gray-500 mt-1">
+      <div class="wizard-card">
+        <div class="wizard-card-header">
+          <h2 style="font-size:18px;font-weight:700;color:var(--text);letter-spacing:-0.02em;margin-bottom:4px;">Your Competitors</h2>
+          <p style="font-size:13px;color:var(--muted);">
             <template x-if="competitors.length > 0">
-              <span><span class="text-purple-600 font-medium" x-text="competitors.length"></span> competitors detected. Review and add more.</span>
+              <span><span style="color:#a855f7;font-weight:600;" x-text="competitors.length"></span> competitors detected. Review and add more.</span>
             </template>
             <template x-if="!competitors.length">Add your main competitors — we'll analyze their SEO strategy.</template>
           </p>
         </div>
-        <div class="p-8 space-y-3">
+        <div class="wizard-card-body" style="display:flex;flex-direction:column;gap:10px;">
 
           <template x-for="(comp, i) in competitors" :key="i">
-            <div class="flex items-center gap-3 p-3 border border-gray-100 rounded-xl hover:border-gray-200 transition-colors group">
-              <div class="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center shrink-0 text-sm font-bold text-purple-400"
+            <div class="competitor-row">
+              <div style="width:30px;height:30px;border-radius:8px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;font-weight:700;color:#a855f7;"
                    x-text="i+1"></div>
               <input type="text" x-model="comp.name" placeholder="Competitor Name"
-                     class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-purple-300 min-w-0">
+                     class="form-input" style="flex:1;">
               <input type="text" x-model="comp.url" placeholder="competitor.com"
-                     class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-purple-300 min-w-0">
+                     class="form-input" style="flex:1;">
               <button type="button" @click="removeCompetitor(i)"
-                      class="opacity-0 group-hover:opacity-100 text-red-300 hover:text-red-500 text-xl leading-none transition-all shrink-0">×</button>
+                      style="background:none;border:none;color:#ef4444;font-size:20px;cursor:pointer;opacity:0.5;flex-shrink:0;transition:opacity 0.15s;padding:0 4px;"
+                      onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">×</button>
             </div>
           </template>
 
           <button type="button" @click="addCompetitor()"
-                  class="w-full p-3 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-purple-300 hover:text-purple-500 transition-colors flex items-center justify-center gap-2">
-            <span class="text-lg leading-none">+</span> Add Competitor
+                  style="width:100%;padding:12px;border:2px dashed var(--border);border-radius:10px;font-size:13px;color:var(--muted2);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;background:transparent;transition:all 0.15s;"
+                  onmouseover="this.style.borderColor='rgba(168,85,247,0.4)';this.style.color='#a855f7'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted2)'">
+            <span style="font-size:16px;line-height:1">+</span> Add Competitor
           </button>
 
           <div x-show="!competitors.length"
-               class="p-4 bg-purple-50 rounded-xl text-sm text-purple-600">
-            💡 Tip: Even if we don't know your competitors yet, the agents will find them automatically from Google.
+               style="padding:14px 16px;background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.15);border-radius:10px;font-size:13px;color:rgba(168,85,247,0.8);">
+            💡 Tip: Even without competitors now, agents will find them automatically from Google.
           </div>
 
         </div>
       </div>
 
-      <div class="flex justify-between mt-6">
-        <button type="button" @click="step = 3"
-                class="px-5 py-2.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl transition-colors">
-          ← Back
-        </button>
-        <button type="button" @click="step = 5"
-                class="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-colors">
-          Next: Connect Site →
-        </button>
+      <div class="wizard-nav">
+        <button type="button" @click="step = 3" class="btn-ghost">← Back</button>
+        <button type="button" @click="step = 5" class="btn-primary">Next: Connect Site →</button>
       </div>
     </div>
 
-    <!-- ════════════════════════════════════════
-         STEP 5 — CONNECT SITE
-    ════════════════════════════════════════ -->
+    <!-- ════ STEP 5 — CONNECT SITE ════ -->
     <div x-show="step === 5" x-cloak>
-      <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div class="px-8 pt-7 pb-5 border-b border-gray-100">
-          <h2 class="text-lg font-bold text-gray-900">Connect Your Site</h2>
-          <p class="text-sm text-gray-500 mt-1">Where should the generated pages be published?</p>
+      <div class="wizard-card">
+        <div class="wizard-card-header">
+          <h2 style="font-size:18px;font-weight:700;color:var(--text);letter-spacing:-0.02em;margin-bottom:4px;">Connect Your Site</h2>
+          <p style="font-size:13px;color:var(--muted);">Where should the generated pages be published?</p>
         </div>
-        <div class="p-8 space-y-5">
+        <div class="wizard-card-body" style="display:flex;flex-direction:column;gap:20px;">
 
-          <!-- Publisher toggle -->
-          <div class="grid grid-cols-2 gap-3">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <button type="button" @click="publisherType = 'wordpress'"
-                    :class="publisherType === 'wordpress' ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-300'"
-                    class="p-4 border-2 rounded-xl text-left transition-all">
-              <div class="flex items-center gap-3 mb-2">
-                <span class="text-2xl">🔵</span>
-                <span class="font-bold text-gray-900">WordPress</span>
+                    class="publisher-option"
+                    :class="publisherType === 'wordpress' ? 'active-wp' : ''">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                <span style="font-size:22px;">🔵</span>
+                <span style="font-size:15px;font-weight:700;color:var(--text);">WordPress</span>
               </div>
-              <p class="text-xs text-gray-500">Publish pages directly via REST API</p>
+              <p style="font-size:12px;color:var(--muted);">Publish pages via REST API</p>
             </button>
             <button type="button" @click="publisherType = 'github'"
-                    :class="publisherType === 'github' ? 'border-gray-700 bg-gray-50 ring-2 ring-gray-200' : 'border-gray-200 hover:border-gray-300'"
-                    class="p-4 border-2 rounded-xl text-left transition-all">
-              <div class="flex items-center gap-3 mb-2">
-                <span class="text-2xl">⚫</span>
-                <span class="font-bold text-gray-900">GitHub Pages</span>
+                    class="publisher-option"
+                    :class="publisherType === 'github' ? 'active-gh' : ''">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                <span style="font-size:22px;">⚫</span>
+                <span style="font-size:15px;font-weight:700;color:var(--text);">GitHub Pages</span>
               </div>
-              <p class="text-xs text-gray-500">Commit HTML files to a GitHub repo</p>
+              <p style="font-size:12px;color:var(--muted);">Commit HTML to a GitHub repo</p>
             </button>
           </div>
 
           <!-- WordPress fields -->
-          <div x-show="publisherType === 'wordpress'" class="space-y-4">
-            <div class="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
+          <div x-show="publisherType === 'wordpress'" style="display:flex;flex-direction:column;gap:16px;">
+            <div style="padding:12px 14px;background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.15);border-radius:8px;font-size:12px;color:rgba(147,197,253,0.9);">
               💡 Requires WordPress Application Password. Go to Users → Profile → Application Passwords.
             </div>
             <div>
-              <label class="block text-sm font-semibold text-gray-700 mb-1.5">WordPress URL</label>
+              <label class="form-label">WordPress URL</label>
               <input type="text" x-model="publisherConfig.wp_url"
-                     placeholder="https://yourbusiness.com"
-                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent">
+                     placeholder="https://yourbusiness.com" class="form-input">
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="field-grid-2">
               <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1.5">WP Username</label>
+                <label class="form-label">WP Username</label>
                 <input type="text" x-model="publisherConfig.wp_user"
-                       placeholder="admin"
-                       class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent">
+                       placeholder="admin" class="form-input">
               </div>
               <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Application Password</label>
+                <label class="form-label">Application Password</label>
                 <input type="password" x-model="publisherConfig.wp_app_password"
-                       placeholder="xxxx xxxx xxxx xxxx"
-                       class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent">
+                       placeholder="xxxx xxxx xxxx xxxx" class="form-input">
               </div>
             </div>
             <div>
-              <label class="block text-sm font-semibold text-gray-700 mb-1.5">Live Domain</label>
+              <label class="form-label">Live Domain</label>
               <input type="text" x-model="publisherConfig.pages_domain"
-                     @input="if(!publisherConfig.pages_domain && publisherConfig.wp_url) publisherConfig.pages_domain = publisherConfig.wp_url"
-                     placeholder="https://yourbusiness.com"
-                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent">
-              <p class="text-xs text-gray-400 mt-1">Used for internal links and sitemap</p>
+                     placeholder="https://yourbusiness.com" class="form-input">
+              <p style="font-size:11px;color:var(--muted2);margin-top:5px;">Used for internal links and sitemap</p>
             </div>
           </div>
 
           <!-- GitHub fields -->
-          <div x-show="publisherType === 'github'" class="space-y-4">
-            <div class="p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-600">
+          <div x-show="publisherType === 'github'" style="display:flex;flex-direction:column;gap:16px;">
+            <div style="padding:12px 14px;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.15);border-radius:8px;font-size:12px;color:rgba(165,180,252,0.9);">
               💡 Create a GitHub Personal Access Token with repo write access at github.com/settings/tokens
             </div>
             <div>
-              <label class="block text-sm font-semibold text-gray-700 mb-1.5">GitHub Repo</label>
+              <label class="form-label">GitHub Repo</label>
               <input type="text" x-model="publisherConfig.github_repo"
-                     placeholder="username/repo-name"
-                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent">
+                     placeholder="username/repo-name" class="form-input">
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="field-grid-2">
               <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Branch</label>
+                <label class="form-label">Branch</label>
                 <input type="text" x-model="publisherConfig.github_branch"
-                       placeholder="main"
-                       class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent">
+                       placeholder="main" class="form-input">
               </div>
               <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Format</label>
-                <select x-model="publisherConfig.github_format"
-                        class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white">
+                <label class="form-label">Format</label>
+                <select x-model="publisherConfig.github_format" class="form-input" style="cursor:pointer;">
                   <option value="html">HTML</option>
                   <option value="nextjs">Next.js / MDX</option>
                 </select>
               </div>
             </div>
             <div>
-              <label class="block text-sm font-semibold text-gray-700 mb-1.5">GitHub Token</label>
+              <label class="form-label">GitHub Token</label>
               <input type="password" x-model="publisherConfig.github_token"
-                     placeholder="ghp_xxxxxxxxxxxx"
-                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent">
+                     placeholder="ghp_xxxxxxxxxxxx" class="form-input">
             </div>
             <div>
-              <label class="block text-sm font-semibold text-gray-700 mb-1.5">Live Domain</label>
+              <label class="form-label">Live Domain</label>
               <input type="text" x-model="publisherConfig.pages_domain"
-                     placeholder="https://yourbusiness.com"
-                     class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent">
+                     placeholder="https://yourbusiness.com" class="form-input">
             </div>
           </div>
 
-          <!-- Skip option -->
-          <p class="text-xs text-gray-400 text-center">You can configure publishing later in Settings.</p>
+          <p style="font-size:12px;color:var(--muted2);text-align:center;">You can configure publishing later in Settings.</p>
 
         </div>
       </div>
 
-      <div class="flex justify-between mt-6">
-        <button type="button" @click="step = 4"
-                class="px-5 py-2.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl transition-colors">
-          ← Back
-        </button>
+      <div class="wizard-nav">
+        <button type="button" @click="step = 4" class="btn-ghost">← Back</button>
         <button type="submit"
-                class="px-8 py-2.5 bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white text-sm font-bold rounded-xl shadow-md shadow-orange-200 transition-all">
+                style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#f97316,#a855f7);color:#fff;font-size:14px;font-weight:700;padding:12px 28px;border-radius:10px;border:none;cursor:pointer;transition:opacity 0.15s;box-shadow:0 4px 20px rgba(249,115,22,0.25);"
+                onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
           🚀 Launch Pipeline
         </button>
       </div>
     </div>
 
   </form>
+
 </div>
+<style>
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
 {% endblock %}

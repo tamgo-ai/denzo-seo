@@ -502,6 +502,10 @@ def edit_client(tenant_id):
             "domain":             ctx["domain"] or "",
             "github_repo":        ctx["github_repo"] or "",
             "github_branch":      ctx["github_branch"] or "main",
+            "github_format":      ctx["github_format"] or "html",
+            "github_path_prefix": ctx["github_path_prefix"] or "",
+            "pages_domain":       ctx["pages_domain"] or "",
+            "dont_sell":          _jlist(ctx["dont_sell"]),
             "wp_url":             ctx["wp_url"] or "",
             "wp_user":            ctx["wp_user"] or "",
             "has_github_token":   bool(ctx["github_token"]),
@@ -610,6 +614,25 @@ def update_client(tenant_id):
     github_token    = f.get("github_token", "").strip() or (existing["github_token"] if existing else "")
     wp_app_password = f.get("wp_app_password", "").strip() or (existing["wp_app_password"] if existing else "")
 
+    # Preserve existing dont_sell and github_path_prefix if blank submitted
+    existing_ctx = db.execute(
+        "SELECT dont_sell, github_path_prefix, pages_domain, github_format FROM client_context WHERE tenant_id=?",
+        (tenant_id,)
+    ).fetchone()
+    dont_sell_raw = f.get("dont_sell_json", "").strip()
+    if dont_sell_raw:
+        try:
+            dont_sell_list = json.loads(dont_sell_raw)
+            dont_sell = json.dumps([str(s).strip() for s in dont_sell_list if str(s).strip()])
+        except Exception:
+            dont_sell = existing_ctx["dont_sell"] if existing_ctx else "[]"
+    else:
+        dont_sell = existing_ctx["dont_sell"] if existing_ctx else "[]"
+
+    github_format      = f.get("github_format", "").strip() or (existing_ctx["github_format"] if existing_ctx else "html")
+    github_path_prefix = f.get("github_path_prefix", "").strip() or (existing_ctx["github_path_prefix"] if existing_ctx else "")
+    pages_domain       = f.get("pages_domain", "").strip() or (existing_ctx["pages_domain"] if existing_ctx else "")
+
     db.execute("""
         UPDATE client_context SET
             tagline=?, service_cities=?, primary_city=?,
@@ -617,7 +640,8 @@ def update_client(tenant_id):
             competitors=?, insurance_partners=?, domain=?,
             github_repo=?, github_branch=?, github_token=?,
             wp_url=?, wp_user=?, wp_app_password=?,
-            industry_vertical=?
+            industry_vertical=?, dont_sell=?,
+            github_format=?, github_path_prefix=?, pages_domain=?
         WHERE tenant_id=?
     """, (
         f.get("tagline", "").strip(),
@@ -633,6 +657,7 @@ def update_client(tenant_id):
         f.get("wp_user", "").strip(),
         wp_app_password,
         f.get("business_type", "other"),
+        dont_sell, github_format, github_path_prefix, pages_domain,
         tenant_id
     ))
 
@@ -671,7 +696,7 @@ def delete_client(tenant_id):
     # Delete all related data — every table that holds tenant_id
     for table in ["activity", "agents", "keywords", "pages", "competitors",
                   "geo_queries", "site_images", "pipeline_runs", "settings", "client_context",
-                  "locations"]:
+                  "locations", "cannibalization_risks", "geo_query_bank"]:
         if table not in _SAFE_TABLE_NAMES:
             continue
         db.execute(f"DELETE FROM {table} WHERE tenant_id=?", (tenant_id,))

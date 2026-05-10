@@ -278,6 +278,9 @@ def init_db():
         FOREIGN KEY (tenant_id) REFERENCES clients(tenant_id)
     );
     CREATE INDEX IF NOT EXISTS idx_locations_tenant ON locations(tenant_id);
+    CREATE INDEX IF NOT EXISTS idx_pipeline_runs_tenant ON pipeline_runs(tenant_id);
+    CREATE INDEX IF NOT EXISTS idx_pipeline_runs_status ON pipeline_runs(tenant_id, status);
+    CREATE INDEX IF NOT EXISTS idx_settings_tenant ON settings(tenant_id);
     """)
 
     # Seed admin from env vars on first install — never hardcode credentials
@@ -308,6 +311,9 @@ def init_db():
         "ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'free'",
         "ALTER TABLE users ADD COLUMN trial_ends_at TIMESTAMP",
         "ALTER TABLE clients ADD COLUMN owner_user_id INTEGER",
+        "CREATE INDEX IF NOT EXISTS idx_pipeline_runs_tenant ON pipeline_runs(tenant_id)",
+        "CREATE INDEX IF NOT EXISTS idx_pipeline_runs_status ON pipeline_runs(tenant_id, status)",
+        "CREATE INDEX IF NOT EXISTS idx_settings_tenant ON settings(tenant_id)",
     ]
     for sql in _migrations:
         try:
@@ -315,6 +321,23 @@ def init_db():
             conn.commit()
         except Exception:
             pass  # column already exists — safe to ignore
+
+    # ── Agent seeding migration — add any new agents to ALL existing clients ─────
+    # Safe to run repeatedly — INSERT OR IGNORE skips agents already seeded.
+    try:
+        from denzo.agents.registry import DEFAULT_AGENTS, AGENT_REGISTRY
+        tenant_rows = conn.execute("SELECT tenant_id FROM clients").fetchall()
+        for row in tenant_rows:
+            tid = row[0]
+            for agent_name in DEFAULT_AGENTS:
+                _, _, layer, color = AGENT_REGISTRY[agent_name]
+                conn.execute(
+                    "INSERT OR IGNORE INTO agents (tenant_id, name, layer, color, status) VALUES (?,?,?,?,'idle')",
+                    (tid, agent_name, layer, color)
+                )
+        conn.commit()
+    except Exception:
+        pass  # fresh DB with no clients yet
 
     conn.close()
     print("✓ DENZO-SEO database initialized")

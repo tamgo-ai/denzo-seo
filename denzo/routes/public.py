@@ -28,6 +28,7 @@ from werkzeug.security import generate_password_hash
 
 from denzo.db import get_db, slugify
 from denzo.auth import login_required
+from denzo.agents.registry import AGENT_REGISTRY, DEFAULT_AGENTS
 
 logger = logging.getLogger(__name__)
 
@@ -668,8 +669,8 @@ def wizard_complete():
             INSERT INTO client_context
               (tenant_id, domain, industry_vertical, service_cities, primary_city,
                certifications, services, differentiators, competitors,
-               insurance_partners, dont_sell)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+               insurance_partners, dont_sell, description, tagline)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             tenant_id,
             urlparse(_normalize_url(website)).netloc if website else "",
@@ -682,22 +683,12 @@ def wizard_complete():
             json.dumps(s3.get("competitors", analysis["competitors"])),
             "[]",
             dont_sell,
+            s1.get("description", ""),
+            s1.get("tagline", ""),
         ))
 
-        for name, layer, color in [
-            ("Keyword Strategist",       1, "blue"),
-            ("Competitor Intel",         1, "purple"),
-            ("Technical Auditor",        1, "yellow"),
-            ("E-E-A-T Architect",        2, "green"),
-            ("Schema Engineer",          2, "cyan"),
-            ("Programmatic SEO",         2, "orange"),
-            ("Content Optimizer",        3, "pink"),
-            ("Internal Linker",          3, "teal"),
-            ("Publisher",                3, "indigo"),
-            ("Rank Tracker",             3, "red"),
-            ("Reviews Intelligence",     2, "violet"),
-            ("Visual Content Optimizer", 2, "amber"),
-        ]:
+        for name in DEFAULT_AGENTS:
+            _, _, layer, color = AGENT_REGISTRY[name]
             db.execute(
                 "INSERT OR IGNORE INTO agents (tenant_id,name,layer,color,status) VALUES (?,?,?,?,'idle')",
                 (tenant_id, name, layer, color)

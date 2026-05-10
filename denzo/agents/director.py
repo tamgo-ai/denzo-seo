@@ -36,6 +36,7 @@ class PipelineDirector(TenantAwareBaseAgent):
     def __init__(self, ctx: ClientContext):
         super().__init__("Pipeline Director", ctx, layer=0, color="indigo")
         self._stop_flag = False
+        self._consecutive_parse_failures = 0
 
     # ── State Assessment ──────────────────────────────────────────────────────
 
@@ -47,7 +48,7 @@ class PipelineDirector(TenantAwareBaseAgent):
         counts = db_execute(
             """SELECT
                 (SELECT COUNT(*) FROM keywords WHERE tenant_id=?)                                   AS kw_total,
-                (SELECT COUNT(*) FROM keywords WHERE tenant_id=? AND priority IN ('high','alta'))   AS kw_high,
+                (SELECT COUNT(*) FROM keywords WHERE tenant_id=? AND priority = 'high')             AS kw_high,
                 (SELECT COUNT(*) FROM pages    WHERE tenant_id=?)                                   AS pg_total,
                 (SELECT COUNT(*) FROM pages    WHERE tenant_id=? AND status='published')            AS pg_pub,
                 (SELECT COUNT(*) FROM pages    WHERE tenant_id=? AND status='ready')                AS pg_ready,
@@ -117,53 +118,88 @@ class PipelineDirector(TenantAwareBaseAgent):
     def _decide(self, state: dict) -> dict:
         """Ask Claude what to do next. Returns structured decision."""
 
-        system = """You are the Pipeline Director AI for DENZO SEO — an autonomous SEO marketing director with 15 years of experience in local SEO, content strategy, and AI-powered marketing.
+        system = """You are the Pipeline Director AI for DENZO SEO — the world's most advanced multi-vertical SEO + GEO platform. You operate as an autonomous Senior SEO Director with 15 years of experience across local SEO, GEO (Generative Engine Optimization), content strategy, and AI-powered marketing for ANY business vertical.
 
 Your personality:
-- Results-obsessed: you care about keywords tracked, pages published, and citations earned — not just "agents running"
-- Zero bullshit: if an agent produces no data, you call it out and retry or escalate
-- Strategic: you understand the dependency chain and won't waste resources running Layer 3 if Layer 1 has no data
-- Proactive: you spot problems before they become failures
-- Decisive: you make clear calls with brief reasoning
+- Results-obsessed: keywords ranked, pages published, GEO citations earned — not just "agents running"
+- Zero bullshit: if an agent produces no data, retry or escalate immediately
+- Strategic: understand the dependency chain; never waste tokens running Layer 3 without Layer 1 data
+- Proactive: spot problems before they become failures
+- Decisive: clear calls with brief reasoning, always
 
-You control a multi-agent SEO pipeline with these layers:
-- Layer 1 (Research): Keyword Strategist, Competitor Intel, Technical Auditor, Site Style Analyzer, Data Intelligence
-- Layer 2 (Strategy): E-E-A-T Architect, Schema Engineer
-- Layer 3 (Generation): Programmatic SEO
-- Layer 4 (Optimization): Content Optimizer, Visual Content Optimizer, GEO Optimizer, Internal Linker
-- Layer 5 (Publishing): GitHub Publisher, WordPress Publisher
-- Layer 6 (Analytics): GEO Query Generator, GEO Monitor, Rank Tracker, SERP Intelligence, Reviews Intelligence, ROI Attribution
+You orchestrate a world-class 26-agent SEO pipeline:
+
+LAYER 1 — Intelligence (run ALL simultaneously — they're independent):
+  Keyword Strategist      → discovers and scores keywords for this vertical/location
+  Keyword Clusterer       → groups keywords into semantic clusters (needs ≥10 keywords first)
+  Competitor Intel        → maps competitors, tier analysis, positioning gaps
+  Technical Auditor       → site audit, CWV, crawlability, schema validation
+  Site Style Analyzer     → brand colors, fonts, visual identity extraction
+  Data Intelligence       → citation-bait data, statistics, authority content
+  GBP Optimizer           → Google Business Profile analysis + optimization plan
+
+LAYER 2 — Strategy (after Layer 1 has ≥20 keywords):
+  E-E-A-T Architect       → authority pillars, content priorities, trust signals
+  Schema Engineer         → LocalBusiness + FAQ + Review + HowTo + Service + SpeakableSpec
+  Vertical Matrix Gen.    → expands page matrix for specific vertical (damage types, insurance KWs, procedures, etc.)
+
+LAYER 3 — Generation (after ALL Layer 2 agents done + ≥20 keywords):
+  Programmatic SEO        → AI-writes full page content for all draft stubs
+
+LAYER 4 — Optimization (after Programmatic SEO done + pages.ready ≥ 10):
+  Content Optimizer       → quality scoring + rewrite to ≥70 score
+  Visual Content Optimizer→ hero images, visual elements, brand alignment
+  GEO Optimizer           → optimize for AI Answer Engines (Perplexity, ChatGPT, Gemini AI Overviews)
+  Internal Linker         → hub-and-spoke link architecture
+  Content Freshness       → refresh published pages older than 90 days (Layer 4 but runs after publishing)
+
+LAYER 5 — Publishing (pages.ready ≥ 1, quality gate passed):
+  GitHub Publisher        → HTML pages + sitemap.xml + robots.txt + llms.txt
+  WordPress Publisher     → WP posts + sitemap ping + llms.txt page
+
+LAYER 6 — Analytics (pages.published ≥ 1):
+  GEO Query Generator     → generates AI search query bank for monitoring
+  GEO Monitor             → tracks citations in ChatGPT, Perplexity, Gemini, Claude
+  Rank Tracker            → estimates keyword positions (Apify real data or AI estimates)
+  SERP Intelligence       → featured snippet opportunities, PAA, local pack analysis
+  Reviews Intelligence    → competitor review analysis, pain points, content opportunities
+  ROI Attribution         → citation rate, ranking improvements, traffic attribution
 
 DEPENDENCY RULES (enforce strictly):
-- Layer 2 requires: ≥20 keywords in DB
-- Layer 3 requires: BOTH E-E-A-T Architect AND Schema Engineer status='done' + ≥20 keywords
-- Layer 4 requires: Programmatic SEO status='done' + pages.ready >= 10 (NOT pages.total — drafts don't count)
-- Layer 5 requires: pages.ready >= 1 (at least some Layer 4 work done, or skip Layer 4 if all pages are ready)
-- Layer 6 requires: pages.published >= 1
+- Keyword Clusterer: requires ≥10 keywords (run after Keyword Strategist produces results)
+- Layer 2: requires ≥20 keywords in DB
+- Vertical Matrix Generator: requires E-E-A-T Architect status='done' (needs the page strategy first)
+- Layer 3 (Programmatic SEO): requires ALL three Layer 2 agents status='done' AND keywords ≥ 20
+- Layer 4: requires Programmatic SEO status='done' + pages.ready ≥ 10
+- Content Freshness: requires pages.published ≥ 1 (refreshes existing published content)
+- Layer 5: requires pages.ready ≥ 1 + quality gate passed
+- Layer 6: requires pages.published ≥ 1
 
-QUALITY THRESHOLDS (minimum acceptable):
-- Keyword Strategist: must produce ≥30 keywords total. If fewer, consider retry.
-- Competitor Intel: must produce ≥3 competitors. If fewer, log warning but continue.
-- Programmatic SEO: must produce ≥10 ready pages. If fewer, retry once.
-- Content quality: avg quality_score should be ≥70. If state.quality.avg_score < 70 and Content Optimizer is idle/done, re-run Content Optimizer.
-- Pages unscored: if state.quality.unscored > 0 and Content Optimizer is idle, start Content Optimizer.
+QUALITY GATE (non-negotiable):
+- Keyword Strategist: must produce ≥30 keywords. Retry if fewer.
+- Competitor Intel: must produce ≥3 competitors. Log warning if fewer, but continue.
+- Programmatic SEO: must produce ≥10 ready pages. Retry once if fewer.
+- Content quality: avg quality_score ≥ 70 before publishing.
+  → If unscored > 0 and Content Optimizer idle: start Content Optimizer
+  → If avg_score < 70 and Content Optimizer run_count < 5: start Content Optimizer
+  → If avg_score ≥ 70 OR Content Optimizer run_count ≥ 5: proceed to publish
 
-DECISION RULES:
-- Never start an agent that is currently 'working'
-- Layer 1: if keywords < 20 and no Layer 1 agents are 'working', start ALL idle Layer 1 agents simultaneously
-- Layer 2: if E-E-A-T Architect and Schema Engineer are both 'idle' or 'done'!=done, and keywords >= 20, start them
-- Layer 3 (Programmatic SEO): start when BOTH Layer 2 agents are 'done' AND keywords >= 20
-- Layer 4: start Content Optimizer, GEO Optimizer, Internal Linker, Visual Content Optimizer when Programmatic SEO='done' AND pages.ready >= 10
-- Layer 5: start the appropriate publisher (GitHub Publisher if github_repo configured, WordPress Publisher if wp_url configured) when pages.ready >= 1
-- QUALITY GATE: Before declaring pipeline_complete, check state.quality:
-  - If unscored > 0: start Content Optimizer (don't publish yet)
-  - If avg_score < 70 and Content Optimizer run_count < 5: start Content Optimizer
-  - If avg_score >= 70 OR Content Optimizer run_count >= 5: proceed to publish
-- Layer 6: start analytics agents when pages.published >= 1
-- An agent in 'error' state that has run_count < 3 can be retried — use 'retry_agent' action
-- An agent in 'error' state with run_count >= 3 — skip it, log it, move forward (don't block pipeline)
-- pipeline_complete: declare ONLY when GitHub Publisher status='done' AND pages.published >= 10 AND (quality.avg_score >= 70 OR Content Optimizer run_count >= 5)
-- After pipeline_complete, the Director should stop — analytics agents are self-sufficient
+EXECUTION RULES:
+- Never start an agent currently 'working'
+- Layer 1: start ALL idle Layer 1 agents simultaneously when keywords < 20
+- After Keyword Strategist done with ≥10 KWs: also start Keyword Clusterer if idle
+- Layer 2: start E-E-A-T Architect + Schema Engineer together when keywords ≥ 20; start Vertical Matrix Generator once E-E-A-T is done
+- Layer 3: start when ALL Layer 2 done (E-E-A-T + Schema + Vertical Matrix)
+- Layer 4: start Content Optimizer, GEO Optimizer, Visual Content Optimizer, Internal Linker simultaneously when Programmatic SEO done + pages.ready ≥ 10
+- Layer 5: start GitHub Publisher (if github_repo set) OR WordPress Publisher (if wp_url set) after quality gate
+- Layer 6: start all analytics agents after first pages published
+- Content Freshness: start after pages.published ≥ 5 (only if not already running)
+- GBP Optimizer: start alongside other Layer 1 agents — it's independent
+- Error handling: retry if run_count < 3; skip and move forward if run_count ≥ 3
+- pipeline_complete: declare ONLY when publisher done + pages.published ≥ 10 + quality.avg_score ≥ 70 (or Content Optimizer run_count ≥ 5)
+- After pipeline_complete: Director stops. Analytics agents are self-sufficient and run independently.
+
+GEO AWARENESS: This platform serves ANY vertical — auto body shops, dental, law firms, HVAC, restaurants, real estate, etc. Keyword Strategist and Vertical Matrix Generator adapt automatically. Your decisions should be vertical-agnostic.
 
 Your output must be valid JSON with no markdown:
 {
@@ -197,14 +233,32 @@ What is your decision? Return JSON only, no markdown."""
             }
 
         try:
-            return json.loads(strip_json_fences(raw))
+            result = json.loads(strip_json_fences(raw))
+            self._consecutive_parse_failures = 0
+            return result
         except Exception as exc:
-            self.log(f"[Director] Could not parse AI decision: {exc}", "warning")
+            self._consecutive_parse_failures += 1
+            self.log(
+                f"[Director] Could not parse AI decision "
+                f"(consecutive failure #{self._consecutive_parse_failures}): {exc}",
+                "warning",
+            )
+            if self._consecutive_parse_failures >= 3:
+                return {
+                    "action": "pipeline_blocked",
+                    "targets": [],
+                    "reasoning": (
+                        f"AI decision engine returned unparseable JSON "
+                        f"{self._consecutive_parse_failures} times in a row. "
+                        "Pipeline cannot continue autonomously."
+                    ),
+                    "next_check_seconds": 60,
+                }
             return {
                 "action": "wait",
                 "targets": [],
-                "reasoning": "Could not parse AI decision — waiting.",
-                "next_check_seconds": 60,
+                "reasoning": "Could not parse AI decision — retrying next cycle.",
+                "next_check_seconds": 30,
             }
 
     # ── Execution Engine ──────────────────────────────────────────────────────
@@ -320,6 +374,32 @@ What is your decision? Return JSON only, no markdown."""
             (self.ctx.tenant_id, agent_name),
         )
         self.log(f"[Director] Stopped {agent_name}", "warning")
+
+    # ── Deadlock Detection ────────────────────────────────────────────────────
+
+    def _check_deadlock(self, agents: list) -> str | None:
+        """
+        Returns a blocked reason string if all agents in the lowest active layer
+        are stuck in 'error' with run_count >= 3. Returns None if pipeline is healthy.
+        """
+        # Group non-done/idle agents by layer
+        active = [a for a in agents if a["status"] not in ("done", "idle")]
+        if not active:
+            return None
+
+        # Find lowest layer with active (working/error) agents
+        min_layer = min(a["layer"] for a in active if a["layer"] is not None)
+        layer_agents = [a for a in active if a["layer"] == min_layer]
+
+        # Deadlock: every agent in this layer is in error with run_count >= 3
+        errored = [a for a in layer_agents if a["status"] == "error" and (a.get("run_count") or 0) >= 3]
+        if errored and len(errored) == len(layer_agents):
+            names = ", ".join(a["name"] for a in errored)
+            return (
+                f"Layer {min_layer} deadlock: all agents failed ≥3 times — {names}. "
+                "Manual intervention required."
+            )
+        return None
 
     # ── Watchdog ──────────────────────────────────────────────────────────────
 
@@ -439,6 +519,14 @@ What is your decision? Return JSON only, no markdown."""
                         self.log(f"[Director] Quality gate found {requeued} pages needing improvement — pipeline continuing", "warning")
 
                 state = self._assess_state()
+
+                # Deadlock guard: if a whole layer is permanently errored, stop now
+                deadlock_reason = self._check_deadlock(state.get("agents", []))
+                if deadlock_reason:
+                    self.log(f"[Director] {deadlock_reason}", "error")
+                    self.set_status("error", deadlock_reason[:200])
+                    break
+
                 decision = self._decide(state)
                 self._execute_decision(decision)
 

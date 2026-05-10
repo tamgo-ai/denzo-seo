@@ -42,19 +42,36 @@ def run_tenant(tenant_id, agents_to_run):
 
 # ── Import all agents ──────────────────────────────────────────────────────────
 
-from denzo.agents.layer3_production.content_optimizer import ContentOptimizer
-from denzo.agents.layer3_production.geo_optimizer import GEOOptimizer
-from denzo.agents.layer3_production.internal_linker import InternalLinker
-from denzo.agents.layer4_publishing.wordpress_publisher import WordPressPublisher
-from denzo.agents.layer4_publishing.github_publisher import GitHubPublisher
-from denzo.agents.layer5_monitoring.rank_tracker import RankTracker
-from denzo.agents.layer5_monitoring.serp_intelligence import SERPIntelligence
-from denzo.agents.layer5_monitoring.roi_attribution import ROIAttribution
-from denzo.agents.layer5_monitoring.geo_monitor import GEOMonitor
+# Layer 1 — Intelligence
 from denzo.agents.layer1_research.keyword_strategist import KeywordStrategist
+from denzo.agents.layer1_research.keyword_clusterer import KeywordClusterer
+from denzo.agents.layer1_research.competitor_intel import CompetitorIntel
+from denzo.agents.layer1_research.technical_auditor import TechnicalAuditor
+from denzo.agents.layer1_research.site_style_analyzer import SiteStyleAnalyzer
+from denzo.agents.layer1_research.data_intelligence import DataIntelligence
+from denzo.agents.layer1_research.gbp_optimizer import GBPOptimizer
+# Layer 2 — Strategy
 from denzo.agents.layer2_strategy.eeat_architect import EEATArchitect
 from denzo.agents.layer2_strategy.schema_engineer import SchemaEngineer
+from denzo.agents.layer2_strategy.vertical_matrix_generator import VerticalMatrixGenerator
+# Layer 3 — Generation
 from denzo.agents.layer3_production.programmatic_seo import ProgrammaticSEO
+# Layer 4 — Optimization
+from denzo.agents.layer3_production.content_optimizer import ContentOptimizer
+from denzo.agents.layer3_production.visual_content_optimizer import VisualContentOptimizer
+from denzo.agents.layer3_production.geo_optimizer import GEOOptimizer
+from denzo.agents.layer3_production.internal_linker import InternalLinker
+from denzo.agents.layer3_production.content_freshness import ContentFreshness
+# Layer 5 — Publishing
+from denzo.agents.layer4_publishing.wordpress_publisher import WordPressPublisher
+from denzo.agents.layer4_publishing.github_publisher import GitHubPublisher
+# Layer 6 — Analytics
+from denzo.agents.layer5_monitoring.rank_tracker import RankTracker
+from denzo.agents.layer5_monitoring.geo_query_generator import GEOQueryGenerator
+from denzo.agents.layer5_monitoring.geo_monitor import GEOMonitor
+from denzo.agents.layer5_monitoring.serp_intelligence import SERPIntelligence
+from denzo.agents.layer5_monitoring.reviews_intelligence import ReviewsIntelligence
+from denzo.agents.layer5_monitoring.roi_attribution import ROIAttribution
 
 
 if __name__ == "__main__":
@@ -79,6 +96,7 @@ if __name__ == "__main__":
         (InternalLinker,    "Internal Linker"),
         (GitHubPublisher,   "GitHub Publisher"),
         (RankTracker,       "Rank Tracker"),
+        (GEOQueryGenerator, "GEO Query Generator"),
         (GEOMonitor,        "GEO Monitor"),
     ])
 

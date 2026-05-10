@@ -220,11 +220,9 @@ class TenantAwareBaseAgent:
             "UPDATE agents SET last_message=?, updated_at=? WHERE tenant_id=? AND name=?",
             (message, now, self.tenant_id, self.name)
         )
-        # Deterministic cleanup — trim when log exceeds 2000 entries for this tenant
-        count_rows = db_execute(
-            "SELECT COUNT(*) AS n FROM activity WHERE tenant_id=?", (self.tenant_id,)
-        )
-        if count_rows and count_rows[0]["n"] > 2000:
+        # Trim activity log every 50 calls — not every call (too expensive at scale)
+        self._log_call_count = getattr(self, "_log_call_count", 0) + 1
+        if self._log_call_count % 50 == 0:
             db_write(
                 """DELETE FROM activity WHERE tenant_id=? AND id NOT IN (
                        SELECT id FROM activity WHERE tenant_id=?
@@ -297,6 +295,8 @@ class TenantAwareBaseAgent:
 
     def call_claude(self, prompt: str, max_tokens: int = 1500,
                     system: str = None, model: str = "claude-haiku-4-5-20251001") -> str:
+        if system is None:
+            system = SEO_EXPERTISE
         global _last_api_call
         import anthropic
 
