@@ -144,15 +144,29 @@
     </div>
 
     <!-- Pipeline Control Room CTA banner -->
-    <a href="/clients/{{ tenant_id }}/agents" style="display:flex;align-items:center;justify-content:space-between;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:12px;padding:16px 20px;text-decoration:none;margin-bottom:24px;transition:border-color 0.2s;" onmouseover="this.style.borderColor='rgba(99,102,241,0.35)'" onmouseout="this.style.borderColor='rgba(99,102,241,0.15)'">
-      <div>
-        <p style="font-size:13px;font-weight:600;color:#818cf8;margin:0 0 2px;">Pipeline Control Room</p>
-        <p style="font-size:12px;color:rgba(255,255,255,0.35);margin:0;">Start agents, monitor live activity, control the Director</p>
-      </div>
-      <svg style="width:16px;height:16px;color:#818cf8;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-      </svg>
-    </a>
+    <div style="display:flex;gap:12px;margin-bottom:24px;">
+      <a href="/clients/{{ tenant_id }}/agents" style="flex:1;display:flex;align-items:center;justify-content:space-between;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:12px;padding:16px 20px;text-decoration:none;transition:border-color 0.2s;" onmouseover="this.style.borderColor='rgba(99,102,241,0.35)'" onmouseout="this.style.borderColor='rgba(99,102,241,0.15)'">
+        <div>
+          <p style="font-size:13px;font-weight:600;color:#818cf8;margin:0 0 2px;">Pipeline Control Room</p>
+          <p style="font-size:12px;color:rgba(255,255,255,0.35);margin:0;">Start agents, monitor live activity, control the Director</p>
+        </div>
+        <svg style="width:16px;height:16px;color:#818cf8;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+      </a>
+      <a href="/clients/{{ tenant_id }}/executive-dashboard"
+         style="display:flex;align-items:center;gap:10px;background:rgba(99,102,241,0.10);border:1px solid rgba(99,102,241,0.28);border-radius:12px;padding:16px 22px;text-decoration:none;white-space:nowrap;transition:all 0.2s;flex-shrink:0;"
+         onmouseover="this.style.background='rgba(99,102,241,0.18)';this.style.borderColor='rgba(99,102,241,0.5)'"
+         onmouseout="this.style.background='rgba(99,102,241,0.10)';this.style.borderColor='rgba(99,102,241,0.28)'">
+        <svg style="width:18px;height:18px;color:#a5b4fc;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+        <div>
+          <p style="font-size:13px;font-weight:700;color:#a5b4fc;margin:0 0 1px;">Executive Dashboard</p>
+          <p style="font-size:11px;color:rgba(165,180,252,0.5);margin:0;">KPIs &amp; C-suite view</p>
+        </div>
+      </a>
+    </div>
 
     <!-- 6-tile KPI grid -->
     <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;">

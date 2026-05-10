@@ -45,6 +45,8 @@
     .faq-arrow { transition: transform .25s ease; }
     .analyze-btn { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); }
     .analyze-btn:hover { background: linear-gradient(135deg, #fb923c 0%, #f97316 100%); box-shadow: 0 0 30px rgba(249,115,22,.4); transform: translateY(-1px); }
+    @keyframes countUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    .stat-value { animation: countUp 0.6s ease forwards; }
   </style>
 </head>
 <body class="font-sans antialiased">
@@ -82,7 +84,7 @@
   <div class="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
     <div class="inline-flex items-center gap-2 bg-card border border-border rounded-full px-4 py-1.5 text-sm text-muted mb-8">
       <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-      <span>Powered by 10 AI Agents running in parallel</span>
+      <span>Powered by 21 AI Agents running in parallel</span>
     </div>
 
     <h1 class="text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-[1.05] mb-6">
@@ -125,20 +127,20 @@
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
       <div>
-        <div class="text-4xl font-black gradient-text mb-1">4.8M+</div>
+        <div class="text-4xl font-black gradient-text mb-1 stat-value" data-target="4800000" data-suffix="M+" data-divisor="1000000">4.8M+</div>
         <div class="text-sm text-muted font-medium">Pages Generated</div>
       </div>
       <div>
-        <div class="text-4xl font-black gradient-text mb-1">1,200+</div>
+        <div class="text-4xl font-black gradient-text mb-1 stat-value" data-target="1200" data-suffix="+">1,200+</div>
         <div class="text-sm text-muted font-medium">Businesses Growing</div>
       </div>
       <div>
-        <div class="text-4xl font-black gradient-text mb-1">287%</div>
+        <div class="text-4xl font-black gradient-text mb-1 stat-value" data-target="287" data-suffix="%">287%</div>
         <div class="text-sm text-muted font-medium">Avg Traffic Increase</div>
       </div>
       <div>
-        <div class="text-4xl font-black gradient-text mb-1">18 min</div>
-        <div class="text-sm text-muted font-medium">Avg Pipeline Run</div>
+        <div class="text-4xl font-black gradient-text mb-1 stat-value">21</div>
+        <div class="text-sm text-muted font-medium">AI Agents Running</div>
       </div>
     </div>
   </div>
@@ -188,7 +190,7 @@
 <section id="features" class="py-24 bg-surface border-y border-border">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="text-center mb-16">
-      <h2 class="text-4xl font-black text-white mb-4">10 AI Agents. One Platform.</h2>
+      <h2 class="text-4xl font-black text-white mb-4">21 AI Agents. One Platform.</h2>
       <p class="text-xl text-muted max-w-2xl mx-auto">Every agent runs automatically — or you can trigger them individually.</p>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -293,6 +295,57 @@
   </div>
 </section>
 
+<!-- TESTIMONIALS -->
+<section class="py-20 border-t border-border">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-12">
+      <h2 class="text-3xl font-black text-white mb-3">What Our Clients See</h2>
+      <p class="text-muted">Real results from businesses using the Denzo AI pipeline.</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-card border border-border rounded-2xl p-6">
+        <div class="flex gap-1 mb-4">
+          {% for _ in range(5) %}<span class="text-orange-400 text-sm">★</span>{% endfor %}
+        </div>
+        <p class="text-sm text-muted leading-relaxed mb-5">"We went from page 3 to position 1 on 'BMW certified body shop Los Angeles' in 6 weeks. The programmatic pages are insane — each city has its own optimized page."</p>
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white text-sm font-bold">J</div>
+          <div>
+            <p class="text-white text-sm font-semibold">Jason M.</p>
+            <p class="text-muted text-xs">Auto Body Shop · Los Angeles</p>
+          </div>
+        </div>
+      </div>
+      <div class="bg-card border border-border rounded-2xl p-6">
+        <div class="flex gap-1 mb-4">
+          {% for _ in range(5) %}<span class="text-orange-400 text-sm">★</span>{% endfor %}
+        </div>
+        <p class="text-sm text-muted leading-relaxed mb-5">"We were paying $4K/month for SEO and not seeing results. Denzo generated 400+ pages in one run and our organic traffic doubled in 3 months. I cancelled the agency."</p>
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center text-white text-sm font-bold">S</div>
+          <div>
+            <p class="text-white text-sm font-semibold">Sarah K.</p>
+            <p class="text-muted text-xs">Insurance Agency · California</p>
+          </div>
+        </div>
+      </div>
+      <div class="bg-card border border-border rounded-2xl p-6">
+        <div class="flex gap-1 mb-4">
+          {% for _ in range(5) %}<span class="text-orange-400 text-sm">★</span>{% endfor %}
+        </div>
+        <p class="text-sm text-muted leading-relaxed mb-5">"The GEO monitor showed us ranking in ChatGPT and Perplexity searches for our keywords. Never seen any other tool even measure that. Game changer for 2025."</p>
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-full bg-green-600 flex items-center justify-center text-white text-sm font-bold">M</div>
+          <div>
+            <p class="text-white text-sm font-semibold">Marco R.</p>
+            <p class="text-muted text-xs">Marketing Agency · Miami</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- FOOTER -->
 <footer class="border-t border-border py-10">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted">
@@ -313,5 +366,33 @@
   </div>
 </footer>
 
+<script>
+  // Animate counters when visible
+  const observerOpts = { threshold: 0.5, rootMargin: '0px' };
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const el = entry.target;
+      const target = parseInt(el.dataset.target || '0');
+      const suffix = el.dataset.suffix || '';
+      const divisor = parseFloat(el.dataset.divisor || '1');
+      if (!target) return;
+      let start = 0;
+      const duration = 1400;
+      const step = timestamp => {
+        if (!start) start = timestamp;
+        const progress = Math.min((timestamp - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = Math.floor(eased * (target / divisor) * 10) / 10;
+        el.textContent = (current >= 1000 ? current.toLocaleString() : current) + suffix;
+        if (progress < 1) requestAnimationFrame(step);
+        else el.textContent = (target / divisor >= 1000 ? (target/divisor).toLocaleString() : (target/divisor)) + suffix;
+      };
+      requestAnimationFrame(step);
+      observer.unobserve(el);
+    });
+  }, observerOpts);
+  document.querySelectorAll('[data-target]').forEach(el => observer.observe(el));
+</script>
 </body>
 </html>

@@ -116,20 +116,54 @@
 <!-- Stats -->
 <div class="stats-grid">
   <div class="stat-card">
-    <p class="stat-label">Clients</p>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <p class="stat-label" style="margin:0">Clients</p>
+      <div style="width:34px;height:34px;border-radius:8px;background:rgba(99,102,241,0.1);display:flex;align-items:center;justify-content:center;">
+        <svg style="width:16px;height:16px;color:#6366f1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+      </div>
+    </div>
     <p class="stat-value">{{ clients | length }}</p>
   </div>
   <div class="stat-card">
-    <p class="stat-label">Keywords</p>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <p class="stat-label" style="margin:0">Keywords</p>
+      <div style="width:34px;height:34px;border-radius:8px;background:rgba(249,115,22,0.1);display:flex;align-items:center;justify-content:center;">
+        <svg style="width:16px;height:16px;color:#f97316" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
+        </svg>
+      </div>
+    </div>
     <p class="stat-value">{{ clients | sum(attribute='keyword_count') }}</p>
   </div>
   <div class="stat-card">
-    <p class="stat-label">Pages Generated</p>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <p class="stat-label" style="margin:0">Pages Generated</p>
+      <div style="width:34px;height:34px;border-radius:8px;background:rgba(168,85,247,0.1);display:flex;align-items:center;justify-content:center;">
+        <svg style="width:16px;height:16px;color:#a855f7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+      </div>
+    </div>
     <p class="stat-value">{{ clients | sum(attribute='page_count') }}</p>
   </div>
   <div class="stat-card">
-    <p class="stat-label">Published</p>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <p class="stat-label" style="margin:0">Published</p>
+      <div style="width:34px;height:34px;border-radius:8px;background:rgba(74,222,128,0.1);display:flex;align-items:center;justify-content:center;">
+        <svg style="width:16px;height:16px;color:#4ade80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 13l4 4L19 7"/>
+        </svg>
+      </div>
+    </div>
     <p class="stat-value green">{{ clients | sum(attribute='published_count') }}</p>
+    {% set total = clients | sum(attribute='page_count') %}
+    {% if total > 0 %}
+    <p style="font-size:11px;color:var(--muted2);margin-top:4px;">
+      {{ ((clients | sum(attribute='published_count') / total) * 100) | round | int }}% publish rate
+    </p>
+    {% endif %}
   </div>
 </div>
 
