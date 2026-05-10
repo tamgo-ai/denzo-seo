@@ -99,8 +99,8 @@ _INDUSTRY_PATTERNS = [
 ]
 
 _INDUSTRY_SERVICES = {
-    "medical_imaging": ["Rayos X / X-Ray", "Ultrasonido", "Mamografía", "Resonancia Magnética",
-                        "Tomografía Computarizada", "Densitometría Ósea"],
+    "medical_imaging": ["X-Ray", "Ultrasound", "Mammogram", "MRI",
+                        "CT Scan", "Bone Density Scan"],
     "auto_body":       ["Collision Repair", "Auto Body Paint", "Frame Straightening",
                         "Paintless Dent Repair (PDR)", "Glass Replacement", "Bumper Repair"],
     "auto_dealership": ["New Vehicle Sales", "Used Vehicle Sales", "Certified Pre-Owned",

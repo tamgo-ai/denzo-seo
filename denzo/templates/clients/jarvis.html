@@ -674,7 +674,7 @@
              x-model="chatInput"
              @keydown.enter="sendChat()"
              :disabled="chatBusy"
-             placeholder="Habla con Denzo… ej: ¿qué bloquea las páginas de Honda?">
+             placeholder="Talk to Denzo… e.g. what's blocking the Honda pages?">
       <span class="chat-hint"><kbd>↵</kbd> send · <kbd>⌘K</kbd> internals</span>
     </div>
   </div>
@@ -713,7 +713,7 @@ function jarvis(tenantId) {
     workingAgents: [],
 
     chat: [
-      { role: 'bot', text: 'Online. Pregúntame lo que necesites — qué bloquea, qué está corriendo, qué hacer next.' },
+      { role: 'bot', text: 'Online. Ask me anything — what\'s running, what\'s blocked, what to do next.' },
     ],
     chatInput: '',
     chatBusy: false,
