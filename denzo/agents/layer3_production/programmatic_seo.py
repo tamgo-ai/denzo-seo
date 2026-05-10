@@ -101,8 +101,9 @@ BRAND STYLE GUIDE:
         # Industry-aware CTA labels — covers 14 verticals
         industry = ctx.industry_vertical or "general"
         _cta_by_industry = {
-            "automotive_dealership":  {"service": "Schedule a Test Drive →",       "about": "Contact Our Team →",      "location": "Get Directions →"},
-            "car_dealership":         {"service": "Schedule a Test Drive →",       "about": "Contact Our Team →",      "location": "Get Directions →"},
+            "automotive_dealership":  {"service": "Schedule a Test Drive →",       "about": "Contact Our Team →",      "location": "Get Directions →",  "inventory": "Browse Our Inventory →", "financing": "Apply for Financing →", "dealer": "Contact Our Team →"},
+            "car_dealership":         {"service": "Schedule a Test Drive →",       "about": "Contact Our Team →",      "location": "Get Directions →",  "inventory": "Browse Our Inventory →", "financing": "Apply for Financing →", "dealer": "Contact Our Team →"},
+            "auto_dealership":        {"service": "Schedule a Test Drive →",       "about": "Contact Our Team →",      "location": "Get Directions →",  "inventory": "Browse Our Inventory →", "financing": "Apply for Financing →", "dealer": "Contact Our Team →"},
             "auto_body_shop":         {"service": "Get a Free Estimate →",         "about": "Contact Us →",            "location": "Get Directions →"},
             "collision_repair":       {"service": "Get a Free Estimate →",         "about": "Contact Us →",            "location": "Get Directions →"},
             "saas_tech":              {"service": "Get a Free Demo →",             "about": "Talk to Our Team →",      "location": "Contact Us →"},

@@ -100,6 +100,29 @@ class VerticalMatrixGenerator(TenantAwareBaseAgent):
                 "best", "authentic", "award winning", "delivery", "outdoor seating",
             ],
         },
+        "auto_dealership": {
+            "makes": [
+                "Toyota", "Honda", "Ford", "Chevrolet", "Nissan",
+                "Hyundai", "Kia", "Jeep", "Ram", "GMC",
+                "Mazda", "Subaru", "Volkswagen", "BMW", "Mercedes-Benz",
+            ],
+            "vehicle_types": [
+                "new", "used", "certified pre-owned",
+            ],
+            "financing_keywords": [
+                "bad credit auto loans", "no credit check car loans",
+                "first time buyer car loans", "lease deals", "zero down payment",
+                "trade-in value", "buy here pay here", "in-house financing",
+            ],
+            "service_keywords": [
+                "service center", "oil change", "parts department",
+                "recall service", "tire rotation", "brake service",
+            ],
+            "qualifiers": [
+                "family owned", "best price", "low miles",
+                "certified", "factory warranty", "0 APR",
+            ],
+        },
         "general": {
             "generic_modifiers": [
                 "near me", "best", "affordable", "top rated", "certified",
@@ -120,6 +143,12 @@ class VerticalMatrixGenerator(TenantAwareBaseAgent):
         "legal":             "law_firm",
         "heating_cooling":   "hvac",
         "air_conditioning":  "hvac",
+        "dealership":        "auto_dealership",
+        "dealer":            "auto_dealership",
+        "car_dealer":        "auto_dealership",
+        "auto_dealer":       "auto_dealership",
+        "used_cars":         "auto_dealership",
+        "new_cars":          "auto_dealership",
     }
 
     def _get_matrix_config(self) -> dict:
@@ -437,6 +466,84 @@ class VerticalMatrixGenerator(TenantAwareBaseAgent):
                         title   = f"{qual.title()} {svc.title()} in {city}"
                         slug    = self._slugify(f"{qual}-{svc}-{city}")
                         _try_add(title, slug, "service", city, keyword, "plumbing:qualifier")
+                    if pages_added >= max_this_run or self.should_stop():
+                        break
+                if pages_added >= max_this_run or self.should_stop():
+                    break
+
+        # ── AUTO DEALERSHIP ───────────────────────────────────────────────────
+        elif matrix_key == "auto_dealership":
+            makes         = matrix_config.get("makes", [])
+            vehicle_types = matrix_config.get("vehicle_types", [])
+            financing_kws = matrix_config.get("financing_keywords", [])
+            service_kws   = matrix_config.get("service_keywords", [])
+            qualifiers    = matrix_config.get("qualifiers", [])
+
+            # 1. Make + vehicle_type + city — highest commercial intent
+            for make in makes:
+                for vt in vehicle_types:
+                    for city in all_cities:
+                        if pages_added >= max_this_run or self.should_stop():
+                            break
+                        keyword = f"{vt} {make} {city}"
+                        title   = f"{vt.title()} {make} in {city}"
+                        slug    = self._slugify(f"{vt}-{make}-{city}")
+                        _try_add(title, slug, "inventory", city, keyword,
+                                 "auto_dealership:make_type")
+                    if pages_added >= max_this_run or self.should_stop():
+                        break
+                if pages_added >= max_this_run or self.should_stop():
+                    break
+
+            self.log(f"Make+type pages: {pages_added} added so far", "info")
+
+            # 2. Financing + city — high-intent shoppers with credit needs
+            for fin in financing_kws:
+                for city in all_cities:
+                    if pages_added >= max_this_run or self.should_stop():
+                        break
+                    keyword = f"{fin} {city}"
+                    title   = f"{fin.title()} in {city}"
+                    slug    = self._slugify(f"{fin}-{city}")
+                    _try_add(title, slug, "financing", city, keyword,
+                             "auto_dealership:financing")
+                if pages_added >= max_this_run or self.should_stop():
+                    break
+
+            self.log(f"After financing pages: {pages_added} added", "info")
+
+            # 3. Make + service + city — captures service-bay revenue
+            top_makes_for_service = makes[:8]
+            for svc in service_kws:
+                for make in top_makes_for_service:
+                    for city in all_cities:
+                        if pages_added >= max_this_run or self.should_stop():
+                            break
+                        keyword = f"{make} {svc} {city}"
+                        title   = f"{make} {svc.title()} in {city}"
+                        slug    = self._slugify(f"{make}-{svc}-{city}")
+                        _try_add(title, slug, "service", city, keyword,
+                                 "auto_dealership:service")
+                    if pages_added >= max_this_run or self.should_stop():
+                        break
+                if pages_added >= max_this_run or self.should_stop():
+                    break
+
+            self.log(f"After service pages: {pages_added} added", "info")
+
+            # 4. Qualifier + make + dealer + city — brand differentiation
+            top_qualifiers     = qualifiers[:3]
+            top_makes_for_qual = makes[:5]
+            for qual in top_qualifiers:
+                for make in top_makes_for_qual:
+                    for city in all_cities:
+                        if pages_added >= max_this_run or self.should_stop():
+                            break
+                        keyword = f"{qual} {make} dealer {city}"
+                        title   = f"{qual.title()} {make} Dealer in {city}"
+                        slug    = self._slugify(f"{qual}-{make}-dealer-{city}")
+                        _try_add(title, slug, "dealer", city, keyword,
+                                 "auto_dealership:qualifier")
                     if pages_added >= max_this_run or self.should_stop():
                         break
                 if pages_added >= max_this_run or self.should_stop():

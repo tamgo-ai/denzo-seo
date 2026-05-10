@@ -61,6 +61,12 @@ _INDUSTRY_PATTERNS = [
         r"\b(m[eé]dic[oa]|cl[íi]nica|clinic|doctor|physician|hospital|healthcare|"
         r"salud|health|paciente|patient|consulta m[eé]dica)\b"
     ]),
+    ("auto_dealership", [
+        r"\b(dealership|car dealer|auto dealer|test drive|new and used|"
+        r"used cars?|new cars?|certified pre[-\s]?owned|cpo vehicles?|"
+        r"auto financing|car loan|lease deal[s]?|trade[-\s]?in value|"
+        r"buy here pay here|concesionario|venta de autos|veh[íi]culos? usados?)\b"
+    ]),
     ("auto_body", [
         r"\b(collision repair|auto body|body shop|frame straightening|"
         r"paintless dent|car repair|carrocer[íi]a|colisi[oó]n)\b"
@@ -97,6 +103,9 @@ _INDUSTRY_SERVICES = {
                         "Tomografía Computarizada", "Densitometría Ósea"],
     "auto_body":       ["Collision Repair", "Auto Body Paint", "Frame Straightening",
                         "Paintless Dent Repair (PDR)", "Glass Replacement", "Bumper Repair"],
+    "auto_dealership": ["New Vehicle Sales", "Used Vehicle Sales", "Certified Pre-Owned",
+                        "Auto Financing", "Lease Specials", "Trade-In Appraisal",
+                        "Service Center", "Parts Department"],
     "dental":          ["General Dentistry", "Teeth Whitening", "Orthodontics",
                         "Dental Implants", "Root Canal", "Veneers"],
     "medical":         ["Primary Care", "Urgent Care", "Telehealth",
@@ -118,17 +127,19 @@ _INDUSTRY_SERVICES = {
 }
 
 _INDUSTRY_DONT_SELL = {
-    "auto_body":   ["Routine Mechanical Maintenance", "Vehicle Sales", "Fuel & Tires"],
-    "dental":      ["Cosmetic Surgery", "Medical Prescriptions"],
-    "legal":       ["Accounting", "Financial Advice"],
-    "real_estate": ["Property Insurance", "Mortgage Lending"],
-    "restaurant":  ["Grocery Delivery", "Cooking Classes"],
-    "general":     ["Wholesale", "Franchising"],
+    "auto_body":       ["Routine Mechanical Maintenance", "Vehicle Sales", "Fuel & Tires"],
+    "auto_dealership": ["Collision Repair", "Body Work", "Paint Jobs"],
+    "dental":          ["Cosmetic Surgery", "Medical Prescriptions"],
+    "legal":           ["Accounting", "Financial Advice"],
+    "real_estate":     ["Property Insurance", "Mortgage Lending"],
+    "restaurant":      ["Grocery Delivery", "Cooking Classes"],
+    "general":         ["Wholesale", "Franchising"],
 }
 
 _INDUSTRY_COMPETITORS = {
-    "auto_body":   ["Caliber Collision", "Service King", "Gerber Collision",
-                    "Fix Auto", "CARSTAR"],
+    "auto_body":       ["Caliber Collision", "Service King", "Gerber Collision",
+                        "Fix Auto", "CARSTAR"],
+    "auto_dealership": ["AutoNation", "CarMax", "Carvana", "Vroom", "Local franchise dealers"],
     "dental":      ["Aspen Dental", "Western Dental", "Smile Direct Club"],
     "legal":       ["LegalZoom", "Avvo", "FindLaw"],
     "real_estate": ["Zillow", "Redfin", "Compass", "Coldwell Banker"],
@@ -143,6 +154,15 @@ _INDUSTRY_KEYWORDS = {
         "certified body shop {city}",
         "bumper repair {city}",
         "car accident repair near me",
+    ],
+    "auto_dealership": [
+        "car dealership {city}",
+        "used cars {city}",
+        "new cars for sale {city}",
+        "bad credit auto loans {city}",
+        "lease deals {city}",
+        "certified pre-owned {city}",
+        "trade-in value {city}",
     ],
     "dental": [
         "dentist near me",
@@ -181,6 +201,13 @@ _ARTICLE_TEMPLATES = {
         "What to Do After a Car Accident in {city}: A Step-by-Step Guide",
         "OEM vs Aftermarket Parts: Why It Matters for Your Repair",
         "How to File an Insurance Claim for Auto Body Repair in {city}",
+    ],
+    "auto_dealership": [
+        "How to Buy a Car With Bad Credit in {city}",
+        "New vs Used vs Certified Pre-Owned: Which Is Right for {city} Buyers?",
+        "Lease vs Buy: A {city} Driver's Complete Guide",
+        "How Much Is My Trade-In Worth in {city}? A Step-by-Step Appraisal Guide",
+        "First-Time Car Buyer's Guide for {city}: Financing, Insurance, and Documents",
     ],
     "dental": [
         "How Much Do Dental Implants Cost in {city}?",
