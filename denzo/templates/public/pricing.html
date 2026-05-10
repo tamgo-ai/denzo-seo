@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pricing · Denzo SEO</title>
+  <meta name="description" content="26 AI agents that run a full multi-vertical SEO + GEO program for one client or one hundred. Three plans, no minimums, cancel anytime."/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      --bg:        #07070b;
+      --surface:   #0e0f17;
+      --card:      #14151f;
+      --border:    rgba(255,255,255,0.08);
+      --text:      #f4f4f5;
+      --muted:     rgba(255,255,255,0.55);
+      --muted2:    rgba(255,255,255,0.35);
+      --accent:    #818cf8;
+      --accent-2:  #a78bfa;
+      --green:     #4ade80;
+    }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: Inter, system-ui, sans-serif;
+      margin: 0; min-height: 100vh; line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    /* Star-field background */
+    body::before {
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% 0%, rgba(99,102,241,0.10), transparent 60%),
+        radial-gradient(ellipse 60% 60% at 100% 100%, rgba(139,92,246,0.07), transparent 70%),
+        radial-gradient(ellipse 70% 50% at 0% 100%, rgba(34,211,238,0.05), transparent 70%);
+    }
+    body::after {
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background-image:
+        linear-gradient(rgba(99,102,241,.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99,102,241,.025) 1px, transparent 1px);
+      background-size: 80px 80px;
+      mask-image: radial-gradient(ellipse at center, black 0%, transparent 75%);
+      -webkit-mask-image: radial-gradient(ellipse at center, black 0%, transparent 75%);
+    }
+
+    .shell { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 32px 24px 96px; }
+
+    /* Top nav */
+    nav.top {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-bottom: 32px;
+    }
+    nav.top .brand {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 16px; font-weight: 700; letter-spacing: -0.02em;
+      color: var(--text); text-decoration: none;
+    }
+    nav.top .brand .logo {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; color: #fff; font-weight: 800;
+    }
+    nav.top a.cta {
+      font-size: 13px; font-weight: 600; color: var(--text);
+      padding: 9px 16px; border-radius: 9px;
+      border: 1px solid var(--border); text-decoration: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    nav.top a.cta:hover { border-color: var(--accent); background: rgba(99,102,241,0.08); }
+
+    /* Hero */
+    .hero { text-align: center; padding: 56px 0 48px; }
+    .hero .pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+      background: rgba(99,102,241,0.08);
+      border: 1px solid rgba(99,102,241,0.22);
+      color: var(--accent);
+      padding: 6px 14px; border-radius: 999px; margin-bottom: 24px;
+    }
+    .hero .pill .dot {
+      width: 6px; height: 6px; border-radius: 50%; background: var(--green);
+      box-shadow: 0 0 10px var(--green);
+      animation: blink 1.4s ease-in-out infinite;
+    }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    .hero h1 {
+      font-size: 56px; font-weight: 800; letter-spacing: -0.04em; line-height: 1.05;
+      margin: 0 0 20px;
+      background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.55) 100%);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero h1 em {
+      font-style: normal;
+      background: linear-gradient(135deg, #818cf8 0%, #a78bfa 50%, #f472b6 100%);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero p {
+      font-size: 17px; color: var(--muted); margin: 0 auto;
+      max-width: 640px;
+    }
+    @media (max-width: 640px) { .hero h1 { font-size: 40px; } }
+
+    /* Plans */
+    .plans {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+      margin-top: 32px;
+    }
+    @media (max-width: 920px) { .plans { grid-template-columns: 1fr; max-width: 480px; margin-left: auto; margin-right: auto; } }
+
+    .plan {
+      background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
+      border: 1px solid var(--border);
+      border-radius: 18px; padding: 28px;
+      position: relative; overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+    }
+    .plan:hover { transform: translateY(-4px); border-color: rgba(99,102,241,0.2); }
+    .plan.featured {
+      border-color: rgba(99,102,241,0.35);
+      box-shadow: 0 0 60px -10px rgba(99,102,241,0.4);
+    }
+    .plan.featured::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, #22d3ee, #818cf8, #a78bfa);
+    }
+    .plan .badge {
+      position: absolute; top: 16px; right: 16px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+      background: linear-gradient(135deg, #818cf8, #a78bfa);
+      color: #0a0a0a; padding: 4px 10px; border-radius: 999px;
+      text-transform: uppercase;
+    }
+    .plan .name {
+      font-size: 14px; font-weight: 600; letter-spacing: 0.02em;
+      color: var(--accent); margin: 0 0 4px;
+      text-transform: uppercase;
+    }
+    .plan .tagline {
+      font-size: 13px; color: var(--muted); margin: 0 0 24px; min-height: 36px;
+    }
+    .plan .price {
+      font-size: 48px; font-weight: 800; letter-spacing: -0.03em;
+      margin: 0; color: var(--text); line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .plan .price small {
+      font-size: 14px; font-weight: 500; color: var(--muted);
+      letter-spacing: 0; margin-left: 4px;
+    }
+    .plan ul {
+      list-style: none; padding: 0; margin: 28px 0 24px;
+    }
+    .plan ul li {
+      padding: 8px 0; font-size: 14px; color: rgba(255,255,255,0.78);
+      display: flex; align-items: flex-start; gap: 10px;
+      line-height: 1.5;
+    }
+    .plan ul li::before {
+      content: ''; width: 18px; height: 18px; flex-shrink: 0;
+      background: rgba(74,222,128,0.12);
+      border: 1px solid rgba(74,222,128,0.25);
+      border-radius: 50%;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%234ade80' stroke-width='2'><path stroke-linecap='round' stroke-linejoin='round' d='M2 6l3 3 5-6'/></svg>");
+      background-size: 11px;
+      background-repeat: no-repeat;
+      background-position: center;
+      margin-top: 2px;
+    }
+
+    .plan form { margin: 0; }
+    .plan button {
+      width: 100%;
+      background: rgba(99,102,241,0.08);
+      border: 1px solid rgba(99,102,241,0.25);
+      color: var(--accent);
+      padding: 14px 20px; border-radius: 12px;
+      font-size: 14px; font-weight: 700; letter-spacing: 0.01em;
+      cursor: pointer; font-family: inherit;
+      transition: all 0.15s;
+    }
+    .plan button:hover {
+      background: rgba(99,102,241,0.15);
+      border-color: rgba(99,102,241,0.45);
+    }
+    .plan.featured button {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border: none; color: #fff;
+    }
+    .plan.featured button:hover {
+      box-shadow: 0 12px 32px -4px rgba(99,102,241,0.6);
+      transform: translateY(-1px);
+    }
+    .plan button[disabled] {
+      opacity: 0.5; cursor: not-allowed;
+    }
+
+    /* Trust section */
+    .trust {
+      margin-top: 80px; text-align: center;
+    }
+    .trust h2 {
+      font-size: 20px; font-weight: 700; letter-spacing: -0.02em;
+      margin: 0 0 12px;
+    }
+    .trust p { color: var(--muted); margin: 0 0 36px; font-size: 14px; }
+    .trust-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+      max-width: 880px; margin: 0 auto;
+    }
+    @media (max-width: 720px) { .trust-grid { grid-template-columns: repeat(2, 1fr); } }
+    .trust-item {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 24px 18px;
+    }
+    .trust-item .num {
+      font-size: 32px; font-weight: 800; letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #818cf8, #a78bfa);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+      margin: 0 0 4px;
+    }
+    .trust-item .label {
+      font-size: 12px; color: var(--muted); margin: 0;
+    }
+
+    /* FAQ */
+    .faq { margin-top: 80px; max-width: 760px; margin-left: auto; margin-right: auto; }
+    .faq h2 { font-size: 24px; font-weight: 700; text-align: center; margin: 0 0 32px; letter-spacing: -0.02em; }
+    .faq-item {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 18px 20px; margin-bottom: 10px;
+    }
+    .faq-item p.q {
+      margin: 0; font-size: 14px; font-weight: 600; color: var(--text);
+    }
+    .faq-item p.a {
+      margin: 8px 0 0; font-size: 13px; color: var(--muted); line-height: 1.6;
+    }
+
+    /* Banner: not configured */
+    .banner-warn {
+      background: rgba(251,146,60,0.06);
+      border: 1px solid rgba(251,146,60,0.22);
+      color: #fdba74;
+      padding: 14px 18px; border-radius: 12px;
+      font-size: 13px; line-height: 1.5;
+      margin: 0 0 32px;
+      display: flex; gap: 12px; align-items: flex-start;
+    }
+    .banner-warn svg { flex-shrink: 0; margin-top: 2px; }
+
+    .footer {
+      margin-top: 80px; padding-top: 32px;
+      border-top: 1px solid var(--border);
+      text-align: center; font-size: 12px; color: var(--muted2);
+    }
+    .footer a { color: var(--muted); text-decoration: none; margin: 0 12px; }
+    .footer a:hover { color: var(--text); }
+  </style>
+</head>
+<body>
+  <div class="shell">
+
+    <nav class="top">
+      <a href="/" class="brand">
+        <span class="logo">D</span>
+        Denzo
+      </a>
+      <div style="display:flex;gap:10px;">
+        {% if not session.user_id %}
+          <a href="/login" class="cta">Log in</a>
+          <a href="/" class="cta" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);border-color:transparent;color:#fff;">Start free</a>
+        {% else %}
+          <a href="/" class="cta">Dashboard</a>
+        {% endif %}
+      </div>
+    </nav>
+
+    <header class="hero">
+      <span class="pill"><span class="dot"></span> 26 agents · 7 layers · multi-vertical</span>
+      <h1>Pricing built around <em>real outcomes</em><br/>not feature checklists.</h1>
+      <p>One client or one hundred — Denzo runs the same world-class SEO + GEO playbook on every tenant: real Search Console data, real Google Business Profile sync, real ranked pages. Cancel anytime.</p>
+    </header>
+
+    {% if not stripe_configured %}
+    <div class="banner-warn">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+      </svg>
+      <div>
+        <strong>Stripe is not configured on this server yet.</strong>
+        Once an admin sets <code>STRIPE_SECRET_KEY</code> and the <code>STRIPE_PRICE_ID_*</code> env vars,
+        Checkout buttons go live. Until then this page shows the plan structure as a preview.
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="plans">
+      {% for plan in plans %}
+      <div class="plan {% if plan.key == 'pro' %}featured{% endif %}">
+        {% if plan.key == 'pro' %}
+        <span class="badge">Most popular</span>
+        {% endif %}
+        <p class="name">{{ plan.name }}</p>
+        <p class="tagline">{{ plan.tagline }}</p>
+        <p class="price">${{ plan.price_monthly }}<small>/mo</small></p>
+
+        <ul>
+          {% for feature in plan.features %}
+            <li>{{ feature }}</li>
+          {% endfor %}
+        </ul>
+
+        <form method="POST" action="/billing/checkout/{{ plan.key }}">
+          <button type="submit" {% if not stripe_configured or not plan.price_id %}disabled title="Not yet configured — set STRIPE_PRICE_ID_{{ plan.key|upper }} in .env"{% endif %}>
+            {% if not stripe_configured or not plan.price_id %}
+              Coming soon
+            {% else %}
+              Start with {{ plan.name }}
+            {% endif %}
+          </button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="trust">
+      <h2>Built for operators, not for theory</h2>
+      <p>Numbers are real and verifiable in your dashboard within minutes of connecting Search Console.</p>
+      <div class="trust-grid">
+        <div class="trust-item">
+          <p class="num">26</p>
+          <p class="label">AI agents in the pipeline</p>
+        </div>
+        <div class="trust-item">
+          <p class="num">7</p>
+          <p class="label">layers · Intel → Strategy → Generation → Optimization → Publishing → Analytics</p>
+        </div>
+        <div class="trust-item">
+          <p class="num">8+</p>
+          <p class="label">verticals supported · auto, dental, legal, HVAC, plumbing, restaurant, dealership, more</p>
+        </div>
+        <div class="trust-item">
+          <p class="num">2s</p>
+          <p class="label">Mission Control refresh — see agents talk in real time</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="faq">
+      <h2>Common questions</h2>
+      <div class="faq-item">
+        <p class="q">Do I need to bring my own Google credentials?</p>
+        <p class="a">No. Denzo uses its own Google Cloud project for OAuth — clients just click "Connect Google Business Profile" or "Connect Search Console" inside their dashboard and authorize their own account. Tokens are stored encrypted per-tenant. Each client's data stays isolated from every other client's.</p>
+      </div>
+      <div class="faq-item">
+        <p class="q">What happens after I subscribe?</p>
+        <p class="a">You're redirected to your dashboard, the agent pipeline becomes available for the number of clients your plan allows, and Mission Control opens. The first run typically generates 100–500 pages within an hour, all of which you can preview, edit, or reject before publishing.</p>
+      </div>
+      <div class="faq-item">
+        <p class="q">Can I cancel anytime?</p>
+        <p class="a">Yes. There's no contract. Click "Manage billing" inside the app and cancel — Stripe will keep your subscription active until the end of the current billing period and then stop charging.</p>
+      </div>
+      <div class="faq-item">
+        <p class="q">Do I keep my generated content if I cancel?</p>
+        <p class="a">Yes. Anything Denzo published to your GitHub repo or WordPress site is yours — it lives on your infrastructure, not ours. The Denzo dashboard goes back to read-only on the free tier.</p>
+      </div>
+      <div class="faq-item">
+        <p class="q">What if my vertical isn't supported?</p>
+        <p class="a">The "general" vertical is a safe fallback that still produces strong content. We add new verticals on request — most take a day or two to ship as a fully-tuned page matrix. Email us with what you do.</p>
+      </div>
+    </div>
+
+    <div class="footer">
+      © {{ 2026 }} Denzo · Made for operators by operators
+      <div style="margin-top:6px;">
+        <a href="/">Home</a> · <a href="/login">Log in</a> · <a href="mailto:hello@denzostudios.com">Contact</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

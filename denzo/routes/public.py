@@ -757,6 +757,31 @@ def upgrade_page():
         if client:
             tenant_id = client["tenant_id"]
             biz_name  = client["name"]
+    from denzo.billing.plans import all_priced_plans, stripe_configured, get_plan
+    return render_template("public/pricing.html",
+                           plan=plan, tenant_id=tenant_id, biz_name=biz_name,
+                           current_plan_obj=get_plan(plan),
+                           plans=all_priced_plans(),
+                           stripe_configured=stripe_configured(),
+                           legacy_template_url=url_for("public.upgrade_page_legacy"))
+
+
+@bp.route("/upgrade-legacy")
+def upgrade_page_legacy():
+    """Original 10-agent upgrade page kept as a fallback during transition."""
+    user_id   = session.get("user_id")
+    plan      = _get_plan(user_id) if user_id else "free"
+    tenant_id = None
+    biz_name  = "your business"
+    if user_id:
+        db = get_db()
+        client = db.execute(
+            "SELECT tenant_id, name FROM clients WHERE owner_user_id=? LIMIT 1", (user_id,)
+        ).fetchone()
+        db.close()
+        if client:
+            tenant_id = client["tenant_id"]
+            biz_name  = client["name"]
     return render_template("public/upgrade.html",
                            plan=plan, tenant_id=tenant_id, biz_name=biz_name)
 

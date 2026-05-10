@@ -342,6 +342,24 @@ def init_db():
     CREATE INDEX IF NOT EXISTS idx_gsc_queries_tenant_date ON gsc_queries(tenant_id, date);
     CREATE INDEX IF NOT EXISTS idx_gsc_queries_query       ON gsc_queries(tenant_id, query);
     CREATE INDEX IF NOT EXISTS idx_gsc_queries_page        ON gsc_queries(tenant_id, page);
+
+    -- Stripe subscriptions — one row per paying user/customer ───────────────────
+    CREATE TABLE IF NOT EXISTS subscriptions (
+        id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id                 INTEGER NOT NULL,
+        stripe_customer_id      TEXT,
+        stripe_subscription_id  TEXT,
+        plan                    TEXT NOT NULL DEFAULT 'free',
+        status                  TEXT DEFAULT 'inactive',
+        current_period_end      TIMESTAMP,
+        cancel_at_period_end    BOOLEAN DEFAULT 0,
+        created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id),
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_subscriptions_user     ON subscriptions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_subscriptions_customer ON subscriptions(stripe_customer_id);
     """)
 
     # Seed admin from env vars on first install — never hardcode credentials
