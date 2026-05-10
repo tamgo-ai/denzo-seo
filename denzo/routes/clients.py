@@ -512,12 +512,32 @@ def edit_client(tenant_id):
             "has_wp_password":    bool(ctx["wp_app_password"]),
         }
 
+    # ── Google Integrations status (GBP, GSC) ─────────────────────────────────
+    from denzo.agents.utils import google_oauth
+    google_integrations = {
+        "configured": google_oauth.credentials_configured(),
+        "providers": {},
+    }
+    for prov in ("gbp", "gsc"):
+        row = google_oauth.get_token_row(tenant_id, prov)
+        if row:
+            google_integrations["providers"][prov] = {
+                "connected":     True,
+                "account_email": row.get("account_email") or "",
+                "site_url":      row.get("site_url") or "",
+                "location_id":   row.get("location_id") or "",
+                "updated_at":    row.get("updated_at") or "",
+            }
+        else:
+            google_integrations["providers"][prov] = {"connected": False}
+
     return render_template("clients/detail.html",
                            client=client,
                            ctx=ctx,
                            context=context,
                            clients=clients,
-                           active_tenant=tenant_id)
+                           active_tenant=tenant_id,
+                           google_integrations=google_integrations)
 
 
 @bp.route("/<tenant_id>/update", methods=["POST"])
