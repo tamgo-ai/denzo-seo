@@ -299,10 +299,33 @@
   .c-rose     { --agent-color: #fb7185; }
   .c-amber    { --agent-color: #fbbf24; }
 
-  /* ── Connection lines ──────────────────────────────────────────────────── */
+  /* ── Connection lines + traveling packets ─────────────────────────────── */
   .mc-connections {
     position: absolute; inset: 0; pointer-events: none;
     z-index: 1;
+    overflow: visible;
+  }
+  .mc-flow-path {
+    fill: none;
+    stroke: url(#flowGradient);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 6;
+    opacity: 0.55;
+    animation: dash-travel 1.2s linear infinite;
+  }
+  @keyframes dash-travel {
+    to { stroke-dashoffset: -10; }
+  }
+  .mc-flow-packet {
+    fill: #fff;
+    filter: drop-shadow(0 0 6px #818cf8) drop-shadow(0 0 12px rgba(99,102,241,0.6));
+  }
+  .mc-flow-glow {
+    fill: none;
+    stroke: #818cf8;
+    stroke-width: 4;
+    opacity: 0.18;
+    filter: blur(2px);
   }
 
   /* ── Activity panel ────────────────────────────────────────────────────── */
@@ -522,7 +545,20 @@
         </div>
       </div>
 
-      <div class="mc-constellation">
+      {# ─── SVG overlay for inter-agent message flow ─── #}
+      <svg class="mc-connections" x-ref="connections"
+           xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="flowGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%"  stop-color="#22d3ee" stop-opacity="0.4"/>
+            <stop offset="50%" stop-color="#818cf8" stop-opacity="0.85"/>
+            <stop offset="100%" stop-color="#a78bfa" stop-opacity="0.4"/>
+          </linearGradient>
+        </defs>
+        <g x-ref="flowGroup"></g>
+      </svg>
+
+      <div class="mc-constellation" x-ref="constellation">
         {% for layer_id, label in layer_labels.items() %}
           <div class="mc-layer">
             <p class="mc-layer-label">
@@ -640,10 +676,77 @@
           this.inProgressCount = data.in_progress_count || 0;
           this._lastUpdate = Date.now();
           this._tickLabel();
+          // Redraw inter-agent flow paths after DOM has settled
+          requestAnimationFrame(() => this._drawFlows());
         } catch (e) {
           console.warn('Mission Control refresh failed:', e);
         } finally {
           this.loading = false;
+        }
+      },
+
+      _drawFlows() {
+        const svg   = this.$refs.connections;
+        const group = this.$refs.flowGroup;
+        if (!svg || !group) return;
+
+        // Resize SVG to cover the constellation area
+        const stage = svg.parentElement;
+        if (!stage) return;
+        const sb = stage.getBoundingClientRect();
+        svg.setAttribute('viewBox', `0 0 ${sb.width} ${sb.height}`);
+        svg.style.width  = sb.width  + 'px';
+        svg.style.height = sb.height + 'px';
+
+        // Clear previous paths
+        group.innerHTML = '';
+
+        if (!this.activeFlows.length) return;
+
+        for (const flow of this.activeFlows) {
+          const fromEl = stage.querySelector(`[data-agent="${cssEscape(flow.from)}"]`);
+          const toEl   = stage.querySelector(`[data-agent="${cssEscape(flow.to)}"]`);
+          if (!fromEl || !toEl) continue;
+
+          const f = fromEl.getBoundingClientRect();
+          const t = toEl.getBoundingClientRect();
+
+          // Coordinates relative to the stage (svg covers stage)
+          const x1 = f.left + f.width  / 2 - sb.left;
+          const y1 = f.top  + f.height      - sb.top;
+          const x2 = t.left + t.width  / 2 - sb.left;
+          const y2 = t.top                  - sb.top;
+
+          const midY = (y1 + y2) / 2;
+          const d = `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+
+          // Glow underlay
+          const glow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          glow.setAttribute('d', d);
+          glow.setAttribute('class', 'mc-flow-glow');
+          group.appendChild(glow);
+
+          // Animated dashed path
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', d);
+          path.setAttribute('class', 'mc-flow-path');
+          path.id = 'flow-' + Math.random().toString(36).slice(2, 9);
+          group.appendChild(path);
+
+          // Traveling packet (uses <animateMotion> along the path)
+          const packet = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          packet.setAttribute('r', '4');
+          packet.setAttribute('class', 'mc-flow-packet');
+          group.appendChild(packet);
+
+          const motion = document.createElementNS('http://www.w3.org/2000/svg', 'animateMotion');
+          motion.setAttribute('dur', '1.6s');
+          motion.setAttribute('repeatCount', 'indefinite');
+          motion.setAttribute('rotate', 'auto');
+          const mpath = document.createElementNS('http://www.w3.org/2000/svg', 'mpath');
+          mpath.setAttributeNS('http://www.w3.org/1999/xlink', 'href', '#' + path.id);
+          motion.appendChild(mpath);
+          packet.appendChild(motion);
         }
       },
 
@@ -671,5 +774,22 @@
       },
     };
   }
+
+  // Polyfill for CSS.escape — needed to handle agent names with special chars
+  function cssEscape(s) {
+    if (typeof CSS !== 'undefined' && CSS.escape) return CSS.escape(s);
+    return String(s).replace(/["\\]/g, '\\$&');
+  }
+
+  // Redraw flow paths on window resize
+  window.addEventListener('resize', () => {
+    const ctrl = document.querySelector('[x-data^="missionControl"]');
+    if (ctrl && ctrl._x_dataStack) {
+      const inst = ctrl._x_dataStack[0];
+      if (inst && typeof inst._drawFlows === 'function') {
+        requestAnimationFrame(() => inst._drawFlows());
+      }
+    }
+  });
 </script>
 {% endblock %}
