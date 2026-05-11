@@ -239,85 +239,175 @@ _APIFY_SEARCH_PHRASES = {
 }
 
 
+_AUTO_MAKES = [
+    "BMW", "Mercedes-Benz", "Mercedes", "Audi", "Porsche", "Lexus",
+    "Acura", "Infiniti", "Cadillac", "Lincoln", "Volvo", "Jaguar",
+    "Land Rover", "Range Rover", "Tesla", "Genesis",
+    "Toyota", "Honda", "Ford", "Chevrolet", "Chevy", "Nissan",
+    "Hyundai", "Kia", "Jeep", "Ram", "GMC", "Mazda", "Subaru",
+    "Volkswagen", "VW", "Mitsubishi", "Buick", "Chrysler", "Dodge",
+]
+
+
+def _detect_auto_brand(business_name: str) -> str:
+    """Find the auto make in the business name, if any. 'BMW of Murrieta'
+    → 'BMW'. Returns '' if no known make matches. Sorted by length desc so
+    'Mercedes-Benz' wins over 'Mercedes' (substring overlap)."""
+    bn = business_name.lower()
+    for make in sorted(_AUTO_MAKES, key=len, reverse=True):
+        if make.lower() in bn:
+            return make
+    return ""
+
+
+def _haversine_miles(lat1, lng1, lat2, lng2) -> float:
+    """Distance in miles between two lat/lng points. Returns +inf if any
+    coordinate is missing — pushes incomplete data to the bottom of sort."""
+    import math
+    if None in (lat1, lng1, lat2, lng2):
+        return float("inf")
+    R = 3958.8  # earth radius in miles
+    lat1, lng1, lat2, lng2 = map(math.radians, [lat1, lng1, lat2, lng2])
+    dlat = lat2 - lat1
+    dlng = lng2 - lng1
+    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlng/2)**2
+    return 2 * R * math.asin(math.sqrt(a))
+
+
+def _detect_county(*, anthropic_client, city: str, state: str) -> str:
+    """Ask Claude Haiku which US county a city belongs to. Cheap (~200ms).
+    Used to scope the regional Apify pass — county is the sweet spot: big
+    enough to include same-brand dealers in nearby cities, small enough that
+    Apify finishes in reasonable time and stays geographically relevant
+    (Murrieta + Riverside County captures Temecula/Riverside/Hemet/Palm
+    Springs without spilling into LA County or San Diego County)."""
+    if not city or not state or anthropic_client is None:
+        return ""
+    try:
+        resp = anthropic_client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=40,
+            messages=[{"role": "user", "content":
+                f"What US county is {city}, {state} in? Reply with ONLY the "
+                f"county name and state, like 'Riverside County, CA'. No explanation."
+            }],
+        )
+        text = "".join(b.text for b in resp.content if hasattr(b, "text")).strip()
+        text = re.sub(r"[\"'\[\].]", "", text).strip()
+        return text if "County" in text else ""
+    except Exception:
+        return ""
+
+
 def _fetch_apify_competitors(
     *, apify, business_name: str, city: str, state: str, industry: str,
 ) -> list[str]:
-    """Hit Google Maps via Apify and return the top businesses for this
-    vertical in the same city. For dealerships we also pull the same-brand
-    dealers in the broader region, which captures BMW competing with other
-    BMW dealers 30-60mi away — the most relevant SEO competitors.
+    """Two-pass Apify Google Maps search:
 
-    Returns up to 10 names. Excludes the business itself.
+      Pass 1 (CITY scope): top businesses in the customer's own city for
+        their vertical. Captures direct local-SEO competitors.
+
+      Pass 2 (COUNTY scope, dealerships with detected brand): same-brand
+        dealers across the surrounding county. Captures the brand-cluster
+        play (other BMW dealers within commute range) without bleeding
+        into far-away metros — using county boundaries means LA dealers
+        do NOT show up for a Murrieta client just because they're "in CA".
+
+    Results merged, deduped, sorted by REAL distance from the client
+    (haversine over lat/lng from Apify), so the closest competitors come
+    first. Within a distance band, sort by SEO weight (reviews × rating).
+
+    Returns up to 12 names. Excludes the client itself.
     """
-    location = f"{city}, {state}".strip(", ")
-    phrases  = _APIFY_SEARCH_PHRASES.get(industry, [industry.replace("_", " ")])
+    city_location = f"{city}, {state}".strip(", ")
+    phrases = _APIFY_SEARCH_PHRASES.get(industry, [industry.replace("_", " ")])
+    brand = _detect_auto_brand(business_name) if industry == "auto_dealership" else ""
 
-    # For dealerships, try to detect the brand from the business name and
-    # add a brand-specific search to surface other BMW/Honda/Ford dealers
-    # in nearby cities.
-    # Build short search phrases (no city appended — we pass it as
-    # locationQuery to the actor so it geolocates properly and returns in
-    # ~30s instead of 3min).
-    queries = []
-    brand = ""
+    # ── Pass 1: same-city competitors ─────────────────────────────────────
     if industry == "auto_dealership":
-        # Detect brand from business name — case-insensitive scan of common makes
-        MAKES = ["BMW", "Mercedes-Benz", "Mercedes", "Audi", "Porsche", "Lexus",
-                 "Acura", "Infiniti", "Cadillac", "Lincoln", "Volvo", "Jaguar",
-                 "Land Rover", "Range Rover", "Tesla",
-                 "Toyota", "Honda", "Ford", "Chevrolet", "Chevy", "Nissan",
-                 "Hyundai", "Kia", "Jeep", "Ram", "GMC", "Mazda", "Subaru",
-                 "Volkswagen", "VW", "Mitsubishi", "Buick", "Chrysler", "Dodge"]
-        bn_lower = business_name.lower()
-        for m in MAKES:
-            if m.lower() in bn_lower:
-                brand = m
-                break
-        if brand:
-            queries.append(f"{brand} dealer")
-            queries.append("luxury car dealer")
-        else:
-            queries.append("car dealership")
+        pass1_queries = [f"{brand} dealer", "luxury car dealer"] if brand else ["car dealership"]
     else:
-        for phrase in phrases[:2]:
-            queries.append(phrase)
+        pass1_queries = phrases[:2]
 
     try:
-        # 90s timeout — should complete in 30-60s with locationQuery scope.
-        # If it doesn't, the wizard falls through to Claude.
-        places = apify.find_local_businesses(
-            queries, max_per_query=10,
-            location_query=location,
-            timeout_secs=90,
+        city_places = apify.find_local_businesses(
+            pass1_queries, max_per_query=6,
+            location_query=city_location,
+            timeout_secs=60,
         )
+        logger.info("Apify pass-1 (city) got %d places", len(city_places))
     except Exception as e:
-        logger.warning("Apify Maps lookup failed: %s", e)
-        return []
+        logger.warning("Apify Maps pass-1 (city) failed: %s", e)
+        city_places = []
 
-    # Filter, dedupe, exclude self, prefer higher-rating + more-reviewed
-    seen = set()
-    scored = []
+    # ── Pass 2: same-brand county-wide (dealerships only) ─────────────────
+    # Pass-2 is best-effort — county-wide scraping is unpredictable (can
+    # expand to dozens of cities). Tight 45s timeout, low max_per_query.
+    # If pass-2 fails or times out, pass-1 + Claude still cover the user.
+    county_places = []
+    if industry == "auto_dealership" and brand:
+        anthro_client = None
+        anthro_key = os.getenv("ANTHROPIC_API_KEY")
+        if anthro_key:
+            try:
+                from anthropic import Anthropic
+                anthro_client = Anthropic(api_key=anthro_key)
+            except Exception:
+                pass
+        county = _detect_county(anthropic_client=anthro_client, city=city, state=state)
+
+        if county:
+            try:
+                county_places = apify.find_local_businesses(
+                    [f"{brand} dealer"],
+                    max_per_query=8,
+                    location_query=county,
+                    timeout_secs=45,
+                )
+                logger.info("Apify pass-2 (%s) got %d places", county, len(county_places))
+            except Exception as e:
+                logger.warning("Apify Maps pass-2 (county) failed: %s", e)
+
+    # ── Locate client's own coordinates from pass-1 results ───────────────
+    self_lat, self_lng = None, None
     self_lower = business_name.lower().strip()
-    for p in places:
+    for p in city_places:
+        nm = (p.get("name") or "").lower().strip()
+        if nm == self_lower or (self_lower in nm and abs(len(nm) - len(self_lower)) < 8):
+            self_lat, self_lng = p.get("lat"), p.get("lng")
+            if self_lat and self_lng:
+                break
+
+    # ── Merge + distance-tiered sort ──────────────────────────────────────
+    all_places = city_places + county_places
+    seen = set()
+    enriched = []
+    for p in all_places:
         name = (p.get("name") or "").strip()
         if not name:
             continue
-        # Exclude the business itself (loose match — strips "of {city}" suffix)
-        if name.lower() == self_lower:
+        nm = name.lower()
+        # Exclude self (loose match)
+        if nm == self_lower or (self_lower and self_lower in nm and abs(len(nm) - len(self_lower)) < 8):
             continue
-        if self_lower in name.lower() and name.lower() in self_lower:
+        if nm in seen:
             continue
-        key = name.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        # Score by reviews_count + rating — proxy for SEO weight
+        seen.add(nm)
+        dist = _haversine_miles(self_lat, self_lng, p.get("lat"), p.get("lng"))
         reviews = int(p.get("reviews_count") or 0)
-        rating  = float(p.get("rating") or 0)
-        scored.append((reviews + (rating * 20), name))
+        rating = float(p.get("rating") or 0)
+        # Tier by distance band — closer always beats further, but within
+        # a tier SEO weight breaks ties so a 20-mile competitor with 5000
+        # reviews ranks above a 5-mile shop with 12 reviews.
+        if   dist <= 15: tier = 0   # truly local (same city / adjacent)
+        elif dist <= 40: tier = 1   # same metro / county
+        elif dist <= 80: tier = 2   # regional
+        else:            tier = 3   # far — only if reputation is strong
+        weight = reviews + (rating * 30)
+        enriched.append((tier, dist, -weight, name))
 
-    scored.sort(key=lambda x: -x[0])
-    return [name for _, name in scored[:10]]
+    enriched.sort()
+    return [name for _, _, _, name in enriched[:12]]
 
 
 def _merge_competitor_lists(apify_list: list[str], claude_list: list[str],

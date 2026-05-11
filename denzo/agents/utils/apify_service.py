@@ -240,6 +240,7 @@ class ApifyService:
                 if len(parts) >= 2:
                     city = parts[-2].strip()
 
+            loc = item.get("location") or {}
             results.append({
                 "name":          name,
                 "url":           item.get("website") or item.get("url") or "",
@@ -250,6 +251,8 @@ class ApifyService:
                 "reviews_count": item.get("reviewsCount") or item.get("reviewCount") or 0,
                 "place_id":      item.get("placeId") or "",
                 "categories":    item.get("categoryName") or item.get("categories") or "",
+                "lat":           loc.get("lat") if isinstance(loc, dict) else None,
+                "lng":           loc.get("lng") if isinstance(loc, dict) else None,
                 "source":        "apify_maps",
             })
 
