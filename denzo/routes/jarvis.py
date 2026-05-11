@@ -58,12 +58,27 @@ def state(tenant_id):
         FROM agents WHERE tenant_id=?
     """, (tenant_id,)).fetchall()]
 
-    # Activity stream — last 12 events with non-trivial messages
-    activity = [dict(r) for r in db.execute("""
+    # Activity stream — fetch more rows than we'll show so we can dedupe.
+    # Director loves to log 4-5 near-duplicate paragraphs in the same second;
+    # we keep one per (agent, level, message_prefix) to keep the HUD readable.
+    raw_activity = db.execute("""
         SELECT type, agent, message, level, created_at
         FROM activity WHERE tenant_id=?
-        ORDER BY id DESC LIMIT 12
-    """, (tenant_id,)).fetchall()]
+        ORDER BY id DESC LIMIT 60
+    """, (tenant_id,)).fetchall()
+
+    activity = []
+    seen = set()
+    for r in raw_activity:
+        msg = (r["message"] or "").strip()
+        # Dedup key: same agent + first 70 chars of message + level
+        key = (r["agent"] or "", (msg[:70]).lower(), r["level"] or "")
+        if key in seen:
+            continue
+        seen.add(key)
+        activity.append(dict(r))
+        if len(activity) >= 14:
+            break
 
     # KPIs
     def n(sql, *args):

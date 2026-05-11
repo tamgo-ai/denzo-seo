@@ -202,7 +202,13 @@
     .activity-msg {
       font-size: 11.5px; color: var(--muted);
       margin-top: 3px; line-height: 1.5;
+      cursor: default;
     }
+    .activity-msg .more {
+      color: var(--indigo); cursor: pointer; font-weight: 600;
+      margin-left: 4px;
+    }
+    .activity-msg .more:hover { color: #fff; }
     .activity-empty {
       text-align: center; padding: 30px 12px;
       font-size: 11px; color: var(--muted2);
@@ -554,7 +560,13 @@
             <span class="activity-agent" x-text="(a.agent || 'system').toUpperCase()"></span>
             <span class="activity-ts" x-text="formatTs(a.created_at)"></span>
           </div>
-          <p class="activity-msg" x-text="a.message"></p>
+          <p class="activity-msg">
+            <span x-text="msgPreview(a.message, expanded[idx])"></span>
+            <span class="more"
+                  x-show="(a.message || '').length > 140"
+                  @click="expanded[idx] = !expanded[idx]"
+                  x-text="expanded[idx] ? 'less' : 'more'"></span>
+          </p>
         </div>
       </template>
     </div>
@@ -704,6 +716,7 @@ function jarvis(tenantId) {
   return {
     tenantId,
     activity: [],
+    expanded: {},   // idx → bool, controls "more / less" on activity rows
     agents: [],
     agentTokens: [],
     missions: [],
@@ -844,6 +857,12 @@ function jarvis(tenantId) {
       this.$nextTick(() => {
         if (this.$refs.chatBox) this.$refs.chatBox.scrollTop = this.$refs.chatBox.scrollHeight;
       });
+    },
+
+    msgPreview(text, isExpanded) {
+      const s = (text || '').replace(/\s+/g, ' ').trim();
+      if (isExpanded || s.length <= 140) return s;
+      return s.slice(0, 140) + '…';
     },
 
     sparkPoints(arr) {
