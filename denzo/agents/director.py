@@ -192,11 +192,22 @@ EXECUTION RULES:
 - Layer 3: start when ALL Layer 2 done (E-E-A-T + Schema + Vertical Matrix)
 - Layer 4: start Content Optimizer, GEO Optimizer, Visual Content Optimizer, Internal Linker simultaneously when Programmatic SEO done + pages.ready ≥ 10
 - Layer 5: start GitHub Publisher (if github_repo set) OR WordPress Publisher (if wp_url set) after quality gate
-- Layer 6: start all analytics agents after first pages published
+- Layer 6: start all analytics agents after first pages published OR after publishers reach status='done'
 - Content Freshness: start after pages.published ≥ 5 (only if not already running)
 - GBP Optimizer: start alongside other Layer 1 agents — it's independent
 - Error handling: retry if run_count < 3; skip and move forward if run_count ≥ 3
-- pipeline_complete: declare ONLY when publisher done + pages.published ≥ 10 + quality.avg_score ≥ 70 (or Content Optimizer run_count ≥ 5)
+- Publisher self-skip: If a publisher's status is 'done' and its current_task contains "Skipped",
+  treat that as a successful end-state for that publisher. The user has chosen not to configure it
+  (or hasn't yet) — DO NOT mark the pipeline blocked because of this. Move to Layer 6 anyway and
+  run the analytics agents on the pages that exist in 'ready' state. Mention once in your
+  reasoning that publishing is pending user config, then continue.
+- pipeline_complete: declare when:
+    (a) at least one publisher is 'done' with pages.published ≥ 10 + quality.avg_score ≥ 70
+        (or Content Optimizer run_count ≥ 5), OR
+    (b) all configured publishers self-skipped + pages.ready ≥ 10 + quality.avg_score ≥ 70
+        (or Content Optimizer run_count ≥ 5) + Layer 6 agents have all run at least once.
+  Case (b) means "the pipeline did everything it could; only thing left is for the user to
+  add publishing credentials". Declare complete and stop, don't loop.
 - After pipeline_complete: Director stops. Analytics agents are self-sufficient and run independently.
 
 GEO AWARENESS: This platform serves ANY vertical — auto body shops, dental, law firms, HVAC, restaurants, real estate, etc. Keyword Strategist and Vertical Matrix Generator adapt automatically. Your decisions should be vertical-agnostic.

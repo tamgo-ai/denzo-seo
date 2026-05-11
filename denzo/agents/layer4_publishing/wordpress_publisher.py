@@ -44,8 +44,17 @@ class WordPressPublisher(TenantAwareBaseAgent):
         ctx = self.ctx
 
         if not ctx.wp_url or not ctx.wp_user or not ctx.wp_app_password:
-            self.log("WordPress credentials not configured. Set them in Settings.", "error")
-            self.set_status("error", "Missing WordPress config")
+            # Soft-skip — same rationale as GitHub Publisher. Missing creds is
+            # a setup gap, not an agent fault. Marking 'done' lets the Director
+            # advance to Layer 6 instead of blocking the entire pipeline.
+            self.log(
+                "WordPress credentials not configured. Skipping publish step. "
+                "Pages remain in 'ready' state. Add wp_url + wp_user + "
+                "wp_app_password in Settings → Publisher Configuration to "
+                "enable real publishing.",
+                "warning",
+            )
+            self.set_status("done", "Skipped — no WordPress config")
             return
 
         wp_url   = ctx.wp_url.rstrip("/")

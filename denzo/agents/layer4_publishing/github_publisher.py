@@ -401,8 +401,17 @@ class GitHubPublisher(TenantAwareBaseAgent):
         ctx = self.ctx
 
         if not ctx.github_repo or not ctx.github_token:
-            self.log("GitHub repo or token not configured. Set them in Settings.", "error")
-            self.set_status("error", "Missing GitHub config")
+            # Soft-skip rather than hard-fail. Missing publisher config is a
+            # client-side setup gap, not an agent failure — the Director treats
+            # status='done' as a green-light to move on to Layer 6 instead of
+            # stalling the whole pipeline.
+            self.log(
+                "GitHub repo/token not configured. Skipping publish step. "
+                "Pages remain in 'ready' state. Add github_repo + github_token "
+                "in Settings → Publisher Configuration to enable real publishing.",
+                "warning",
+            )
+            self.set_status("done", "Skipped — no GitHub config")
             return
 
         repo   = ctx.github_repo
