@@ -697,25 +697,34 @@ def wizard_step(step):
     s3 = session.get("wizard_s3", {})
     s4 = session.get("wizard_s4", {})
 
+    # Pre-fills: use saved user data UNLESS it's empty, in which case fall back
+    # to the freshly-analyzed values. The `or` trick handles the common case
+    # where a previous step submission stored an empty list (e.g. user clicked
+    # Continue too fast on Services and we saved []), without losing legitimate
+    # user edits where they typed something.
     ctx = {
         "step":     step,
         "analysis": analysis,
         "s1": s1, "s2": s2, "s3": s3, "s4": s4,
-        # Pre-fills using saved data or analysis defaults
-        "business_name": s1.get("business_name", analysis["business_name"]),
-        "city":          s1.get("city",          analysis["city"]),
-        "state":         s1.get("state",         analysis.get("state") or "CA"),
-        "industry":      s1.get("industry",      analysis["industry_guess"]),
-        "description":   s1.get("description",   analysis["description"]),
-        "phone":         s1.get("phone",         analysis.get("phone", "")),
-        "address":       s1.get("address",       analysis.get("address", "")),
-        "zip":           s1.get("zip",           analysis.get("zip", "")),
-        "services":      s2.get("services",      analysis["services"]),
-        "dont_sell":     s2.get("dont_sell",     analysis["dont_sell"]),
-        "focus_service": s2.get("focus_service", analysis["services"][0] if analysis["services"] else ""),
-        "competitors":   s3.get("competitors",   analysis["competitors"]),
-        "keywords":      s4.get("keywords",      analysis["keywords"]),
-        "titles":        s4.get("titles",        analysis["article_titles"]),
+
+        # Strings — keep user input even if it's blank (they may have deleted on purpose)
+        "business_name": s1.get("business_name") or analysis["business_name"],
+        "city":          s1.get("city")          or analysis["city"],
+        "state":         s1.get("state")         or analysis.get("state") or "CA",
+        "industry":      s1.get("industry")      or analysis["industry_guess"],
+        "description":   s1.get("description")   or analysis["description"],
+        "phone":         s1.get("phone")         or analysis.get("phone", ""),
+        "address":       s1.get("address")       or analysis.get("address", ""),
+        "zip":           s1.get("zip")           or analysis.get("zip", ""),
+
+        # Lists — empty list means "nothing saved yet", fall back to analysis
+        "services":      s2.get("services")      or analysis["services"],
+        "dont_sell":     s2.get("dont_sell")     or analysis["dont_sell"],
+        "focus_service": s2.get("focus_service") or (analysis["services"][0] if analysis["services"] else ""),
+        "competitors":   s3.get("competitors")   or analysis["competitors"],
+        "keywords":      s4.get("keywords")      or analysis["keywords"],
+        "titles":        s4.get("titles")        or analysis["article_titles"],
+
         "score":         analysis.get("score", 60),
         "issues":        analysis.get("issues", []),
     }
