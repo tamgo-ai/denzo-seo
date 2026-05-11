@@ -226,6 +226,69 @@ _ARTICLE_TEMPLATES = {
 }
 
 
+def _fetch_local_competitors(
+    *, client, business_name: str, city: str, state: str,
+    industry: str, national_seeds: list[str],
+) -> list[str]:
+    """Ask Claude for real local + brand competitors for SEO purposes.
+
+    Returns 8-10 competitor names: brand-adjacent dealers in nearby cities +
+    other relevant local businesses in the same city + 1-2 national players.
+    Returns [] on any failure — caller keeps the generic seeds.
+    """
+    industry_label = {
+        "auto_dealership": "auto dealership",
+        "auto_body":       "auto body / collision repair shop",
+        "dental":          "dental clinic",
+        "medical":         "medical clinic",
+        "medical_imaging": "medical imaging / radiology center",
+        "legal":           "law firm",
+        "real_estate":     "real estate agency",
+        "restaurant":      "restaurant",
+        "beauty":          "beauty salon / spa",
+    }.get(industry, industry)
+
+    location = f"{city}, {state}".strip(", ")
+    seeds_str = ", ".join(national_seeds[:5]) if national_seeds else "—"
+
+    prompt = f"""You are a local SEO analyst. List 8 real competitors that "{business_name}" in {location} actually competes with for organic Google rankings on local-intent queries.
+
+Business: {business_name}
+Type: {industry_label}
+Location: {location}
+National brands already considered: {seeds_str}
+
+Rules:
+- Prioritize REAL businesses you know exist in or near {location}.
+- For dealerships specifically: include 3-4 OTHER dealers of the same brand in nearby cities (e.g. for BMW of {city}, other BMW dealers within 60 miles), plus 2-3 luxury/competing-brand dealers in the same city.
+- For other verticals: include the top 5-7 specific local businesses someone in {city} would actually consider as alternatives.
+- Add 1 national/online competitor at the end (Carvana for dealers, Aspen Dental for dental, etc.) — only one.
+- Use real business names you're confident about, not invented placeholders.
+- If you are not confident about a specific business existing, omit it rather than hallucinate.
+
+Return ONLY a JSON array of strings, no markdown, no explanation:
+["Business Name 1", "Business Name 2", ...]"""
+
+    try:
+        resp = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=500,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = "".join(b.text for b in resp.content if hasattr(b, "text")).strip()
+        # Strip ```json fences if present
+        text = re.sub(r"^```(?:json)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+        comps = json.loads(text)
+        if not isinstance(comps, list):
+            return []
+        cleaned = [str(c).strip() for c in comps if str(c).strip()]
+        return cleaned[:10]
+    except Exception as e:
+        logger.warning("Claude competitor fetch failed: %s", e)
+        return []
+
+
 def _analyze_website(url: str) -> dict:
     """
     Fetch a URL and run a comprehensive SEO audit.
@@ -467,6 +530,35 @@ def _analyze_website(url: str) -> dict:
     # ── Fill dont_sell from industry defaults ──────────────────────────────────
     result["dont_sell"]  = _INDUSTRY_DONT_SELL.get(industry, _INDUSTRY_DONT_SELL["general"])
     result["competitors"] = _INDUSTRY_COMPETITORS.get(industry, _INDUSTRY_COMPETITORS["general"])
+
+    # ── Local competitor enrichment via Claude ─────────────────────────────────
+    # For verticals where SEO is hyper-local (auto_dealership, auto_body, dental,
+    # legal, restaurant, real_estate, home_services), the generic "national
+    # players" list above is useless for local SEO. Ask Claude for real local
+    # competitors based on the business name + city. The model has strong
+    # geographic knowledge for major US/EU cities and brand-specific dealerships.
+    LOCAL_SEO_VERTICALS = {
+        "auto_dealership", "auto_body", "dental", "medical", "medical_imaging",
+        "legal", "real_estate", "restaurant", "beauty",
+    }
+    if (industry in LOCAL_SEO_VERTICALS
+            and result["city"]
+            and result["business_name"]
+            and os.getenv("ANTHROPIC_API_KEY")):
+        try:
+            from anthropic import Anthropic
+            local_comps = _fetch_local_competitors(
+                client=Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY")),
+                business_name=result["business_name"],
+                city=result["city"],
+                state=result.get("state") or "",
+                industry=industry,
+                national_seeds=result["competitors"],
+            )
+            if local_comps:
+                result["competitors"] = local_comps
+        except Exception as e:
+            logger.warning("local competitor enrichment skipped: %s", e)
 
     # ── Keywords ──────────────────────────────────────────────────────────────
     svc0 = result["services"][0].lower() if result["services"] else "service"
