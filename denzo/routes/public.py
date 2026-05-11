@@ -239,6 +239,132 @@ _APIFY_SEARCH_PHRASES = {
 }
 
 
+_PLACES_QUERIES = {
+    # vertical → list of (query, radius_m) pairs to run as text searches
+    # Two queries gives us city-local + nearby brand-cluster competitors,
+    # naturally sorted by distance by Google's own ranking.
+    "auto_dealership": [],   # built dynamically per-brand below
+    "auto_body":       [("auto body shop", 20000), ("collision repair", 30000)],
+    "dental":          [("dentist", 15000), ("dental clinic", 25000)],
+    "medical":         [("medical clinic", 15000)],
+    "medical_imaging": [("radiology imaging center", 40000)],
+    "legal":           [("law firm", 20000), ("attorney", 30000)],
+    "real_estate":     [("real estate agency", 15000)],
+    "restaurant":      [("restaurant", 10000)],
+    "beauty":          [("beauty salon spa", 15000)],
+}
+
+
+def _fetch_places_competitors(
+    *, business_name: str, city: str, state: str, industry: str,
+) -> list[str]:
+    """Use Google Places API (New) v1 to find local competitors. Much faster
+    and more stable than Apify scraping (~500ms vs 60-120s).
+
+    Strategy for dealerships:
+      - Pass 1: '<brand> dealer' biased to a 20km circle from city → captures
+        same-brand dealers in the city + immediately adjacent towns.
+      - Pass 2: '<brand> dealer' biased to a 80km circle → captures regional
+        same-brand cluster (Murrieta's BMW also competes with Riverside, San
+        Diego, Carlsbad, Palm Springs).
+
+    Strategy for other verticals: one text search with locationBias to the
+    city's neighborhood radius.
+
+    Returns up to 12 distance-sorted competitor names. Excludes the client.
+    """
+    from denzo.agents.utils.google_places import (
+        search_nearby, search_text, PlacesError,
+    )
+
+    # Geocode the city — we need lat/lng for locationBias.circle. The cheapest
+    # way is a text search for the city itself; Google returns its centroid.
+    try:
+        city_query = f"{city}, {state}".strip(", ")
+        city_results = search_text(text_query=city_query, page_size=1)
+        if not city_results or city_results[0].get("lat") is None:
+            logger.warning("Could not geocode '%s' via Places API", city_query)
+            return []
+        city_lat = city_results[0]["lat"]
+        city_lng = city_results[0]["lng"]
+    except PlacesError as e:
+        logger.warning("Places geocoding failed: %s", e)
+        return []
+
+    brand = _detect_auto_brand(business_name) if industry == "auto_dealership" else ""
+
+    # Build query list
+    queries = []
+    # NOTE: Google Places API caps locationBias.circle.radius at 50000m (50km).
+    if industry == "auto_dealership":
+        if brand:
+            queries.append((f"{brand} dealer", 20000))     # local + adjacent
+            queries.append((f"{brand} dealer", 50000))     # regional brand cluster (max radius)
+            queries.append(("luxury car dealer", 15000))   # competing brands in town
+        else:
+            queries.append(("car dealership", 25000))
+    else:
+        queries = _PLACES_QUERIES.get(industry, [(industry.replace("_", " "), 20000)])
+
+    # Run all queries — each is one HTTP call, ~300-500ms
+    all_places = []
+    for query, radius_m in queries:
+        try:
+            places = search_nearby(
+                query=query, lat=city_lat, lng=city_lng,
+                radius_m=radius_m, page_size=15,
+            )
+            all_places.extend(places)
+        except PlacesError as e:
+            logger.warning("Places search '%s' failed: %s", query, e)
+            continue
+
+    if not all_places:
+        return []
+
+    # Find client's own lat/lng if present in results
+    self_lat = self_lng = None
+    self_lower = business_name.lower().strip()
+    for p in all_places:
+        nm = p.get("name", "").lower().strip()
+        if nm == self_lower or (self_lower in nm and abs(len(nm) - len(self_lower)) < 8):
+            self_lat, self_lng = p.get("lat"), p.get("lng")
+            if self_lat:
+                break
+    # Fallback: use city centroid as the client's position
+    if self_lat is None:
+        self_lat, self_lng = city_lat, city_lng
+
+    # Dedupe + distance-tier sort
+    seen = set()
+    enriched = []
+    for p in all_places:
+        name = (p.get("name") or "").strip()
+        if not name:
+            continue
+        nm = name.lower()
+        if nm == self_lower or (self_lower in nm and abs(len(nm) - len(self_lower)) < 8):
+            continue
+        if nm in seen:
+            continue
+        # Filter out closed places
+        if p.get("business_status") == "CLOSED_PERMANENTLY":
+            continue
+        seen.add(nm)
+        dist = _haversine_miles(self_lat, self_lng, p.get("lat"), p.get("lng"))
+        reviews = int(p.get("reviews_count") or 0)
+        rating = float(p.get("rating") or 0)
+        if   dist <= 15: tier = 0
+        elif dist <= 40: tier = 1
+        elif dist <= 80: tier = 2
+        else:            tier = 3
+        weight = reviews + (rating * 30)
+        enriched.append((tier, dist, -weight, name))
+
+    enriched.sort()
+    return [name for _, _, _, name in enriched[:12]]
+
+
 _AUTO_MAKES = [
     "BMW", "Mercedes-Benz", "Mercedes", "Audi", "Porsche", "Lexus",
     "Acura", "Infiniti", "Cadillac", "Lincoln", "Volvo", "Jaguar",
@@ -734,16 +860,12 @@ def _analyze_website(url: str) -> dict:
     result["dont_sell"]  = _INDUSTRY_DONT_SELL.get(industry, _INDUSTRY_DONT_SELL["general"])
     result["competitors"] = _INDUSTRY_COMPETITORS.get(industry, _INDUSTRY_COMPETITORS["general"])
 
-    # ── Local competitor enrichment: Apify SERP/Maps FIRST, Claude as fallback ─
-    # For verticals where SEO is hyper-local, the generic "national players"
-    # seeds are useless. Strategy:
-    #   1. If APIFY_API_KEY is set → query Google Maps for "<industry-term>
-    #      <city>" and use the actual top-ranking local businesses (real SERP
-    #      data, this is what we're competing against).
-    #   2. If Apify is unavailable or returns nothing → call Claude with
-    #      brand+location context to produce a confident list from training
-    #      knowledge (good for major US/EU markets).
-    #   3. If both fail → keep the generic national seeds.
+    # ── Local competitor enrichment: cascade Google Places → Apify → Claude ───
+    # Priority order (each step kicks in only if the previous returned <8 names):
+    #   1. Google Places API (New) v1 — ~500ms, official Google data, ~$0.06/onboarding
+    #   2. Apify Maps scraping — 60-120s fallback when Places quota exceeded
+    #   3. Claude Haiku knowledge — final fallback if no live data available
+    # Generic national seeds remain as the final-final safety net.
     LOCAL_SEO_VERTICALS = {
         "auto_dealership", "auto_body", "dental", "medical", "medical_imaging",
         "legal", "real_estate", "restaurant", "beauty",
@@ -752,25 +874,45 @@ def _analyze_website(url: str) -> dict:
             and result["city"]
             and result["business_name"]):
 
-        # ── Step 1: Apify Google Maps (real SERP) ─────────────────────────────
-        apify_comps = []
+        live_comps = []
+
+        # ── Step 1: Google Places API (fastest, most reliable) ────────────────
         try:
-            from denzo.agents.utils.apify_service import ApifyService
-            apify = ApifyService(log_fn=lambda m, l="info": logger.info(m))
-            if apify.available():
-                apify_comps = _fetch_apify_competitors(
-                    apify=apify,
+            from denzo.agents.utils import google_places
+            if google_places.is_configured():
+                live_comps = _fetch_places_competitors(
                     business_name=result["business_name"],
                     city=result["city"],
                     state=result.get("state") or "",
                     industry=industry,
                 )
+                if live_comps:
+                    logger.info("Google Places returned %d competitors", len(live_comps))
         except Exception as e:
-            logger.warning("Apify competitor lookup skipped: %s", e)
+            logger.warning("Google Places competitor lookup skipped: %s", e)
 
-        # ── Step 2: Claude (training knowledge) — supplements or replaces ─────
-        claude_comps = []
-        if os.getenv("ANTHROPIC_API_KEY"):
+        # ── Step 2: Apify (only if Places didn't deliver enough) ──────────────
+        if len(live_comps) < 8:
+            try:
+                from denzo.agents.utils.apify_service import ApifyService
+                apify = ApifyService(log_fn=lambda m, l="info": logger.info(m))
+                if apify.available():
+                    apify_comps = _fetch_apify_competitors(
+                        apify=apify,
+                        business_name=result["business_name"],
+                        city=result["city"],
+                        state=result.get("state") or "",
+                        industry=industry,
+                    )
+                    # Merge — Places first, Apify fills gaps
+                    live_comps = _merge_competitor_lists(
+                        live_comps, apify_comps, result["business_name"]
+                    )
+            except Exception as e:
+                logger.warning("Apify competitor lookup skipped: %s", e)
+
+        # ── Step 3: Claude (training knowledge) — final fallback ──────────────
+        if len(live_comps) < 6 and os.getenv("ANTHROPIC_API_KEY"):
             try:
                 from anthropic import Anthropic
                 claude_comps = _fetch_local_competitors(
@@ -781,13 +923,14 @@ def _analyze_website(url: str) -> dict:
                     industry=industry,
                     national_seeds=result["competitors"],
                 )
+                live_comps = _merge_competitor_lists(
+                    live_comps, claude_comps, result["business_name"]
+                )
             except Exception as e:
                 logger.warning("Claude competitor fetch skipped: %s", e)
 
-        # ── Merge: Apify first (real), then Claude (gaps), dedupe ─────────────
-        merged = _merge_competitor_lists(apify_comps, claude_comps, result["business_name"])
-        if merged:
-            result["competitors"] = merged
+        if live_comps:
+            result["competitors"] = live_comps
         # else: keep the generic seeds — better than nothing
 
     # ── Keywords ──────────────────────────────────────────────────────────────
