@@ -639,6 +639,18 @@ def wizard_step(step):
         return redirect(url_for("public.landing"))
     analysis = session["wizard_analysis"]
 
+    # ── Stale-analysis guard ──────────────────────────────────────────────────
+    # If the session was created by an older build of the analyzer (before
+    # phone/address/zip extraction was added), the saved dict won't have those
+    # keys and the user sees pre-filled fields as empty inputs. Detect this
+    # mismatch and transparently re-run the analyzer on the same URL.
+    has_new_keys = "phone" in analysis and "address" in analysis and "zip" in analysis
+    if not has_new_keys and analysis.get("url"):
+        fresh = _analyze_website(analysis["url"])
+        # Preserve any user edits saved in s1/s2/s3/s4
+        session["wizard_analysis"] = fresh
+        analysis = fresh
+
     if request.method == "POST":
         # Save step data
         if step == 1:
