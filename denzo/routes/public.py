@@ -251,14 +251,19 @@ def _analyze_website(url: str) -> dict:
     body_text = ""
 
     try:
-        resp = requests.get(
-            url, timeout=8,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; DenzoSEOBot/1.0)"},
-            allow_redirects=True
-        )
-        result["reachable"] = resp.status_code < 400
-        result["page_size_kb"] = round(len(resp.content) / 1024, 1)
-        soup = BeautifulSoup(resp.text, "lxml")
+        # Use stealth_fetch — it tries curl → requests → cloudscraper → playwright
+        # in that order, transparently bypassing Cloudflare bot protection that
+        # was blocking plain `requests` (the old code got 403 on most modern
+        # dealership / agency / SaaS sites).
+        from denzo.agents.utils.stealth_fetch import fetch_html
+        fetched = fetch_html(url, timeout=30)
+        if not fetched.get("ok") or not fetched.get("html"):
+            raise RuntimeError(f"fetch failed via {fetched.get('method', '?')}: status={fetched.get('status')}")
+
+        html_text = fetched["html"]
+        result["reachable"] = True
+        result["page_size_kb"] = round(len(html_text) / 1024, 1)
+        soup = BeautifulSoup(html_text, "lxml")
         body_text = (soup.get_text(" ", strip=True) or "")
         result["word_count"] = len(body_text.split())
         body_lower = body_text.lower()
@@ -288,7 +293,24 @@ def _analyze_website(url: str) -> dict:
         if og_site and og_site.get("content", "").strip():
             biz_name = og_site["content"].strip()
         result["business_name"] = biz_name or domain.replace("www.", "").split(".")[0].title()
+
+        # Description priority: meta description → og:description → first
+        # meaningful <p>. Avoid leaving the field blank — clients hate filling
+        # this manually and Claude generates better content with seed text.
         result["description"] = result["meta_description"]
+        if not result["description"]:
+            og_desc = soup.find("meta", attrs={"property": "og:description"})
+            if og_desc and og_desc.get("content", "").strip():
+                result["description"] = og_desc["content"].strip()
+        if not result["description"]:
+            # Find first <p> with 60+ chars of meaningful text (skip cookie
+            # banners, footers, nav menus)
+            SKIP_PATTERNS = re.compile(r"(cookie|privacy|accept|menu|navigation|copyright|©)", re.I)
+            for p in soup.find_all("p"):
+                text = p.get_text(" ", strip=True)
+                if 60 <= len(text) <= 400 and not SKIP_PATTERNS.search(text):
+                    result["description"] = text
+                    break
 
         # ── Headings ─────────────────────────────────────────────────────────
         h1s = soup.find_all("h1")
@@ -323,23 +345,76 @@ def _analyze_website(url: str) -> dict:
             for h in link_hrefs
         )
 
-        # ── Location from Schema.org ──────────────────────────────────────────
+        # ── Location + phone + address from Schema.org JSON-LD ───────────────
+        # JSON-LD is the most reliable source — well-tagged sites put their
+        # full NAP (Name/Address/Phone) here. We walk all script blocks because
+        # many sites put multiple @types and we want LocalBusiness/Org first.
+        def _flatten_jsonld(blob):
+            """Yield every dict node inside arbitrarily nested JSON-LD."""
+            if isinstance(blob, list):
+                for item in blob: yield from _flatten_jsonld(item)
+            elif isinstance(blob, dict):
+                yield blob
+                for v in blob.values():
+                    if isinstance(v, (list, dict)): yield from _flatten_jsonld(v)
+
+        result["address"] = ""
+        result["zip"] = ""
         for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
             try:
                 data = json.loads(script.string or "{}")
-                if isinstance(data, list): data = data[0]
-                addr = data.get("address", {})
-                result["city"]  = result["city"]  or addr.get("addressLocality", "")
-                result["state"] = result["state"] or addr.get("addressRegion", "")
-                result["phone"] = result["phone"] or data.get("telephone", "")
+                for node in _flatten_jsonld(data):
+                    addr = node.get("address") if isinstance(node.get("address"), dict) else {}
+                    if isinstance(addr, dict):
+                        street = (addr.get("streetAddress") or "").strip()
+                        city   = (addr.get("addressLocality") or "").strip()
+                        state  = (addr.get("addressRegion") or "").strip()
+                        zip_c  = (addr.get("postalCode") or "").strip()
+                        result["city"]  = result["city"]  or city
+                        result["state"] = result["state"] or state
+                        result["zip"]   = result["zip"]   or zip_c
+                        if street and not result["address"]:
+                            result["address"] = ", ".join(filter(None, [street, city, state, zip_c]))
+                    tel = (node.get("telephone") or "").strip()
+                    if tel and not result["phone"]:
+                        result["phone"] = tel
             except Exception:
                 pass
 
-        # ── Phone from body ───────────────────────────────────────────────────
+        # ── Phone from body — only if JSON-LD didn't have it ──────────────────
+        # Stricter regex: must look like a real US/intl phone, not a spec table
+        # entry like "0-60: 5.4" or "MPG: 28/35". Require at least one of:
+        #   parentheses around area code, "tel:" prefix, or strict 3-3-4 with
+        #   hyphen/space separators.
         if not result["phone"]:
-            pm = re.search(r"[\+]?[\(]?\d{3}[\)]?[\s\.\-]?\d{3,4}[\s\.\-]?\d{4}", body_text)
-            if pm:
-                result["phone"] = pm.group()
+            tel_href = soup.find("a", href=re.compile(r"^tel:"))
+            if tel_href:
+                result["phone"] = tel_href["href"].replace("tel:", "").strip()
+        if not result["phone"]:
+            patterns = [
+                r"\(\d{3}\)\s*\d{3}[\-\.\s]\d{4}",       # (951) 234-5678
+                r"\b\d{3}[\-\.]\d{3}[\-\.]\d{4}\b",      # 951-234-5678 / 951.234.5678
+                r"\b1[\-\.]?\d{3}[\-\.]\d{3}[\-\.]\d{4}\b",  # 1-833-613-1189
+                r"\b\d{1}[\-\.]\d{3}[\-\.]\d{3}[\-\.]\d{4}\b",  # 1-833-613-1189
+            ]
+            for pat in patterns:
+                m = re.search(pat, body_text)
+                if m:
+                    result["phone"] = m.group().strip()
+                    break
+
+        # ── Address from body — fallback if JSON-LD missed it ─────────────────
+        if not result["address"]:
+            # "123 Main St, City, ST 12345" — strict enough to avoid garbage
+            addr_re = re.compile(
+                r"\b\d{2,6}\s+[A-Z][A-Za-z0-9\.\s\-]+?"
+                r"(?:Street|St\.?|Avenue|Ave\.?|Road|Rd\.?|Boulevard|Blvd\.?|Drive|Dr\.?|"
+                r"Way|Lane|Ln\.?|Parkway|Pkwy\.?|Court|Ct\.?|Plaza|Place|Pl\.?|Highway|Hwy\.?)"
+                r"\s*,?\s*[A-Z][A-Za-z\s\.]+?,?\s+[A-Z]{2}\s+\d{5}(?:-\d{4})?\b"
+            )
+            m = addr_re.search(body_text)
+            if m:
+                result["address"] = m.group().strip()
 
         # ── Industry detection (word-boundary regex, bilingual) ───────────────
         for industry_key, patterns in _INDUSTRY_PATTERNS:
@@ -573,6 +648,9 @@ def wizard_step(step):
                 "state":         request.form.get("state", "CA"),
                 "industry":      request.form.get("industry", analysis["industry_guess"]),
                 "description":   request.form.get("description", analysis["description"]),
+                "phone":         request.form.get("phone", analysis.get("phone", "")),
+                "address":       request.form.get("address", analysis.get("address", "")),
+                "zip":           request.form.get("zip", analysis.get("zip", "")),
             }
         elif step == 2:
             services_raw  = request.form.getlist("services[]")
@@ -614,9 +692,12 @@ def wizard_step(step):
         # Pre-fills using saved data or analysis defaults
         "business_name": s1.get("business_name", analysis["business_name"]),
         "city":          s1.get("city",          analysis["city"]),
-        "state":         s1.get("state",         "CA"),
+        "state":         s1.get("state",         analysis.get("state") or "CA"),
         "industry":      s1.get("industry",      analysis["industry_guess"]),
         "description":   s1.get("description",   analysis["description"]),
+        "phone":         s1.get("phone",         analysis.get("phone", "")),
+        "address":       s1.get("address",       analysis.get("address", "")),
+        "zip":           s1.get("zip",           analysis.get("zip", "")),
         "services":      s2.get("services",      analysis["services"]),
         "dont_sell":     s2.get("dont_sell",     analysis["dont_sell"]),
         "focus_service": s2.get("focus_service", analysis["services"][0] if analysis["services"] else ""),
@@ -687,10 +768,15 @@ def wizard_complete():
 
         db.execute("""
             INSERT INTO clients
-              (tenant_id, name, business_type, website_url, city, state,
+              (tenant_id, name, business_type, website_url,
+               phone, address, city, state,
                publisher_type, status, owner_user_id, created_at, updated_at)
-            VALUES (?,?,?,?,?,?,'wordpress','active',?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
-        """, (tenant_id, biz_name, industry, website, city, state, user_id))
+            VALUES (?,?,?,?,?,?,?,?,'wordpress','active',?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+        """, (
+            tenant_id, biz_name, industry, website,
+            s1.get("phone", ""), s1.get("address", ""),
+            city, state, user_id,
+        ))
 
         db.execute("""
             INSERT INTO client_context

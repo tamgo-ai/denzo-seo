@@ -87,6 +87,8 @@
     textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
     select option { background: #111; }
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-row-3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; }
+    @media (max-width: 640px) { .form-row-3 { grid-template-columns: 1fr; } }
 
     /* ── Service tags ──────────────────────────────────────────── */
     .tag-list { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -294,7 +296,12 @@
         <label>Business Name</label>
         <input type="text" name="business_name" value="{{ business_name }}" required placeholder="Your Business Name"/>
       </div>
-      <div class="form-row" style="margin-bottom:16px">
+      <div style="margin-bottom:16px">
+        <label>Street Address</label>
+        <input type="text" name="address" value="{{ address }}" placeholder="41430 Auto Mall Parkway, Murrieta, CA 92562"/>
+        <p style="font-size:11px;color:#4b5563;margin-top:4px">Full street address — used for local SEO schema and Google Business Profile content.</p>
+      </div>
+      <div class="form-row-3" style="margin-bottom:16px">
         <div>
           <label>City</label>
           <input type="text" name="city" value="{{ city }}" placeholder="Los Angeles"/>
@@ -303,11 +310,19 @@
           <label>State</label>
           <input type="text" name="state" value="{{ state }}" placeholder="CA" maxlength="2"/>
         </div>
+        <div>
+          <label>ZIP</label>
+          <input type="text" name="zip" value="{{ zip }}" placeholder="92562" maxlength="10"/>
+        </div>
+      </div>
+      <div style="margin-bottom:16px">
+        <label>Phone</label>
+        <input type="text" name="phone" value="{{ phone }}" placeholder="(951) 234-5678"/>
       </div>
       <div style="margin-bottom:16px">
         <label>Industry</label>
         <select name="industry">
-          {% for val, label in [('general','General Business'),('auto_body','Auto Body / Collision'),('dental','Dental / Healthcare'),('medical_imaging','Medical Imaging / Radiology'),('medical','Medical / Healthcare'),('legal','Legal Services'),('real_estate','Real Estate'),('restaurant','Restaurant / Food'),('ecommerce','E-Commerce'),('saas','SaaS / Software'),('education','Education / Training'),('beauty','Beauty / Salon / Spa')] %}
+          {% for val, label in [('general','General Business'),('auto_body','Auto Body / Collision'),('auto_dealership','Auto Dealership'),('dental','Dental / Healthcare'),('medical_imaging','Medical Imaging / Radiology'),('medical','Medical / Healthcare'),('legal','Legal Services'),('real_estate','Real Estate'),('restaurant','Restaurant / Food'),('ecommerce','E-Commerce'),('saas','SaaS / Software'),('education','Education / Training'),('beauty','Beauty / Salon / Spa')] %}
           <option value="{{ val }}" {% if industry == val %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
         </select>
