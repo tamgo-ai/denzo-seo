@@ -255,6 +255,9 @@ def _fetch_apify_competitors(
     # For dealerships, try to detect the brand from the business name and
     # add a brand-specific search to surface other BMW/Honda/Ford dealers
     # in nearby cities.
+    # Build short search phrases (no city appended — we pass it as
+    # locationQuery to the actor so it geolocates properly and returns in
+    # ~30s instead of 3min).
     queries = []
     brand = ""
     if industry == "auto_dealership":
@@ -271,18 +274,22 @@ def _fetch_apify_competitors(
                 brand = m
                 break
         if brand:
-            # Search for OTHER same-brand dealers across a wider radius —
-            # Google Maps does the geographic prioritization for us.
-            queries.append(f"{brand} dealer near {location}")
-            queries.append(f"luxury car dealer {location}")
+            queries.append(f"{brand} dealer")
+            queries.append("luxury car dealer")
         else:
-            queries.append(f"car dealership {location}")
+            queries.append("car dealership")
     else:
         for phrase in phrases[:2]:
-            queries.append(f"{phrase} {location}")
+            queries.append(phrase)
 
     try:
-        places = apify.find_local_businesses(queries, max_per_query=10)
+        # 90s timeout — should complete in 30-60s with locationQuery scope.
+        # If it doesn't, the wizard falls through to Claude.
+        places = apify.find_local_businesses(
+            queries, max_per_query=10,
+            location_query=location,
+            timeout_secs=90,
+        )
     except Exception as e:
         logger.warning("Apify Maps lookup failed: %s", e)
         return []

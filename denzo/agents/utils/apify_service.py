@@ -195,21 +195,35 @@ class ApifyService:
         return all_results
 
     def find_local_businesses(self, search_queries: list[str],
-                               max_per_query: int = 20) -> list[dict]:
+                               max_per_query: int = 20,
+                               location_query: str | None = None,
+                               timeout_secs: int = 180) -> list[dict]:
         """
         Find local businesses via Google Maps.
-        Returns list of {name, url, address, city, phone, rating, reviews_count, place_id}
+        Returns list of {name, url, address, city, phone, rating, reviews_count, place_id}.
+
+        location_query: optional "City, State" or "City, Country" string passed
+        to the Apify actor as `locationQuery`. This tells Google Maps to focus
+        the geolocation on that specific city instead of crawling the whole
+        country (USA-wide search takes 3+ minutes and returns 3 noisy results;
+        city-scoped search takes ~30s and returns 15-20 relevant ones).
         """
         if not search_queries or not self._key:
             return []
 
-        items = self.run_actor("maps", {
+        actor_input = {
             "searchStringsArray":          search_queries,
             "maxCrawledPlacesPerSearch":   max_per_query,
             "language":                    "en",
             "countryCode":                 "us",
             "exportPlaceUrls":             False,
-        }, timeout_secs=180, max_items=max_per_query * len(search_queries))
+        }
+        if location_query:
+            actor_input["locationQuery"] = location_query
+
+        items = self.run_actor("maps", actor_input,
+            timeout_secs=timeout_secs,
+            max_items=max_per_query * len(search_queries))
 
         results = []
         for item in items:
