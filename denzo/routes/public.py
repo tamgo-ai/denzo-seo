@@ -226,6 +226,112 @@ _ARTICLE_TEMPLATES = {
 }
 
 
+_APIFY_SEARCH_PHRASES = {
+    "auto_dealership": ["car dealership", "auto dealer", "luxury car dealer"],
+    "auto_body":       ["auto body shop", "collision repair"],
+    "dental":          ["dentist", "dental clinic"],
+    "medical":         ["medical clinic", "doctor's office"],
+    "medical_imaging": ["radiology center", "imaging center"],
+    "legal":           ["lawyer", "attorney", "law firm"],
+    "real_estate":     ["real estate agency", "realtor"],
+    "restaurant":      ["restaurant"],
+    "beauty":          ["beauty salon", "spa"],
+}
+
+
+def _fetch_apify_competitors(
+    *, apify, business_name: str, city: str, state: str, industry: str,
+) -> list[str]:
+    """Hit Google Maps via Apify and return the top businesses for this
+    vertical in the same city. For dealerships we also pull the same-brand
+    dealers in the broader region, which captures BMW competing with other
+    BMW dealers 30-60mi away — the most relevant SEO competitors.
+
+    Returns up to 10 names. Excludes the business itself.
+    """
+    location = f"{city}, {state}".strip(", ")
+    phrases  = _APIFY_SEARCH_PHRASES.get(industry, [industry.replace("_", " ")])
+
+    # For dealerships, try to detect the brand from the business name and
+    # add a brand-specific search to surface other BMW/Honda/Ford dealers
+    # in nearby cities.
+    queries = []
+    brand = ""
+    if industry == "auto_dealership":
+        # Detect brand from business name — case-insensitive scan of common makes
+        MAKES = ["BMW", "Mercedes-Benz", "Mercedes", "Audi", "Porsche", "Lexus",
+                 "Acura", "Infiniti", "Cadillac", "Lincoln", "Volvo", "Jaguar",
+                 "Land Rover", "Range Rover", "Tesla",
+                 "Toyota", "Honda", "Ford", "Chevrolet", "Chevy", "Nissan",
+                 "Hyundai", "Kia", "Jeep", "Ram", "GMC", "Mazda", "Subaru",
+                 "Volkswagen", "VW", "Mitsubishi", "Buick", "Chrysler", "Dodge"]
+        bn_lower = business_name.lower()
+        for m in MAKES:
+            if m.lower() in bn_lower:
+                brand = m
+                break
+        if brand:
+            # Search for OTHER same-brand dealers across a wider radius —
+            # Google Maps does the geographic prioritization for us.
+            queries.append(f"{brand} dealer near {location}")
+            queries.append(f"luxury car dealer {location}")
+        else:
+            queries.append(f"car dealership {location}")
+    else:
+        for phrase in phrases[:2]:
+            queries.append(f"{phrase} {location}")
+
+    try:
+        places = apify.find_local_businesses(queries, max_per_query=10)
+    except Exception as e:
+        logger.warning("Apify Maps lookup failed: %s", e)
+        return []
+
+    # Filter, dedupe, exclude self, prefer higher-rating + more-reviewed
+    seen = set()
+    scored = []
+    self_lower = business_name.lower().strip()
+    for p in places:
+        name = (p.get("name") or "").strip()
+        if not name:
+            continue
+        # Exclude the business itself (loose match — strips "of {city}" suffix)
+        if name.lower() == self_lower:
+            continue
+        if self_lower in name.lower() and name.lower() in self_lower:
+            continue
+        key = name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        # Score by reviews_count + rating — proxy for SEO weight
+        reviews = int(p.get("reviews_count") or 0)
+        rating  = float(p.get("rating") or 0)
+        scored.append((reviews + (rating * 20), name))
+
+    scored.sort(key=lambda x: -x[0])
+    return [name for _, name in scored[:10]]
+
+
+def _merge_competitor_lists(apify_list: list[str], claude_list: list[str],
+                             business_name: str) -> list[str]:
+    """Combine Apify (real SERP) and Claude (knowledge) lists, prioritizing
+    Apify results, deduplicating by case-insensitive name, and capping at 10."""
+    out = []
+    seen = set()
+    self_lower = business_name.lower().strip()
+    for src in (apify_list, claude_list):
+        for name in src or []:
+            key = (name or "").lower().strip()
+            if not key or key in seen or key == self_lower:
+                continue
+            seen.add(key)
+            out.append(name.strip())
+            if len(out) >= 10:
+                return out
+    return out
+
+
 def _fetch_local_competitors(
     *, client, business_name: str, city: str, state: str,
     industry: str, national_seeds: list[str],
@@ -531,34 +637,61 @@ def _analyze_website(url: str) -> dict:
     result["dont_sell"]  = _INDUSTRY_DONT_SELL.get(industry, _INDUSTRY_DONT_SELL["general"])
     result["competitors"] = _INDUSTRY_COMPETITORS.get(industry, _INDUSTRY_COMPETITORS["general"])
 
-    # ── Local competitor enrichment via Claude ─────────────────────────────────
-    # For verticals where SEO is hyper-local (auto_dealership, auto_body, dental,
-    # legal, restaurant, real_estate, home_services), the generic "national
-    # players" list above is useless for local SEO. Ask Claude for real local
-    # competitors based on the business name + city. The model has strong
-    # geographic knowledge for major US/EU cities and brand-specific dealerships.
+    # ── Local competitor enrichment: Apify SERP/Maps FIRST, Claude as fallback ─
+    # For verticals where SEO is hyper-local, the generic "national players"
+    # seeds are useless. Strategy:
+    #   1. If APIFY_API_KEY is set → query Google Maps for "<industry-term>
+    #      <city>" and use the actual top-ranking local businesses (real SERP
+    #      data, this is what we're competing against).
+    #   2. If Apify is unavailable or returns nothing → call Claude with
+    #      brand+location context to produce a confident list from training
+    #      knowledge (good for major US/EU markets).
+    #   3. If both fail → keep the generic national seeds.
     LOCAL_SEO_VERTICALS = {
         "auto_dealership", "auto_body", "dental", "medical", "medical_imaging",
         "legal", "real_estate", "restaurant", "beauty",
     }
     if (industry in LOCAL_SEO_VERTICALS
             and result["city"]
-            and result["business_name"]
-            and os.getenv("ANTHROPIC_API_KEY")):
+            and result["business_name"]):
+
+        # ── Step 1: Apify Google Maps (real SERP) ─────────────────────────────
+        apify_comps = []
         try:
-            from anthropic import Anthropic
-            local_comps = _fetch_local_competitors(
-                client=Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY")),
-                business_name=result["business_name"],
-                city=result["city"],
-                state=result.get("state") or "",
-                industry=industry,
-                national_seeds=result["competitors"],
-            )
-            if local_comps:
-                result["competitors"] = local_comps
+            from denzo.agents.utils.apify_service import ApifyService
+            apify = ApifyService(log_fn=lambda m, l="info": logger.info(m))
+            if apify.available():
+                apify_comps = _fetch_apify_competitors(
+                    apify=apify,
+                    business_name=result["business_name"],
+                    city=result["city"],
+                    state=result.get("state") or "",
+                    industry=industry,
+                )
         except Exception as e:
-            logger.warning("local competitor enrichment skipped: %s", e)
+            logger.warning("Apify competitor lookup skipped: %s", e)
+
+        # ── Step 2: Claude (training knowledge) — supplements or replaces ─────
+        claude_comps = []
+        if os.getenv("ANTHROPIC_API_KEY"):
+            try:
+                from anthropic import Anthropic
+                claude_comps = _fetch_local_competitors(
+                    client=Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY")),
+                    business_name=result["business_name"],
+                    city=result["city"],
+                    state=result.get("state") or "",
+                    industry=industry,
+                    national_seeds=result["competitors"],
+                )
+            except Exception as e:
+                logger.warning("Claude competitor fetch skipped: %s", e)
+
+        # ── Merge: Apify first (real), then Claude (gaps), dedupe ─────────────
+        merged = _merge_competitor_lists(apify_comps, claude_comps, result["business_name"])
+        if merged:
+            result["competitors"] = merged
+        # else: keep the generic seeds — better than nothing
 
     # ── Keywords ──────────────────────────────────────────────────────────────
     svc0 = result["services"][0].lower() if result["services"] else "service"
