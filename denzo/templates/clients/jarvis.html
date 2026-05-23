@@ -132,58 +132,73 @@
     .activity-msg { font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.5; }
     .activity-empty { text-align:center; padding:30px 12px; font-size:11px; color:var(--muted2); }
 
-    /* ── CENTER: Orbital core ──────────────────────────────────────────── */
+    /* ── CENTER: Pipeline Phase Core ──────────────────────────────────── */
     .panel-core { grid-area:core; display:flex; align-items:center; justify-content:center;
-      background:transparent; border:none; position:relative; }
+      background:transparent; border:none; position:relative; flex-direction:column; }
     .panel-core::before { display:none; }
     .core-wrap { position:relative; width:380px; height:380px; max-width:90%; max-height:90%; }
-    .orbit { position:absolute; inset:0; border-radius:50%; border:1px solid var(--border-h);
-      animation:rotate-cw 60s linear infinite; }
-    .orbit.r2 { inset:36px; animation:rotate-ccw 45s linear infinite; border-color:rgba(120,130,200,0.18); }
-    .orbit.r3 { inset:72px; animation:rotate-cw 30s linear infinite; border-color:rgba(120,130,200,0.22); }
-    .orbit.r4 { inset:108px; animation:rotate-ccw 22s linear infinite; border-color:rgba(120,130,200,0.28); }
-    .orbit.r5 { inset:50px; animation:rotate-cw 38s linear infinite; border-color:rgba(34,211,238,0.15); display:none; }
-    .orbit.r5.active { display:block; }
-    .orbit.r6 { inset:88px; animation:rotate-ccw 28s linear infinite; border-color:rgba(167,139,250,0.18); display:none; }
-    .orbit.r6.active { display:block; }
-    @keyframes rotate-cw  { to { transform:rotate(360deg); } }
-    @keyframes rotate-ccw { to { transform:rotate(-360deg); } }
-    .orbit-dot { position:absolute; top:-3px; left:50%; transform:translateX(-50%);
-      width:6px; height:6px; border-radius:50%; background:var(--cyan); box-shadow:0 0 8px var(--cyan); }
-    .orbit.r2 .orbit-dot { background:var(--indigo); box-shadow:0 0 8px var(--indigo); }
-    .orbit.r3 .orbit-dot { background:var(--violet); box-shadow:0 0 8px var(--violet); }
-    .orbit.r4 .orbit-dot { background:var(--pink);   box-shadow:0 0 8px var(--pink); }
-    .orbit.r5 .orbit-dot { background:var(--cyan);   box-shadow:0 0 8px var(--cyan); }
-    .orbit.r6 .orbit-dot { background:var(--amber);  box-shadow:0 0 8px var(--amber); }
 
-    .core { position:absolute; inset:132px; border-radius:50%;
-      background:radial-gradient(circle at 35% 30%, rgba(255,255,255,0.18) 0%, transparent 50%),
-                radial-gradient(circle at 60% 70%, rgba(167,139,250,0.35) 0%, rgba(99,102,241,0.18) 30%, transparent 60%);
-      box-shadow:0 0 60px rgba(99,102,241,0.4), inset 0 0 60px rgba(255,255,255,0.06);
-      animation:core-breathe 4s ease-in-out infinite; transition:box-shadow 0.5s; }
-    .core.is-thinking { animation:core-thinking 0.8s ease-in-out infinite;
-      box-shadow:0 0 80px rgba(34,211,238,0.6), inset 0 0 80px rgba(34,211,238,0.15); }
-    .core.is-warning { box-shadow:0 0 80px rgba(251,191,36,0.5), inset 0 0 60px rgba(251,191,36,0.1); }
-    .core.is-done { box-shadow:0 0 80px rgba(74,222,128,0.5), inset 0 0 60px rgba(74,222,128,0.1); }
-    @keyframes core-breathe { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
-    @keyframes core-thinking { 0%,100%{transform:scale(1.04)} 50%{transform:scale(1.10)} }
-    .core-label { position:absolute; inset:0; display:flex; align-items:center;
-      justify-content:center; flex-direction:column; pointer-events:none; }
-    .core-label .name { font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600;
-      letter-spacing:0.16em; color:rgba(255,255,255,0.95); text-shadow:0 0 12px rgba(99,102,241,0.6); }
-    .core-label .status { font-family:'JetBrains Mono',monospace; font-size:9px;
-      letter-spacing:0.10em; color:var(--muted); margin-top:3px; }
+    /* Phase rings — one per pipeline stage pair, filled by progress */
+    .phase-ring { position:absolute; border-radius:50%; border:2px solid transparent; }
+    .phase-ring.r1 { inset:12px;  border-color:rgba(99,102,241,0.15); }
+    .phase-ring.r2 { inset:50px;  border-color:rgba(99,102,241,0.12); }
+    .phase-ring.r3 { inset:88px;  border-color:rgba(99,102,241,0.10); }
+    .phase-ring.r4 { inset:126px; border-color:rgba(99,102,241,0.08); }
+    .phase-ring.done { border-color:rgba(74,222,128,0.35) !important; box-shadow:0 0 12px rgba(74,222,128,0.15); }
+    .phase-ring.working { border-color:rgba(34,211,238,0.45) !important; box-shadow:0 0 14px rgba(34,211,238,0.2); animation:ring-pulse 1.5s ease-in-out infinite; }
+    .phase-ring.error { border-color:rgba(251,113,133,0.45) !important; }
+    @keyframes ring-pulse { 0%,100%{box-shadow:0 0 14px rgba(34,211,238,0.2)} 50%{box-shadow:0 0 28px rgba(34,211,238,0.45)} }
 
-    .agent-token { position:absolute; top:50%; left:50%; width:34px; height:34px;
-      margin:-17px 0 0 -17px; border-radius:50%; background:var(--surface-2);
-      border:1px solid var(--border-h); display:flex; align-items:center; justify-content:center;
-      font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; color:#fff;
-      animation:token-pulse 1.6s ease-in-out infinite; cursor:pointer;
-      box-shadow:0 0 12px currentColor; transition:transform 0.15s; }
-    .agent-token:hover { transform:translate(var(--tx,0px),var(--ty,0px)) scale(1.3) !important;
-      animation:none; z-index:10; border-color:#fff; }
-    @keyframes token-pulse { 0%,100%{transform:translate(var(--tx,0px),var(--ty,0px)) scale(1)}
-      50%{transform:translate(var(--tx,0px),var(--ty,0px)) scale(1.15)} }
+    .ring-label {
+      position:absolute; top:-10px; left:50%; transform:translateX(-50%);
+      font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:600;
+      letter-spacing:0.06em; color:var(--muted2); white-space:nowrap;
+      transition:color 0.3s;
+    }
+    .phase-ring.done .ring-label { color:var(--green); }
+    .phase-ring.working .ring-label { color:var(--cyan); }
+
+    /* Center — phase indicator + CTA */
+    .core-center { position:absolute; inset:140px; border-radius:50%;
+      background:radial-gradient(circle at 35% 30%, rgba(255,255,255,0.12) 0%, transparent 50%),
+                  radial-gradient(circle at 60% 70%, rgba(99,102,241,0.25) 0%, rgba(99,102,241,0.08) 30%, transparent 60%);
+      border:1px solid rgba(99,102,241,0.2);
+      display:flex; align-items:center; justify-content:center; flex-direction:column;
+      cursor:pointer; transition:all 0.3s; z-index:2;
+      box-shadow:0 0 40px rgba(99,102,241,0.25), inset 0 0 40px rgba(255,255,255,0.04);
+    }
+    .core-center:hover { border-color:var(--indigo); box-shadow:0 0 60px rgba(99,102,241,0.5); }
+    .core-center .phase-icon { font-size:28px; margin-bottom:2px; }
+    .core-center .phase-name { font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700;
+      letter-spacing:0.08em; color:rgba(255,255,255,0.95); }
+    .core-center .phase-pct { font-family:'JetBrains Mono',monospace; font-size:20px; font-weight:800;
+      color:var(--cyan); margin:2px 0; }
+    .core-center .phase-cta { font-family:'JetBrains Mono',monospace; font-size:9px;
+      color:var(--muted2); letter-spacing:0.06em; margin-top:2px;
+      background:rgba(99,102,241,0.12); padding:4px 10px; border-radius:999px;
+      border:1px solid rgba(99,102,241,0.25); transition:all 0.15s; }
+    .core-center:hover .phase-cta { background:rgba(99,102,241,0.3); color:#fff; border-color:var(--indigo); }
+
+    /* Agent tokens on rings */
+    .agent-token { position:absolute; width:28px; height:28px; border-radius:50%;
+      background:var(--surface-2); border:1px solid;
+      display:flex; align-items:center; justify-content:center;
+      font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; color:#fff;
+      cursor:pointer; z-index:3; transition:transform 0.15s, box-shadow 0.3s;
+      animation:token-glow 1.6s ease-in-out infinite; }
+    .agent-token:hover { transform:scale(1.35) !important; animation:none; z-index:10; border-color:#fff !important; }
+    @keyframes token-glow { 0%,100%{box-shadow:0 0 8px currentColor} 50%{box-shadow:0 0 18px currentColor} }
+
+    /* Phase legend below core */
+    .core-legend { display:flex; gap:10px; margin-top:8px; flex-wrap:wrap; justify-content:center; }
+    .core-legend-item { display:flex; align-items:center; gap:5px;
+      font-family:'JetBrains Mono',monospace; font-size:8px; color:var(--muted2);
+      letter-spacing:0.04em; }
+    .core-legend-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+    .core-legend-dot.ldone { background:var(--green); }
+    .core-legend-dot.lworking { background:var(--cyan); }
+    .core-legend-dot.lidle { background:var(--muted2); }
+    .core-legend-dot.lerror { background:var(--rose); }
 
     /* ── RIGHT: Missions + KPIs ────────────────────────────────────────── */
     .right-col { grid-area:right; display:grid; grid-template-rows:auto 1fr; gap:16px; overflow:hidden; }
@@ -369,31 +384,41 @@
     </div>
   </div>
 
-  {# ─── CENTER: Orbital Core ──────────────────────────────────────── #}
-  <div class="panel-core">
-    <div class="core-wrap">
-      <div class="orbit r1"><div class="orbit-dot"></div></div>
-      <div class="orbit r2"><div class="orbit-dot"></div></div>
-      <div class="orbit r3"><div class="orbit-dot"></div></div>
-      <div class="orbit r4"><div class="orbit-dot"></div></div>
-      <div class="orbit r5" :class="{active: pipeline.agents_working >= 4}"><div class="orbit-dot"></div></div>
-      <div class="orbit r6" :class="{active: pipeline.agents_working >= 6}"><div class="orbit-dot"></div></div>
+	  {# ─── CENTER: Pipeline Phase Core ──────────────────────────────── #}
+	  <div class="panel-core">
+	    <div class="core-wrap">
+	      {# Phase rings — each represents a pipeline stage pair #}
+	      <div class="phase-ring r1" :class="ringClass(0)"><span class="ring-label">RESEARCH</span></div>
+	      <div class="phase-ring r2" :class="ringClass(1)"><span class="ring-label">STRATEGY</span></div>
+	      <div class="phase-ring r3" :class="ringClass(2)"><span class="ring-label">GENERATE</span></div>
+	      <div class="phase-ring r4" :class="ringClass(3)"><span class="ring-label">PUBLISH</span></div>
 
-      <template x-for="(token, i) in agentTokens" :key="token.name">
-        <div class="agent-token"
-             :style="'--tx:'+token.x+'px; --ty:'+token.y+'px; color:'+token.color+'; border-color:'+token.color+'; background:'+token.bg+';'"
-             x-text="token.letter"
-             :title="token.name"
-             @click="showAgentDetail(token.name)"></div>
-      </template>
+	      {# Agent tokens placed on their layer ring #}
+	      <template x-for="token in agentTokens" :key="token.name">
+	        <div class="agent-token"
+	             :style="'left:'+token.left+'%; top:'+token.top+'%; color:'+token.color+'; border-color:'+token.color+'; background:'+token.bg+';'"
+	             x-text="token.letter"
+	             :title="token.name + ': ' + (token.task || 'working')"
+	             @click="showAgentDetail(token.name)"></div>
+	      </template>
 
-      <div class="core" :class="coreClass()"></div>
-      <div class="core-label">
-        <span class="name">DENZO</span>
-        <span class="status" x-text="coreStatus()"></span>
-      </div>
-    </div>
-  </div>
+	      {# Center: phase indicator + progress + CTA #}
+	      <div class="core-center" @click="onCoreClick()">
+	        <div class="phase-icon" x-text="phaseData().icon"></div>
+	        <div class="phase-name" x-text="phaseData().name"></div>
+	        <div class="phase-pct" x-text="pipeline.progress_pct + '%'"></div>
+	        <div class="phase-cta" x-text="phaseData().cta"></div>
+	      </div>
+	    </div>
+
+	    {# Legend #}
+	    <div class="core-legend">
+	      <div class="core-legend-item"><span class="core-legend-dot ldone"></span> Done</div>
+	      <div class="core-legend-item"><span class="core-legend-dot lworking"></span> Working</div>
+	      <div class="core-legend-item"><span class="core-legend-dot lidle"></span> Idle</div>
+	      <div class="core-legend-item"><span class="core-legend-dot lerror"></span> Error</div>
+	    </div>
+	  </div>
 
   {# ─── RIGHT: Missions + KPIs ────────────────────────────────────── #}
   <div class="right-col">
@@ -564,26 +589,54 @@ function jarvis(tenantId) {
         yellow:'#facc15',pink:'#f472b6',lime:'#a3e635',slate:'#94a3b8',sky:'#38bdf8',
         emerald:'#34d399',rose:'#fb7185',amber:'#fbbf24',
       };
-      const working = this.agents.filter(a => a.status === 'working').slice(0,8);
-      const radius = 155;
-      this.agentTokens = working.map((a,i) => {
-        const angle = (i / Math.max(working.length,1)) * Math.PI*2 - Math.PI/2;
+      // Layer ring radii as percentage of core-wrap (380px / 2 = 190px radius)
+      const ringPct = [82, 68, 54, 40];  // r1-r4 insets → approximate ring positions
+      const working = this.agents.filter(a => a.status === 'working' || a.status === 'error').slice(0,8);
+      this.agentTokens = working.map((a, i) => {
         const c = colorMap[a.color] || '#818cf8';
-        return { name:a.name, letter:(a.name||'?')[0].toUpperCase(), task:a.current_task||'', color:c, bg:c+'22', x:Math.cos(angle)*radius, y:Math.sin(angle)*radius };
+        // Place agents on their layer ring with slight angular offset
+        const layer = a.layer || 1;
+        const ringIdx = layer <= 2 ? 0 : (layer === 3 ? 1 : (layer === 4 ? 2 : 3));
+        const pct = ringPct[Math.min(ringIdx, 3)];
+        const angle = (i * 1.2 + ringIdx * 0.8) * Math.PI * 2 / Math.max(working.length, 1);
+        return {
+          name: a.name, letter: (a.name || '?')[0].toUpperCase(),
+          task: a.current_task || '', color: c, bg: c + '22',
+          left: 50 + Math.cos(angle) * pct,
+          top: 50 + Math.sin(angle) * pct,
+        };
       });
     },
 
-    coreClass() {
-      if (this.pipeline.agents_working > 0) return 'is-thinking';
-      if (this.pipeline.agents_error > 0) return 'is-warning';
-      if (this.pipeline.progress_pct >= 100) return 'is-done';
+    ringClass(ringIdx) {
+      // Determine ring status from agents in that layer group
+      const layers = [[1,1], [2,2], [3,3], [4,6]];  // ring 0=L1, 1=L2, 2=L3, 3=L4-6
+      const [lo, hi] = layers[ringIdx] || [0, 0];
+      const ringAgents = this.agents.filter(a => a.layer >= lo && a.layer <= hi);
+      if (ringAgents.length === 0) return '';
+      const hasError = ringAgents.some(a => a.status === 'error');
+      const hasWorking = ringAgents.some(a => a.status === 'working');
+      const allDone = ringAgents.every(a => a.status === 'done');
+      if (hasError) return 'error';
+      if (hasWorking) return 'working';
+      if (allDone) return 'done';
       return '';
     },
-    coreStatus() {
-      if (this.pipeline.agents_working > 0) return 'EXECUTING';
-      if (this.pipeline.agents_error > 0) return 'ATTENTION';
-      if (this.pipeline.progress_pct >= 100) return 'COMPLETE';
-      return 'STANDBY';
+    phaseData() {
+      const w = this.pipeline.agents_working || 0;
+      const pct = this.pipeline.progress_pct || 0;
+      if (pct >= 100) return { icon: '◆', name: 'COMPLETE', cta: 'View Results' };
+      if (w > 0) return { icon: '◉', name: 'EXECUTING', cta: w + ' agent' + (w>1?'s':'') + ' working' };
+      if (pct === 0) return { icon: '○', name: 'IDLE', cta: 'Click to Start' };
+      if (pct > 0) return { icon: '◐', name: 'IN PROGRESS', cta: 'Continue Pipeline' };
+      return { icon: '○', name: 'STANDBY', cta: 'Start Pipeline' };
+    },
+    onCoreClick() {
+      if (this.pipeline.progress_pct >= 100) {
+        this.showInternals = true;
+      } else if (this.pipeline.agents_working === 0) {
+        this.execAction('run_pipeline', '');
+      }
     },
 
     expandActivity(idx) { this.expanded = this.expanded[0] === idx ? [] : [idx]; },
