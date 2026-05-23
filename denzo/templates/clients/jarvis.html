@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Denzo Operator · {{ client.name }}</title>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 
   <style>
     *, *::before, *::after { box-sizing: border-box; }
@@ -36,18 +36,13 @@
       overflow: hidden;
     }
 
-    /* ── Cosmic background ────────────────────────────────────────────────── */
-    body::before {
-      content: '';
-      position: fixed; inset: 0; z-index: 0;
+    /* ── Cosmic bg ─────────────────────────────────────────────────────── */
+    body::before { content:''; position:fixed; inset:0; z-index:0;
       background:
-        radial-gradient(ellipse 50% 40% at 50% 35%, rgba(99,102,241,0.16),  transparent 60%),
-        radial-gradient(ellipse 40% 40% at 15% 90%, rgba(34,211,238,0.10),  transparent 70%),
-        radial-gradient(ellipse 40% 40% at 85% 90%, rgba(167,139,250,0.10), transparent 70%);
-    }
-    body::after {
-      content: '';
-      position: fixed; inset: 0; z-index: 0;
+        radial-gradient(ellipse 50% 40% at 50% 35%, rgba(99,102,241,0.16), transparent 60%),
+        radial-gradient(ellipse 40% 40% at 15% 90%, rgba(34,211,238,0.10), transparent 70%),
+        radial-gradient(ellipse 40% 40% at 85% 90%, rgba(167,139,250,0.10), transparent 70%); }
+    body::after { content:''; position:fixed; inset:0; z-index:0;
       background-image:
         radial-gradient(circle at 12% 22%, rgba(255,255,255,0.4) 0.5px, transparent 1px),
         radial-gradient(circle at 78% 18%, rgba(255,255,255,0.3) 0.5px, transparent 1px),
@@ -55,589 +50,372 @@
         radial-gradient(circle at 92% 64%, rgba(255,255,255,0.3) 0.5px, transparent 1px),
         radial-gradient(circle at 24% 88%, rgba(255,255,255,0.25) 0.5px, transparent 1px),
         radial-gradient(circle at 60% 30%, rgba(255,255,255,0.3) 0.5px, transparent 1px);
-      opacity: 0.6;
-      pointer-events: none;
-    }
+      opacity:0.6; pointer-events:none; }
 
-    /* ── Layout ────────────────────────────────────────────────────────────── */
-    .hud {
-      position: relative; z-index: 1;
-      width: 100%; height: 100vh;
-      display: grid;
-      grid-template-columns: 340px 1fr 340px;
-      grid-template-rows: 56px 1fr 120px;
-      grid-template-areas:
-        "top top top"
-        "left core right"
-        "chat chat chat";
-      gap: 16px;
-      padding: 16px;
-    }
-    @media (max-width: 1280px) {
-      .hud {
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: 56px 280px 1fr 120px;
-        grid-template-areas:
-          "top top"
-          "core core"
-          "left right"
-          "chat chat";
-      }
-    }
+    /* ── Layout ────────────────────────────────────────────────────────── */
+    .hud { position:relative; z-index:1; width:100%; height:100vh;
+      display:grid;
+      grid-template-columns:340px 1fr 340px;
+      grid-template-rows:56px 1fr 160px;
+      grid-template-areas:"top top top" "left core right" "chat chat chat";
+      gap:16px; padding:16px; }
+    @media (max-width:1280px) { .hud {
+      grid-template-columns:1fr 1fr;
+      grid-template-rows:56px 280px 1fr 160px;
+      grid-template-areas:"top top" "core core" "left right" "chat chat"; } }
+    @media (max-width:768px) { .hud {
+      grid-template-columns:1fr;
+      grid-template-rows:48px 200px 1fr 140px;
+      grid-template-areas:"top" "core" "right" "chat"; } }
 
-    /* ── Top bar ──────────────────────────────────────────────────────────── */
-    .topbar {
-      grid-area: top;
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 8px;
-    }
-    .brand {
-      display: flex; align-items: center; gap: 14px;
-      font-size: 13px; font-weight: 600;
-      letter-spacing: 0.04em; text-transform: uppercase;
-      color: rgba(255,255,255,0.85);
-      font-family: 'JetBrains Mono', monospace;
-    }
-    .brand .dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 12px var(--green), 0 0 24px rgba(74,222,128,0.4);
-      animation: pulse-dot 1.8s ease-in-out infinite;
-    }
-    @keyframes pulse-dot {
-      0%, 100% { opacity: 1; }
-      50%      { opacity: 0.4; }
-    }
-    .brand .sep {
-      width: 1px; height: 14px; background: var(--border-h);
-    }
-    .brand .label-muted {
-      color: var(--muted2);
-      font-weight: 400;
-    }
-    .topbar-right {
-      display: flex; align-items: center; gap: 16px;
-      font-size: 11px; font-family: 'JetBrains Mono', monospace;
-      color: var(--muted);
-    }
-    .topbar-right .meta {
-      display: flex; align-items: center; gap: 6px;
-    }
-    .topbar-right .pill {
-      padding: 4px 10px; border-radius: 999px;
-      background: rgba(99,102,241,0.08);
-      border: 1px solid rgba(99,102,241,0.18);
-      color: #a5b4fc; font-weight: 600;
-      letter-spacing: 0.06em;
-    }
-    .topbar-right button {
-      background: transparent; border: 1px solid var(--border);
-      color: var(--muted); padding: 6px 12px; border-radius: 8px;
-      font-size: 11px; cursor: pointer; font-family: inherit;
-      letter-spacing: 0.04em;
-      transition: border-color 0.15s, color 0.15s;
-    }
-    .topbar-right button:hover { border-color: var(--border-h); color: #fff; }
+    /* ── Topbar ────────────────────────────────────────────────────────── */
+    .topbar { grid-area:top; display:flex; align-items:center; justify-content:space-between; padding:0 8px; }
+    .brand { display:flex; align-items:center; gap:14px; font-size:13px; font-weight:600;
+      letter-spacing:0.04em; text-transform:uppercase; color:rgba(255,255,255,0.85);
+      font-family:'JetBrains Mono',monospace; }
+    .brand .dot { width:8px; height:8px; border-radius:50%; background:var(--green);
+      box-shadow:0 0 12px var(--green), 0 0 24px rgba(74,222,128,0.4);
+      animation:pulse-dot 1.8s ease-in-out infinite; }
+    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .brand .sep { width:1px; height:14px; background:var(--border-h); }
+    .brand .label-muted { color:var(--muted2); font-weight:400; }
 
-    /* ── Panels (glass cards) ─────────────────────────────────────────────── */
-    .panel {
-      background: var(--surface);
-      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 18px;
-      position: relative;
-      overflow: hidden;
-    }
-    .panel::before {
-      content: ''; position: absolute; top: 0; left: 12%; right: 12%; height: 1px;
-      background: linear-gradient(90deg, transparent, var(--border-h), transparent);
-    }
-    .panel-head {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 14px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px; font-weight: 600;
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--muted);
-    }
-    .panel-head .count {
-      background: rgba(255,255,255,0.04);
-      border: 1px solid var(--border);
-      padding: 2px 8px; border-radius: 999px;
-      color: var(--text); font-size: 9px;
-    }
+    .topbar-center { display:flex; align-items:center; gap:20px; flex:1; justify-content:center; }
+    .progress-bar-wrap { width:200px; height:3px; background:rgba(255,255,255,0.06); border-radius:2px; overflow:hidden; }
+    .progress-bar-fill { height:100%; background:linear-gradient(90deg,var(--cyan),var(--indigo),var(--violet));
+      transition:width 0.8s ease; border-radius:2px; }
+    .progress-label { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted2);
+      letter-spacing:0.04em; white-space:nowrap; }
 
-    /* ── LEFT: Activity stream ─────────────────────────────────────────────── */
-    .panel-activity { grid-area: left; overflow: hidden; display: flex; flex-direction: column; }
-    .activity-feed { overflow-y: auto; flex: 1; margin: 0 -8px; padding: 0 8px; }
-    .activity-feed::-webkit-scrollbar { width: 4px; }
-    .activity-feed::-webkit-scrollbar-thumb { background: var(--border-h); border-radius: 2px; }
-    .activity-item {
-      padding: 10px 4px;
-      border-left: 1px solid var(--border);
-      margin-left: 6px;
-      padding-left: 14px;
-      position: relative;
-    }
-    .activity-item::before {
-      content: ''; position: absolute; left: -3px; top: 14px;
-      width: 5px; height: 5px; border-radius: 50%;
-      background: var(--muted);
-    }
-    .activity-item.lvl-success::before { background: var(--green); box-shadow: 0 0 6px var(--green); }
-    .activity-item.lvl-warning::before { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
-    .activity-item.lvl-error::before   { background: var(--rose);  box-shadow: 0 0 6px var(--rose);  }
-    .activity-item.lvl-info::before    { background: var(--indigo); box-shadow: 0 0 6px var(--indigo); }
-    .activity-agent {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px; font-weight: 600; color: var(--text);
-      letter-spacing: 0.02em;
-    }
-    .activity-ts {
-      float: right;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 9px; color: var(--muted2);
-    }
-    .activity-msg {
-      font-size: 11.5px; color: var(--muted);
-      margin-top: 3px; line-height: 1.5;
-      cursor: default;
-    }
-    .activity-msg .more {
-      color: var(--indigo); cursor: pointer; font-weight: 600;
-      margin-left: 4px;
-    }
-    .activity-msg .more:hover { color: #fff; }
-    .activity-empty {
-      text-align: center; padding: 30px 12px;
-      font-size: 11px; color: var(--muted2);
-    }
+    .topbar-right { display:flex; align-items:center; gap:16px;
+      font-size:11px; font-family:'JetBrains Mono',monospace; color:var(--muted); }
+    .topbar-right .pill { padding:4px 10px; border-radius:999px;
+      background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.18);
+      color:#a5b4fc; font-weight:600; letter-spacing:0.06em; }
+    .topbar-right button { background:transparent; border:1px solid var(--border);
+      color:var(--muted); padding:6px 12px; border-radius:8px; font-size:11px; cursor:pointer;
+      font-family:inherit; letter-spacing:0.04em; transition:border-color 0.15s,color 0.15s; }
+    .topbar-right button:hover { border-color:var(--border-h); color:#fff; }
+    .bell-btn { position:relative; }
+    .bell-btn .badge { position:absolute; top:-4px; right:-4px; width:16px; height:16px;
+      background:var(--rose); border-radius:50%; font-size:9px; display:flex;
+      align-items:center; justify-content:center; font-weight:700; }
 
-    /* ── CENTER: Orbital core ─────────────────────────────────────────────── */
-    .panel-core {
-      grid-area: core;
-      display: flex; align-items: center; justify-content: center;
-      background: transparent;
-      border: none;
-      position: relative;
-    }
-    .panel-core::before { display: none; }
-    .core-wrap {
-      position: relative;
-      width: 380px; height: 380px;
-      max-width: 90%; max-height: 90%;
-    }
-    .orbit {
-      position: absolute; inset: 0;
-      border-radius: 50%;
-      border: 1px solid var(--border-h);
-      animation: rotate-cw 60s linear infinite;
-    }
-    .orbit.r2 { inset: 36px; animation: rotate-ccw 45s linear infinite; border-color: rgba(120,130,200,0.18); }
-    .orbit.r3 { inset: 72px; animation: rotate-cw 30s linear infinite;  border-color: rgba(120,130,200,0.22); }
-    .orbit.r4 { inset: 108px; animation: rotate-ccw 22s linear infinite; border-color: rgba(120,130,200,0.28); }
-    @keyframes rotate-cw  { to { transform: rotate(360deg); } }
-    @keyframes rotate-ccw { to { transform: rotate(-360deg); } }
+    /* ── Panels ────────────────────────────────────────────────────────── */
+    .panel { background:var(--surface); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+      border:1px solid var(--border); border-radius:18px; padding:18px; position:relative; overflow:hidden; }
+    .panel::before { content:''; position:absolute; top:0; left:12%; right:12%; height:1px;
+      background:linear-gradient(90deg,transparent,var(--border-h),transparent); }
+    .panel-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;
+      font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:600;
+      letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); }
+    .panel-head .count { background:rgba(255,255,255,0.04); border:1px solid var(--border);
+      padding:2px 8px; border-radius:999px; color:var(--text); font-size:9px; }
 
-    .orbit-dot {
-      position: absolute; top: -3px; left: 50%; transform: translateX(-50%);
-      width: 6px; height: 6px; border-radius: 50%;
-      background: var(--cyan);
-      box-shadow: 0 0 8px var(--cyan);
-    }
-    .orbit.r2 .orbit-dot { background: var(--indigo); box-shadow: 0 0 8px var(--indigo); }
-    .orbit.r3 .orbit-dot { background: var(--violet); box-shadow: 0 0 8px var(--violet); }
-    .orbit.r4 .orbit-dot { background: var(--pink);   box-shadow: 0 0 8px var(--pink); }
+    /* ── LEFT: Activity ────────────────────────────────────────────────── */
+    .panel-activity { grid-area:left; overflow:hidden; display:flex; flex-direction:column; }
+    .activity-feed { overflow-y:auto; flex:1; margin:0 -8px; padding:0 8px; }
+    .activity-feed::-webkit-scrollbar { width:4px; }
+    .activity-feed::-webkit-scrollbar-thumb { background:var(--border-h); border-radius:2px; }
+    .activity-item { padding:10px 4px; border-left:1px solid var(--border); margin-left:6px;
+      padding-left:14px; position:relative; cursor:pointer; transition:background 0.15s; }
+    .activity-item:hover { background:rgba(255,255,255,0.02); }
+    .activity-item::before { content:''; position:absolute; left:-3px; top:14px;
+      width:5px; height:5px; border-radius:50%; background:var(--muted); }
+    .activity-item.lvl-success::before { background:var(--green); box-shadow:0 0 6px var(--green); }
+    .activity-item.lvl-warning::before { background:var(--amber); box-shadow:0 0 6px var(--amber); }
+    .activity-item.lvl-error::before   { background:var(--rose);  box-shadow:0 0 6px var(--rose); }
+    .activity-item.lvl-info::before    { background:var(--indigo); box-shadow:0 0 6px var(--indigo); }
+    .activity-agent { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:600;
+      color:var(--text); letter-spacing:0.02em; }
+    .activity-ts { float:right; font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--muted2); }
+    .activity-msg { font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.5; }
+    .activity-empty { text-align:center; padding:30px 12px; font-size:11px; color:var(--muted2); }
 
-    .core {
-      position: absolute; inset: 132px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.18) 0%, transparent 50%),
-                  radial-gradient(circle at 60% 70%, rgba(167,139,250,0.35) 0%, rgba(99,102,241,0.18) 30%, transparent 60%);
-      box-shadow:
-        0 0 60px rgba(99,102,241,0.4),
-        inset 0 0 60px rgba(255,255,255,0.06);
-      animation: core-breathe 4s ease-in-out infinite;
-    }
-    .core.is-thinking {
-      animation: core-thinking 0.8s ease-in-out infinite;
-      box-shadow:
-        0 0 80px rgba(34,211,238,0.6),
-        inset 0 0 80px rgba(34,211,238,0.15);
-    }
-    @keyframes core-breathe {
-      0%, 100% { transform: scale(1); box-shadow: 0 0 60px rgba(99,102,241,0.4), inset 0 0 60px rgba(255,255,255,0.06); }
-      50%      { transform: scale(1.05); box-shadow: 0 0 80px rgba(99,102,241,0.55), inset 0 0 80px rgba(255,255,255,0.1); }
-    }
-    @keyframes core-thinking {
-      0%, 100% { transform: scale(1.04); }
-      50%      { transform: scale(1.10); }
-    }
+    /* ── CENTER: Orbital core ──────────────────────────────────────────── */
+    .panel-core { grid-area:core; display:flex; align-items:center; justify-content:center;
+      background:transparent; border:none; position:relative; }
+    .panel-core::before { display:none; }
+    .core-wrap { position:relative; width:380px; height:380px; max-width:90%; max-height:90%; }
+    .orbit { position:absolute; inset:0; border-radius:50%; border:1px solid var(--border-h);
+      animation:rotate-cw 60s linear infinite; }
+    .orbit.r2 { inset:36px; animation:rotate-ccw 45s linear infinite; border-color:rgba(120,130,200,0.18); }
+    .orbit.r3 { inset:72px; animation:rotate-cw 30s linear infinite; border-color:rgba(120,130,200,0.22); }
+    .orbit.r4 { inset:108px; animation:rotate-ccw 22s linear infinite; border-color:rgba(120,130,200,0.28); }
+    .orbit.r5 { inset:50px; animation:rotate-cw 38s linear infinite; border-color:rgba(34,211,238,0.15); display:none; }
+    .orbit.r5.active { display:block; }
+    .orbit.r6 { inset:88px; animation:rotate-ccw 28s linear infinite; border-color:rgba(167,139,250,0.18); display:none; }
+    .orbit.r6.active { display:block; }
+    @keyframes rotate-cw  { to { transform:rotate(360deg); } }
+    @keyframes rotate-ccw { to { transform:rotate(-360deg); } }
+    .orbit-dot { position:absolute; top:-3px; left:50%; transform:translateX(-50%);
+      width:6px; height:6px; border-radius:50%; background:var(--cyan); box-shadow:0 0 8px var(--cyan); }
+    .orbit.r2 .orbit-dot { background:var(--indigo); box-shadow:0 0 8px var(--indigo); }
+    .orbit.r3 .orbit-dot { background:var(--violet); box-shadow:0 0 8px var(--violet); }
+    .orbit.r4 .orbit-dot { background:var(--pink);   box-shadow:0 0 8px var(--pink); }
+    .orbit.r5 .orbit-dot { background:var(--cyan);   box-shadow:0 0 8px var(--cyan); }
+    .orbit.r6 .orbit-dot { background:var(--amber);  box-shadow:0 0 8px var(--amber); }
 
-    .core-label {
-      position: absolute; inset: 0;
-      display: flex; align-items: center; justify-content: center;
-      flex-direction: column;
-      pointer-events: none;
-    }
-    .core-label .name {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px; font-weight: 600;
-      letter-spacing: 0.16em;
-      color: rgba(255,255,255,0.95);
-      text-shadow: 0 0 12px rgba(99,102,241,0.6);
-    }
-    .core-label .status {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 9px;
-      letter-spacing: 0.10em;
-      color: var(--muted);
-      margin-top: 3px;
-    }
+    .core { position:absolute; inset:132px; border-radius:50%;
+      background:radial-gradient(circle at 35% 30%, rgba(255,255,255,0.18) 0%, transparent 50%),
+                radial-gradient(circle at 60% 70%, rgba(167,139,250,0.35) 0%, rgba(99,102,241,0.18) 30%, transparent 60%);
+      box-shadow:0 0 60px rgba(99,102,241,0.4), inset 0 0 60px rgba(255,255,255,0.06);
+      animation:core-breathe 4s ease-in-out infinite; transition:box-shadow 0.5s; }
+    .core.is-thinking { animation:core-thinking 0.8s ease-in-out infinite;
+      box-shadow:0 0 80px rgba(34,211,238,0.6), inset 0 0 80px rgba(34,211,238,0.15); }
+    .core.is-warning { box-shadow:0 0 80px rgba(251,191,36,0.5), inset 0 0 60px rgba(251,191,36,0.1); }
+    .core.is-done { box-shadow:0 0 80px rgba(74,222,128,0.5), inset 0 0 60px rgba(74,222,128,0.1); }
+    @keyframes core-breathe { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+    @keyframes core-thinking { 0%,100%{transform:scale(1.04)} 50%{transform:scale(1.10)} }
+    .core-label { position:absolute; inset:0; display:flex; align-items:center;
+      justify-content:center; flex-direction:column; pointer-events:none; }
+    .core-label .name { font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600;
+      letter-spacing:0.16em; color:rgba(255,255,255,0.95); text-shadow:0 0 12px rgba(99,102,241,0.6); }
+    .core-label .status { font-family:'JetBrains Mono',monospace; font-size:9px;
+      letter-spacing:0.10em; color:var(--muted); margin-top:3px; }
 
-    /* In-flight agent rings — small circles floating around the core */
-    .agent-token {
-      position: absolute; top: 50%; left: 50%;
-      width: 32px; height: 32px; margin: -16px 0 0 -16px;
-      border-radius: 50%;
-      background: var(--surface-2);
-      border: 1px solid var(--border-h);
-      display: flex; align-items: center; justify-content: center;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px; font-weight: 700; color: #fff;
-      animation: token-pulse 1.6s ease-in-out infinite;
-      box-shadow: 0 0 12px currentColor;
-    }
-    @keyframes token-pulse {
-      0%, 100% { transform: translate(var(--tx, 0px), var(--ty, 0px)) scale(1); }
-      50%      { transform: translate(var(--tx, 0px), var(--ty, 0px)) scale(1.15); }
-    }
+    .agent-token { position:absolute; top:50%; left:50%; width:34px; height:34px;
+      margin:-17px 0 0 -17px; border-radius:50%; background:var(--surface-2);
+      border:1px solid var(--border-h); display:flex; align-items:center; justify-content:center;
+      font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; color:#fff;
+      animation:token-pulse 1.6s ease-in-out infinite; cursor:pointer;
+      box-shadow:0 0 12px currentColor; transition:transform 0.15s; }
+    .agent-token:hover { transform:translate(var(--tx,0px),var(--ty,0px)) scale(1.3) !important;
+      animation:none; z-index:10; border-color:#fff; }
+    @keyframes token-pulse { 0%,100%{transform:translate(var(--tx,0px),var(--ty,0px)) scale(1)}
+      50%{transform:translate(var(--tx,0px),var(--ty,0px)) scale(1.15)} }
 
-    /* ── RIGHT: Missions + KPIs ───────────────────────────────────────────── */
-    .right-col {
-      grid-area: right;
-      display: grid; grid-template-rows: auto 1fr;
-      gap: 16px; overflow: hidden;
-    }
-    .panel-kpis { padding: 14px 16px; }
-    .kpi-grid {
-      display: grid; grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    .kpi {
-      background: rgba(255,255,255,0.02);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 8px 10px;
-    }
-    .kpi-label {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 9px; letter-spacing: 0.08em;
-      text-transform: uppercase; color: var(--muted);
-      margin: 0 0 2px;
-    }
-    .kpi-value {
-      font-size: 22px; font-weight: 700; letter-spacing: -0.02em;
-      color: var(--text); line-height: 1;
-      font-variant-numeric: tabular-nums;
-    }
-    .kpi-sub {
-      font-size: 9px; color: var(--muted2);
-      margin-top: 2px;
-    }
-    .sparkline {
-      width: 100%; height: 18px; margin-top: 5px;
-    }
+    /* ── RIGHT: Missions + KPIs ────────────────────────────────────────── */
+    .right-col { grid-area:right; display:grid; grid-template-rows:auto 1fr; gap:16px; overflow:hidden; }
+    .panel-kpis { padding:14px 16px; }
+    .kpi-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .kpi { background:rgba(255,255,255,0.02); border:1px solid var(--border);
+      border-radius:10px; padding:8px 10px; }
+    .kpi-label { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.08em;
+      text-transform:uppercase; color:var(--muted); margin:0 0 2px; }
+    .kpi-value { font-size:22px; font-weight:700; letter-spacing:-0.02em;
+      color:var(--text); line-height:1; font-variant-numeric:tabular-nums; }
+    .kpi-sub { font-size:9px; color:var(--muted2); margin-top:2px; }
+    .sparkline { width:100%; height:18px; margin-top:5px; }
 
-    .panel-missions { display: flex; flex-direction: column; overflow: hidden; }
-    .missions-list { overflow-y: auto; flex: 1; margin: 0 -8px; padding: 0 8px; }
-    .missions-list::-webkit-scrollbar { width: 4px; }
-    .missions-list::-webkit-scrollbar-thumb { background: var(--border-h); border-radius: 2px; }
-    .mission {
-      background: rgba(255,255,255,0.02);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 12px 14px;
-      margin-bottom: 10px;
-      position: relative;
-    }
-    .mission::before {
-      content: ''; position: absolute; left: 12px; top: 12px;
-      width: 8px; height: 8px; border-radius: 50%;
-    }
-    .mission.s-green::before  { background: var(--green);  box-shadow: 0 0 8px var(--green); }
-    .mission.s-yellow::before { background: var(--amber);  box-shadow: 0 0 8px var(--amber); }
-    .mission.s-red::before    { background: var(--rose);   box-shadow: 0 0 8px var(--rose); }
-    .mission.s-idle::before   { background: var(--muted2); }
-    .mission-label {
-      font-size: 12px; font-weight: 600; color: var(--text);
-      padding-left: 18px; margin: 0;
-      letter-spacing: -0.005em;
-    }
-    .mission-detail {
-      font-size: 11px; color: var(--muted);
-      margin: 4px 0 0; padding-left: 18px;
-    }
-    .mission-progress {
-      margin: 10px 0 4px;
-      height: 3px; background: rgba(255,255,255,0.04);
-      border-radius: 2px; overflow: hidden;
-    }
-    .mission-progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--cyan), var(--indigo), var(--violet));
-      transition: width 0.6s ease;
-    }
-    .mission-next {
-      font-size: 10px; color: var(--muted2);
-      margin-top: 4px;
-      font-family: 'JetBrains Mono', monospace;
-    }
-    .mission-next::before { content: '→ '; color: var(--indigo); }
+    .panel-missions { display:flex; flex-direction:column; overflow:hidden; }
+    .missions-list { overflow-y:auto; flex:1; margin:0 -8px; padding:0 8px; }
+    .missions-list::-webkit-scrollbar { width:4px; }
+    .missions-list::-webkit-scrollbar-thumb { background:var(--border-h); border-radius:2px; }
+    .mission { background:rgba(255,255,255,0.02); border:1px solid var(--border);
+      border-radius:12px; padding:12px 14px; margin-bottom:10px; position:relative; }
+    .mission::before { content:''; position:absolute; left:12px; top:12px;
+      width:8px; height:8px; border-radius:50%; }
+    .mission.s-green::before  { background:var(--green);  box-shadow:0 0 8px var(--green); }
+    .mission.s-yellow::before { background:var(--amber);  box-shadow:0 0 8px var(--amber); }
+    .mission.s-red::before    { background:var(--rose);   box-shadow:0 0 8px var(--rose); }
+    .mission-label { font-size:12px; font-weight:600; color:var(--text);
+      padding-left:18px; margin:0; letter-spacing:-0.005em; }
+    .mission-detail { font-size:11px; color:var(--muted); margin:4px 0 0; padding-left:18px; }
+    .mission-progress { margin:10px 0 8px; height:3px; background:rgba(255,255,255,0.04);
+      border-radius:2px; overflow:hidden; }
+    .mission-progress-fill { height:100%;
+      background:linear-gradient(90deg,var(--cyan),var(--indigo),var(--violet));
+      transition:width 0.6s ease; }
+    .mission-btn { margin-top:4px; padding:5px 12px; border-radius:6px;
+      background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.25);
+      color:#a5b4fc; font-family:'JetBrains Mono',monospace; font-size:10px;
+      cursor:pointer; letter-spacing:0.04em; transition:all 0.15s; }
+    .mission-btn:hover { background:rgba(99,102,241,0.25); border-color:var(--indigo); color:#fff; }
+    .mission-btn:disabled { opacity:0.3; cursor:not-allowed; }
 
-    /* ── Chat panel ───────────────────────────────────────────────────────── */
-    .panel-chat {
-      grid-area: chat;
-      display: flex; flex-direction: column;
-      padding: 12px 16px;
-    }
-    .chat-messages {
-      flex: 1; overflow-y: auto; padding: 4px 4px 6px;
-      display: flex; flex-direction: column; gap: 6px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-    }
-    .chat-messages::-webkit-scrollbar { width: 4px; }
-    .chat-messages::-webkit-scrollbar-thumb { background: var(--border-h); border-radius: 2px; }
-    .chat-msg {
-      max-width: 88%;
-      line-height: 1.5;
-    }
-    .chat-msg.user {
-      color: rgba(255,255,255,0.95);
-      align-self: flex-end;
-      background: rgba(99,102,241,0.10);
-      border: 1px solid rgba(99,102,241,0.20);
-      padding: 6px 12px; border-radius: 12px;
-    }
-    .chat-msg.bot {
-      color: var(--muted);
-      align-self: flex-start;
-      padding: 4px 0;
-    }
-    .chat-msg.bot::before {
-      content: '◉ ';
-      color: var(--cyan);
-      text-shadow: 0 0 6px var(--cyan);
-    }
-    .chat-msg.bot.thinking::after {
-      content: '...'; animation: think-dots 1s steps(3, end) infinite;
-    }
-    @keyframes think-dots {
-      0%, 33%   { content: '.'; }
-      34%, 66%  { content: '..'; }
-      67%, 100% { content: '...'; }
-    }
+    /* ── Chat ──────────────────────────────────────────────────────────── */
+    .panel-chat { grid-area:chat; display:flex; flex-direction:column; padding:12px 16px; }
+    .chat-messages { flex:1; overflow-y:auto; padding:4px 4px 6px;
+      display:flex; flex-direction:column; gap:6px;
+      font-family:'JetBrains Mono',monospace; font-size:12px; }
+    .chat-messages::-webkit-scrollbar { width:4px; }
+    .chat-messages::-webkit-scrollbar-thumb { background:var(--border-h); border-radius:2px; }
+    .chat-msg { max-width:88%; line-height:1.5; }
+    .chat-msg.user { color:rgba(255,255,255,0.95); align-self:flex-end;
+      background:rgba(99,102,241,0.10); border:1px solid rgba(99,102,241,0.20);
+      padding:6px 12px; border-radius:12px; }
+    .chat-msg.bot { color:var(--muted); align-self:flex-start; padding:4px 0; }
+    .chat-msg.bot::before { content:'◉ '; color:var(--cyan); text-shadow:0 0 6px var(--cyan); }
+    .chat-msg.bot.streaming::after { content:'▊'; color:var(--cyan);
+      animation:blink-cursor 0.5s step-end infinite; margin-left:2px; }
+    @keyframes blink-cursor { 0%,100%{opacity:1} 50%{opacity:0} }
+    .chat-msg .cmd-highlight { color:var(--cyan); }
+    .chat-input-row { display:flex; align-items:center; gap:8px; margin-top:8px; }
+    .chat-input-row .prompt { font-family:'JetBrains Mono',monospace; font-size:14px;
+      color:var(--cyan); text-shadow:0 0 6px var(--cyan); }
+    .chat-input-row input { flex:1; background:transparent; border:none; color:var(--text);
+      font-family:'JetBrains Mono',monospace; font-size:13px; padding:8px 0;
+      outline:none; caret-color:var(--cyan); }
+    .chat-input-row input::placeholder { color:var(--muted2); }
+    .chat-hint { font-family:'JetBrains Mono',monospace; font-size:10px;
+      color:var(--muted2); letter-spacing:0.04em; }
+    .chat-hint kbd { background:rgba(255,255,255,0.06); padding:1px 5px; border-radius:3px;
+      font-family:inherit; font-size:9px; }
 
-    .chat-input-row {
-      display: flex; align-items: center; gap: 8px;
-      margin-top: 8px;
-    }
-    .chat-input-row .prompt {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 14px; color: var(--cyan);
-      text-shadow: 0 0 6px var(--cyan);
-    }
-    .chat-input-row input {
-      flex: 1;
-      background: transparent;
-      border: none;
-      color: var(--text);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      padding: 8px 0;
-      outline: none;
-      caret-color: var(--cyan);
-    }
-    .chat-input-row input::placeholder { color: var(--muted2); }
-    .chat-hint {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px; color: var(--muted2);
-      letter-spacing: 0.04em;
-    }
-    .chat-hint kbd {
-      background: rgba(255,255,255,0.06);
-      padding: 1px 5px; border-radius: 3px;
-      font-family: inherit; font-size: 9px;
-    }
+    /* ── Agent detail panel ────────────────────────────────────────────── */
+    .agent-detail-overlay { position:fixed; inset:0; z-index:80;
+      background:rgba(5,6,16,0.85); backdrop-filter:blur(12px);
+      display:none; align-items:center; justify-content:center; }
+    .agent-detail-overlay.open { display:flex; }
+    .agent-detail-card { background:var(--surface); border:1px solid var(--border-h);
+      border-radius:18px; padding:24px; max-width:500px; width:90%; }
+    .agent-detail-card h3 { font-family:'JetBrains Mono',monospace; font-size:14px; margin:0 0 4px; }
+    .agent-detail-card .ad-status { font-size:11px; color:var(--muted); margin:0 0 16px; }
+    .agent-detail-card .ad-log { font-size:10px; color:var(--muted2); max-height:200px; overflow-y:auto; }
+    .agent-detail-card .ad-log p { margin:4px 0; padding:4px 0; border-bottom:1px solid var(--border); }
+    .agent-detail-card button { margin-top:16px; background:var(--rose); border:none; color:#fff;
+      padding:8px 16px; border-radius:8px; cursor:pointer; font-family:inherit; font-size:12px; }
 
-    /* ── Floating alerts ──────────────────────────────────────────────────── */
-    .alerts {
-      position: fixed; bottom: 140px; right: 24px; z-index: 50;
-      display: flex; flex-direction: column-reverse; gap: 8px;
-      pointer-events: none;
-    }
-    .alert {
-      background: var(--surface);
-      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-      border: 1px solid var(--border-h);
-      border-radius: 999px;
-      padding: 8px 14px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px; color: var(--text);
-      display: flex; align-items: center; gap: 10px;
-      animation: alert-in 0.35s ease-out, alert-out 0.5s ease-in 4.5s forwards;
-      box-shadow: 0 8px 32px rgba(99,102,241,0.2);
-    }
-    .alert .dot {
-      width: 6px; height: 6px; border-radius: 50%;
-      background: var(--cyan); box-shadow: 0 0 8px var(--cyan);
-    }
-    .alert.kind-success .dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
-    .alert.kind-warning .dot { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
-    .alert.kind-error   .dot { background: var(--rose);  box-shadow: 0 0 8px var(--rose); }
-    @keyframes alert-in  { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    @keyframes alert-out { to   { transform: translateY(-10px); opacity: 0; } }
+    /* ── Alerts ────────────────────────────────────────────────────────── */
+    .alerts { position:fixed; bottom:180px; right:24px; z-index:50;
+      display:flex; flex-direction:column-reverse; gap:8px; pointer-events:none; }
+    .alert { background:var(--surface); backdrop-filter:blur(12px);
+      border:1px solid var(--border-h); border-radius:999px; padding:8px 14px;
+      font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text);
+      display:flex; align-items:center; gap:10px;
+      animation:alert-in 0.35s ease-out, alert-out 0.5s ease-in 4.5s forwards;
+      box-shadow:0 8px 32px rgba(99,102,241,0.2); }
+    .alert .dot { width:6px; height:6px; border-radius:50%; background:var(--cyan);
+      box-shadow:0 0 8px var(--cyan); }
+    .alert.kind-success .dot { background:var(--green); box-shadow:0 0 8px var(--green); }
+    .alert.kind-warning .dot { background:var(--amber); box-shadow:0 0 8px var(--amber); }
+    .alert.kind-error   .dot { background:var(--rose);  box-shadow:0 0 8px var(--rose); }
+    @keyframes alert-in  { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+    @keyframes alert-out { to{transform:translateY(-10px);opacity:0} }
 
-    /* ── Cmd+K internals overlay (placeholder) ────────────────────────────── */
-    .internals-overlay {
-      position: fixed; inset: 0; z-index: 100;
-      background: rgba(5,6,16,0.92);
-      backdrop-filter: blur(20px);
-      display: none;
-      align-items: center; justify-content: center;
-    }
-    .internals-overlay.open { display: flex; }
-    .internals-overlay iframe {
-      width: 100%; height: 100%; border: none;
-    }
-    .internals-close {
-      position: fixed; top: 16px; right: 16px;
-      background: rgba(20,22,38,0.9); border: 1px solid var(--border-h);
-      color: var(--text); padding: 8px 14px; border-radius: 8px;
-      font-family: 'JetBrains Mono', monospace; font-size: 11px;
-      cursor: pointer; z-index: 101;
-    }
+    /* ── ⌘K overlay ────────────────────────────────────────────────────── */
+    .internals-overlay { position:fixed; inset:0; z-index:100;
+      background:rgba(5,6,16,0.92); backdrop-filter:blur(20px);
+      display:none; align-items:center; justify-content:center; }
+    .internals-overlay.open { display:flex; }
+    .internals-overlay iframe { width:100%; height:100%; border:none; }
+    .internals-close { position:fixed; top:16px; right:16px;
+      background:rgba(20,22,38,0.9); border:1px solid var(--border-h);
+      color:var(--text); padding:8px 14px; border-radius:8px;
+      font-family:'JetBrains Mono',monospace; font-size:11px; cursor:pointer; z-index:101; }
+
+    /* ── Notifications drawer ──────────────────────────────────────────── */
+    .notif-drawer { position:fixed; top:60px; right:24px; z-index:60;
+      width:320px; max-height:400px; background:var(--surface-2);
+      border:1px solid var(--border-h); border-radius:14px; overflow-y:auto;
+      display:none; backdrop-filter:blur(16px); padding:12px; }
+    .notif-drawer.open { display:block; }
+    .notif-item { padding:8px 4px; border-bottom:1px solid var(--border);
+      font-size:10px; font-family:'JetBrains Mono',monospace; color:var(--muted); }
+    .notif-item .nf-time { font-size:8px; color:var(--muted2); float:right; }
   </style>
 </head>
 <body>
 
 <div class="hud" x-data="jarvis('{{ client.tenant_id }}')" x-init="boot()">
 
-  {# ─── TOP BAR ─────────────────────────────────────────────── #}
+  {# ─── TOPBAR ─────────────────────────────────────────────────── #}
   <div class="topbar">
     <div class="brand">
-      <span class="dot"></span>
+      <span class="dot" :class="{'is-warning': pipeline.agents_error > 0, 'is-done': pipeline.progress_pct >= 100}"></span>
       <span>DENZO · OPERATOR</span>
       <span class="sep"></span>
       <span class="label-muted">{{ client.name }}</span>
     </div>
+    <div class="topbar-center">
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" :style="'width:' + pipeline.progress_pct + '%'"></div>
+      </div>
+      <span class="progress-label" x-text="pipeline.progress_pct + '%'"></span>
+      <span class="progress-label" style="color:var(--cyan)" x-text="pipeline.eta"></span>
+    </div>
     <div class="topbar-right">
-      <span class="meta"><span class="pill" x-text="inProgressCount + ' AGENTS LIVE'"></span></span>
+      <span class="meta"><span class="pill" x-text="pipeline.agents_working + ' LIVE'"></span></span>
       <span class="meta" x-text="clock"></span>
-      <button @click="showInternals = true" title="Show all 26 agents">⌘K · INTERNALS</button>
-      <button onclick="window.location.href='/clients/{{ client.tenant_id }}/edit'">SETTINGS</button>
+      <button class="bell-btn" @click="showNotifs = !showNotifs">
+        ⏏ <span class="badge" x-show="notifCount > 0" x-text="notifCount"></span>
+      </button>
+      <button @click="showInternals = true">⌘K</button>
+      <button onclick="window.location.href='/clients/{{ client.tenant_id }}/settings'">SETTINGS</button>
     </div>
   </div>
 
-  {# ─── LEFT: Activity stream ─────────────────────────────── #}
+  {# ─── NOTIFICATIONS DRAWER ─────────────────────────────────────── #}
+  <div class="notif-drawer" :class="{open: showNotifs}">
+    <template x-if="notifications.length === 0">
+      <div style="font-size:10px;color:var(--muted2);text-align:center;padding:20px">No notifications yet</div>
+    </template>
+    <template x-for="n in notifications.slice(-20).reverse()" :key="n.id">
+      <div class="notif-item">
+        <span class="nf-time" x-text="formatTs(n.time)"></span>
+        <span x-text="n.text"></span>
+      </div>
+    </template>
+  </div>
+
+  {# ─── LEFT: Activity ───────────────────────────────────────────── #}
   <div class="panel panel-activity">
-    <div class="panel-head">
-      <span>◉ Live Activity</span>
-      <span class="count" x-text="activity.length"></span>
-    </div>
+    <div class="panel-head"><span>◉ Live Activity</span><span class="count" x-text="activity.length"></span></div>
     <div class="activity-feed" x-ref="feed">
       <template x-if="activity.length === 0">
-        <div class="activity-empty">
-          No activity yet.<br/>
-          Ask Denzo to kick off the pipeline.
-        </div>
+        <div class="activity-empty">No activity yet.<br/>Type a command or start the pipeline.</div>
       </template>
-      <template x-for="(a, idx) in activity" :key="idx + ':' + a.created_at + ':' + a.message">
-        <div class="activity-item" :class="'lvl-' + (a.level || 'info')">
+      <template x-for="(a, idx) in activity" :key="idx + ':' + a.created_at">
+        <div class="activity-item" :class="'lvl-' + (a.level || 'info')"
+             @click="expandActivity(idx)">
           <div>
             <span class="activity-agent" x-text="(a.agent || 'system').toUpperCase()"></span>
             <span class="activity-ts" x-text="formatTs(a.created_at)"></span>
           </div>
-          <p class="activity-msg">
-            <span x-text="msgPreview(a.message, expanded[idx])"></span>
-            <span class="more"
-                  x-show="(a.message || '').length > 140"
-                  @click="expanded[idx] = !expanded[idx]"
-                  x-text="expanded[idx] ? 'less' : 'more'"></span>
-          </p>
+          <p class="activity-msg" x-text="expanded[0] === idx ? a.message : msgPreview(a.message)"></p>
         </div>
       </template>
     </div>
   </div>
 
-  {# ─── CENTER: Orbital core ────────────────────────────────── #}
+  {# ─── CENTER: Orbital Core ──────────────────────────────────────── #}
   <div class="panel-core">
     <div class="core-wrap">
-      <div class="orbit r1">
-        <div class="orbit-dot"></div>
-      </div>
-      <div class="orbit r2">
-        <div class="orbit-dot"></div>
-      </div>
-      <div class="orbit r3">
-        <div class="orbit-dot"></div>
-      </div>
-      <div class="orbit r4">
-        <div class="orbit-dot"></div>
-      </div>
+      <div class="orbit r1"><div class="orbit-dot"></div></div>
+      <div class="orbit r2"><div class="orbit-dot"></div></div>
+      <div class="orbit r3"><div class="orbit-dot"></div></div>
+      <div class="orbit r4"><div class="orbit-dot"></div></div>
+      <div class="orbit r5" :class="{active: pipeline.agents_working >= 4}"><div class="orbit-dot"></div></div>
+      <div class="orbit r6" :class="{active: pipeline.agents_working >= 6}"><div class="orbit-dot"></div></div>
 
-      {# Active agent tokens orbiting the core #}
       <template x-for="(token, i) in agentTokens" :key="token.name">
         <div class="agent-token"
-             :style="`--tx:${token.x}px; --ty:${token.y}px; color:${token.color}; border-color:${token.color}; background:${token.bg};`"
+             :style="'--tx:'+token.x+'px; --ty:'+token.y+'px; color:'+token.color+'; border-color:'+token.color+'; background:'+token.bg+';'"
              x-text="token.letter"
-             :title="token.name + ': ' + (token.task || 'working')"></div>
+             :title="token.name"
+             @click="showAgentDetail(token.name)"></div>
       </template>
 
-      <div class="core" :class="{ 'is-thinking': thinking || inProgressCount > 0 }"></div>
+      <div class="core" :class="coreClass()"></div>
       <div class="core-label">
         <span class="name">DENZO</span>
-        <span class="status" x-text="thinking ? 'THINKING' : (inProgressCount > 0 ? 'EXECUTING' : 'STANDBY')"></span>
+        <span class="status" x-text="coreStatus()"></span>
       </div>
     </div>
   </div>
 
-  {# ─── RIGHT: Missions + KPIs ──────────────────────────────── #}
+  {# ─── RIGHT: Missions + KPIs ────────────────────────────────────── #}
   <div class="right-col">
-
     <div class="panel panel-kpis">
-      <div class="panel-head">
-        <span>◉ Signals</span>
-      </div>
+      <div class="panel-head"><span>◉ Signals</span></div>
       <div class="kpi-grid">
         <div class="kpi">
           <p class="kpi-label">Pages</p>
           <p class="kpi-value" x-text="kpis.pages_published"></p>
           <p class="kpi-sub"><span x-text="kpis.pages_total"></span> total · <span x-text="kpis.pages_ready"></span> ready</p>
-          <svg class="sparkline" :viewBox="`0 0 ${sparkW} ${sparkH}`" preserveAspectRatio="none">
-            <polyline fill="none" stroke="url(#sparkPagesGrad)" stroke-width="1.5" :points="sparkPoints(sparklines.pages)"/>
-            <defs>
-              <linearGradient id="sparkPagesGrad" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%"   stop-color="#22d3ee"/>
-                <stop offset="100%" stop-color="#a78bfa"/>
-              </linearGradient>
-            </defs>
+          <svg class="sparkline" :viewBox="'0 0 '+sparkW+' '+sparkH" preserveAspectRatio="none">
+            <polyline fill="none" stroke="url(#spkP)" stroke-width="1.5" :points="sparkPoints(sparklines.pages)"/>
+            <defs><linearGradient id="spkP"><stop offset="0%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient></defs>
           </svg>
         </div>
         <div class="kpi">
           <p class="kpi-label">Keywords</p>
           <p class="kpi-value" x-text="kpis.keywords_total"></p>
           <p class="kpi-sub"><span x-text="kpis.keywords_high"></span> high priority</p>
-          <svg class="sparkline" :viewBox="`0 0 ${sparkW} ${sparkH}`" preserveAspectRatio="none">
-            <polyline fill="none" stroke="url(#sparkKwsGrad)" stroke-width="1.5" :points="sparkPoints(sparklines.keywords)"/>
-            <defs>
-              <linearGradient id="sparkKwsGrad" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%"   stop-color="#818cf8"/>
-                <stop offset="100%" stop-color="#f472b6"/>
-              </linearGradient>
-            </defs>
+          <svg class="sparkline" :viewBox="'0 0 '+sparkW+' '+sparkH" preserveAspectRatio="none">
+            <polyline fill="none" stroke="url(#spkK)" stroke-width="1.5" :points="sparkPoints(sparklines.keywords)"/>
+            <defs><linearGradient id="spkK"><stop offset="0%" stop-color="#818cf8"/><stop offset="100%" stop-color="#f472b6"/></linearGradient></defs>
           </svg>
         </div>
         <div class="kpi">
@@ -654,10 +432,7 @@
     </div>
 
     <div class="panel panel-missions">
-      <div class="panel-head">
-        <span>◉ Missions</span>
-        <span class="count" x-text="missions.length"></span>
-      </div>
+      <div class="panel-head"><span>◉ Missions</span><span class="count" x-text="missions.length"></span></div>
       <div class="missions-list">
         <template x-for="m in missions" :key="m.id">
           <div class="mission" :class="'s-' + m.status">
@@ -666,43 +441,62 @@
             <div class="mission-progress">
               <div class="mission-progress-fill" :style="'width:' + Math.round(m.progress*100) + '%'"></div>
             </div>
-            <p class="mission-next" x-text="m.next_action" x-show="m.next_action"></p>
+            <button class="mission-btn" x-show="m.action"
+                    @click="execMission(m)"
+                    :disabled="commandBusy"
+                    x-text="commandBusy ? 'Working...' : m.action_label"></button>
           </div>
         </template>
       </div>
     </div>
   </div>
 
-  {# ─── CHAT (bottom) ──────────────────────────────────────── #}
+  {# ─── CHAT ──────────────────────────────────────────────────────── #}
   <div class="panel panel-chat">
     <div class="chat-messages" x-ref="chatBox">
       <template x-for="(m, idx) in chat" :key="idx">
-        <div class="chat-msg" :class="m.role + (m.thinking ? ' thinking' : '')" x-text="m.text"></div>
+        <div class="chat-msg" :class="m.role + (m.streaming ? ' streaming' : '')">
+          <span x-html="m.html || m.text"></span>
+        </div>
       </template>
     </div>
     <div class="chat-input-row">
       <span class="prompt">›</span>
-      <input type="text"
-             x-model="chatInput"
-             @keydown.enter="sendChat()"
+      <input type="text" x-model="chatInput" @keydown.enter="sendChat()"
              :disabled="chatBusy"
-             placeholder="Talk to Denzo… e.g. what's blocking the Honda pages?">
+             placeholder="Ask or command — e.g. 'start keyword strategist' or 'what's blocking us?'">
       <span class="chat-hint"><kbd>↵</kbd> send · <kbd>⌘K</kbd> internals</span>
     </div>
   </div>
 
-  {# ─── Floating alerts ─────────────────────────────────────── #}
+  {# ─── ALERTS ────────────────────────────────────────────────────── #}
   <div class="alerts">
     <template x-for="al in alerts" :key="al.id">
-      <div class="alert" :class="'kind-' + al.kind">
-        <span class="dot"></span>
-        <span x-text="al.text"></span>
-      </div>
+      <div class="alert" :class="'kind-' + al.kind"><span class="dot"></span><span x-text="al.text"></span></div>
     </template>
   </div>
 
-  {# ─── Internals overlay (Cmd+K → Mission Control iframe) ─── #}
-  <div class="internals-overlay" :class="{ open: showInternals }">
+  {# ─── AGENT DETAIL PANEL ────────────────────────────────────────── #}
+  <div class="agent-detail-overlay" :class="{open: detailAgent}">
+    <div class="agent-detail-card" x-show="detailAgent">
+      <h3 x-text="detailAgent?.name || ''"></h3>
+      <p class="ad-status"><span x-text="detailAgent?.status"></span> · runs: <span x-text="detailAgent?.run_count"></span></p>
+      <p style="font-size:10px;color:var(--muted)" x-text="detailAgent?.current_task"></p>
+      <div class="ad-log">
+        <template x-for="log in detailLogs" :key="log.created_at">
+          <p><span style="color:var(--indigo)" x-text="formatTs(log.created_at)"></span> <span x-text="log.message"></span></p>
+        </template>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button @click="execAction('stop_agent', detailAgent?.name)" style="background:var(--rose)">Stop Agent</button>
+        <button @click="execAction('start_agent', detailAgent?.name)">Retry Agent</button>
+        <button @click="detailAgent=null;detailLogs=[]" style="background:transparent;border:1px solid var(--border)">Close</button>
+      </div>
+    </div>
+  </div>
+
+  {# ─── ⌘K OVERLAY ───────────────────────────────────────────────── #}
+  <div class="internals-overlay" :class="{open: showInternals}">
     <button class="internals-close" @click="showInternals = false">ESC · CLOSE</button>
     <template x-if="showInternals">
       <iframe :src="'/clients/{{ client.tenant_id }}/mission-control/'"></iframe>
@@ -715,31 +509,20 @@
 function jarvis(tenantId) {
   return {
     tenantId,
-    activity: [],
-    expanded: {},   // idx → bool, controls "more / less" on activity rows
-    agents: [],
-    agentTokens: [],
+    activity: [], expanded: [],
+    agents: [], agentTokens: [],
     missions: [],
-    kpis: { pages_published: 0, pages_total: 0, pages_ready: 0, keywords_total: 0, keywords_high: 0, geo_citations: 0, geo_queries_total: 0, competitors: 0 },
-    sparklines: { pages: [0,0,0,0,0,0,0], keywords: [0,0,0,0,0,0,0] },
-    inProgressCount: 0,
-    workingAgents: [],
+    kpis: { pages_published:0, pages_total:0, pages_ready:0, keywords_total:0, keywords_high:0, geo_citations:0, geo_queries_total:0, competitors:0 },
+    sparklines: { pages:[0,0,0,0,0,0,0], keywords:[0,0,0,0,0,0,0] },
+    pipeline: { progress_pct:0, eta:'Idle', agents_working:0, agents_done:0, agents_error:0, agents_total:0 },
 
-    chat: [
-      { role: 'bot', text: 'Online. Ask me anything — what\'s running, what\'s blocked, what to do next.' },
-    ],
-    chatInput: '',
-    chatBusy: false,
-    thinking: false,
-
-    alerts: [],
-    _alertId: 0,
-    _lastActivityKey: '',
-
-    showInternals: false,
-    clock: '',
-
-    sparkW: 140, sparkH: 18,
+    chat: [{ role:'bot', text:'Online. Ask me anything or give commands like "start keyword strategist" or "run pipeline".', html:'Online. Ask me anything or give commands like <span class="cmd-highlight">start keyword strategist</span> or <span class="cmd-highlight">run pipeline</span>.' }],
+    chatInput:'', chatBusy:false,
+    alerts:[], _alertId:0,
+    notifications:[], notifCount:0, showNotifs:false,
+    detailAgent:null, detailLogs:[],
+    showInternals:false, clock:'', commandBusy:false,
+    sparkW:140, sparkH:18,
 
     async boot() {
       await this.refresh();
@@ -747,137 +530,190 @@ function jarvis(tenantId) {
       setInterval(() => this._tickClock(), 1000);
       this._tickClock();
       window.addEventListener('keydown', (e) => {
-        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-          e.preventDefault();
-          this.showInternals = !this.showInternals;
-        } else if (e.key === 'Escape' && this.showInternals) {
-          this.showInternals = false;
-        }
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); this.showInternals = !this.showInternals; }
+        else if (e.key === 'Escape') { this.showInternals = false; this.detailAgent = null; this.showNotifs = false; }
       });
     },
 
     async refresh() {
       try {
-        const r = await fetch(`/clients/${this.tenantId}/jarvis/state`, { credentials: 'same-origin' });
+        const r = await fetch(`/clients/${this.tenantId}/jarvis/state`, { credentials:'same-origin' });
         if (!r.ok) return;
         const d = await r.json();
-        const prevTopKey = this.activity.length ? this._actKey(this.activity[0]) : '';
+        const prevTop = this.activity.length ? (this.activity[0].agent + this.activity[0].message) : '';
         this.activity = d.activity || [];
         this.agents = d.agents || [];
         this.kpis = d.kpis || this.kpis;
         this.sparklines = d.sparklines || this.sparklines;
         this.missions = d.missions || [];
-        this.inProgressCount = d.in_progress_count || 0;
-        this.workingAgents = d.working_agents || [];
+        this.pipeline = d.pipeline || this.pipeline;
         this._refreshAgentTokens();
-
-        // Detect new top-of-feed activity and surface as alert
-        if (this.activity.length && this._actKey(this.activity[0]) !== prevTopKey && prevTopKey) {
+        if (this.activity.length && (this.activity[0].agent + this.activity[0].message) !== prevTop && prevTop) {
           const a = this.activity[0];
-          this._addAlert(`${a.agent || 'system'}: ${a.message}`.slice(0, 80), a.level || 'info');
+          this._addAlert(`${a.agent || 'system'}: ${a.message}`.slice(0,80), a.level||'info');
+          this.notifications.push({id:Date.now(), text:`${a.agent||'system'}: ${a.message}`.slice(0,80), time:new Date().toISOString()});
+          this.notifCount = Math.min(this.notifCount + 1, 99);
         }
-      } catch (e) {
-        // silent — keep retrying
-      }
+      } catch(e) {}
     },
 
-    _actKey(a) { return (a.created_at || '') + ':' + (a.message || ''); },
-
     _refreshAgentTokens() {
-      // Position tokens evenly around the core for any working agent (max 6)
       const colorMap = {
-        blue: '#60a5fa', cyan: '#22d3ee', purple: '#a78bfa', gray: '#9ca3af',
-        teal: '#5eead4', indigo: '#818cf8', green: '#4ade80', violet: '#a78bfa',
-        fuchsia: '#e879f9', orange: '#fb923c', yellow: '#facc15', pink: '#f472b6',
-        lime: '#a3e635', slate: '#94a3b8', sky: '#38bdf8', emerald: '#34d399',
-        rose: '#fb7185', amber: '#fbbf24',
+        blue:'#60a5fa',cyan:'#22d3ee',purple:'#a78bfa',gray:'#9ca3af',teal:'#5eead4',
+        indigo:'#818cf8',green:'#4ade80',violet:'#a78bfa',fuchsia:'#e879f9',orange:'#fb923c',
+        yellow:'#facc15',pink:'#f472b6',lime:'#a3e635',slate:'#94a3b8',sky:'#38bdf8',
+        emerald:'#34d399',rose:'#fb7185',amber:'#fbbf24',
       };
-      const working = this.agents.filter(a => a.status === 'working').slice(0, 6);
-      const radius = 160;
-      this.agentTokens = working.map((a, i) => {
-        const angle = (i / Math.max(working.length, 1)) * Math.PI * 2 - Math.PI / 2;
+      const working = this.agents.filter(a => a.status === 'working').slice(0,8);
+      const radius = 155;
+      this.agentTokens = working.map((a,i) => {
+        const angle = (i / Math.max(working.length,1)) * Math.PI*2 - Math.PI/2;
         const c = colorMap[a.color] || '#818cf8';
-        return {
-          name: a.name,
-          letter: (a.name || '?')[0].toUpperCase(),
-          task: a.current_task || '',
-          color: c,
-          bg: c + '22',
-          x: Math.cos(angle) * radius,
-          y: Math.sin(angle) * radius,
-        };
+        return { name:a.name, letter:(a.name||'?')[0].toUpperCase(), task:a.current_task||'', color:c, bg:c+'22', x:Math.cos(angle)*radius, y:Math.sin(angle)*radius };
       });
     },
 
-    _addAlert(text, level) {
-      const kind = level === 'success' ? 'success' : level === 'warning' ? 'warning' : level === 'error' ? 'error' : 'info';
-      const id = ++this._alertId;
-      this.alerts.push({ id, text, kind });
-      setTimeout(() => { this.alerts = this.alerts.filter(a => a.id !== id); }, 5200);
+    coreClass() {
+      if (this.pipeline.agents_working > 0) return 'is-thinking';
+      if (this.pipeline.agents_error > 0) return 'is-warning';
+      if (this.pipeline.progress_pct >= 100) return 'is-done';
+      return '';
+    },
+    coreStatus() {
+      if (this.pipeline.agents_working > 0) return 'EXECUTING';
+      if (this.pipeline.agents_error > 0) return 'ATTENTION';
+      if (this.pipeline.progress_pct >= 100) return 'COMPLETE';
+      return 'STANDBY';
     },
 
-    _tickClock() {
-      const d = new Date();
-      this.clock = String(d.getHours()).padStart(2,'0') + ':' +
-                   String(d.getMinutes()).padStart(2,'0') + ':' +
-                   String(d.getSeconds()).padStart(2,'0');
+    expandActivity(idx) { this.expanded = this.expanded[0] === idx ? [] : [idx]; },
+    msgPreview(text) { const s = (text||'').replace(/\s+/g,' ').trim(); return s.length <= 140 ? s : s.slice(0,140)+'…'; },
+    sparkPoints(arr) {
+      if (!arr||!arr.length) return '';
+      const w=this.sparkW, h=this.sparkH, max=Math.max(1,...arr), step=w/Math.max(1,arr.length-1);
+      return arr.map((v,i) => `${(i*step).toFixed(1)},${(h-(v/max)*(h-2)-1).toFixed(1)}`).join(' ');
+    },
+    formatTs(ts) {
+      if (!ts) return '';
+      const d=new Date(ts.includes('T')?ts:ts.replace(' ','T')+'Z');
+      if (isNaN(d.getTime())) return '';
+      return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    },
+    _tickClock(){ const d=new Date(); this.clock=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0'); },
+    _addAlert(text,level){
+      const kind=level==='success'?'success':level==='warning'?'warning':level==='error'?'error':'info';
+      const id=++this._alertId;
+      this.alerts.push({id,text,kind});
+      setTimeout(()=>{this.alerts=this.alerts.filter(a=>a.id!==id);},5200);
+    },
+
+    async execMission(m) {
+      if (!m.action || this.commandBusy) return;
+      this.commandBusy = true;
+      try {
+        const body = { action: m.action };
+        if (m.action_target) body.agent = m.action_target;
+        const r = await fetch(`/clients/${this.tenantId}/jarvis/command`, {
+          method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin',
+          body: JSON.stringify(body),
+        });
+        const d = await r.json();
+        const text = d.ok ? `✓ ${m.action_target || 'Pipeline'} ${d.status || 'started'}` : `✗ ${d.error || d.reason || 'failed'}`;
+        this._addAlert(text, d.ok ? 'success' : 'warning');
+      } catch(e) {
+        this._addAlert('Command failed: ' + e.message, 'error');
+      }
+      this.commandBusy = false;
+      await this.refresh();
+    },
+
+    async execAction(action, agentName) {
+      if (this.commandBusy) return;
+      this.commandBusy = true;
+      try {
+        const r = await fetch(`/clients/${this.tenantId}/jarvis/command`, {
+          method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin',
+          body: JSON.stringify({ action, agent: agentName }),
+        });
+        const d = await r.json();
+        this._addAlert(`✓ ${agentName}: ${d.status || 'ok'}`, 'success');
+      } catch(e) {
+        this._addAlert('Action failed: '+e.message, 'error');
+      }
+      this.commandBusy = false;
+      this.detailAgent = null;
+      await this.refresh();
+    },
+
+    async showAgentDetail(name) {
+      try {
+        const r = await fetch(`/clients/${this.tenantId}/jarvis/agent/${name}`, { credentials:'same-origin' });
+        const d = await r.json();
+        this.detailAgent = d.agent;
+        this.detailLogs = d.recent_logs || [];
+      } catch(e) {
+        this._addAlert('Could not load agent details', 'error');
+      }
     },
 
     async sendChat() {
       const msg = this.chatInput.trim();
       if (!msg || this.chatBusy) return;
-      this.chat.push({ role: 'user', text: msg });
+      this.chat.push({ role:'user', text:msg, html:this._escapeHtml(msg) });
       this.chatInput = '';
       this.chatBusy = true;
-      this.thinking = true;
-      const tplIdx = this.chat.push({ role: 'bot', text: '', thinking: true }) - 1;
+      const botIdx = this.chat.push({ role:'bot', text:'', streaming:true }) - 1;
       this._scrollChat();
 
       try {
         const r = await fetch(`/clients/${this.tenantId}/jarvis/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
+          method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin',
           body: JSON.stringify({ message: msg }),
         });
-        const d = await r.json();
-        this.chat[tplIdx].thinking = false;
-        this.chat[tplIdx].text = d.reply || '(no reply)';
-      } catch (e) {
-        this.chat[tplIdx].thinking = false;
-        this.chat[tplIdx].text = 'Operator offline — try again.';
-      } finally {
-        this.chatBusy = false;
-        this.thinking = false;
-        this._scrollChat();
+        const reader = r.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const text = decoder.decode(value, { stream:true });
+          for (const line of text.split('\n')) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.chunk) {
+                  fullText += data.chunk;
+                  this.chat[botIdx].text = fullText;
+                  this.chat[botIdx].html = this._formatReply(fullText);
+                } else if (data.done) {
+                  this.chat[botIdx].streaming = false;
+                } else if (data.error) {
+                  this.chat[botIdx].text = 'Error: ' + data.error;
+                  this.chat[botIdx].streaming = false;
+                }
+              } catch(e) {}
+            }
+          }
+        }
+      } catch(e) {
+        this.chat[botIdx].text = 'Operator offline — try again.';
+        this.chat[botIdx].streaming = false;
       }
+      this.chatBusy = false;
+      this._scrollChat();
+    },
+
+    _escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); },
+    _formatReply(text) {
+      return this._escapeHtml(text)
+        .replace(/\/start\s+(\w[\w\s-]*\w)/gi, '<span class="cmd-highlight">/start $1</span>')
+        .replace(/\/stop\s+(\w[\w\s-]*\w)/gi, '<span class="cmd-highlight">/stop $1</span>')
+        .replace(/\/pipeline/gi, '<span class="cmd-highlight">/pipeline</span>')
+        .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.06);padding:1px 4px;border-radius:3px">$1</code>');
     },
 
     _scrollChat() {
-      this.$nextTick(() => {
-        if (this.$refs.chatBox) this.$refs.chatBox.scrollTop = this.$refs.chatBox.scrollHeight;
-      });
-    },
-
-    msgPreview(text, isExpanded) {
-      const s = (text || '').replace(/\s+/g, ' ').trim();
-      if (isExpanded || s.length <= 140) return s;
-      return s.slice(0, 140) + '…';
-    },
-
-    sparkPoints(arr) {
-      if (!arr || !arr.length) return '';
-      const w = this.sparkW, h = this.sparkH;
-      const max = Math.max(1, ...arr);
-      const step = w / Math.max(1, arr.length - 1);
-      return arr.map((v, i) => `${(i * step).toFixed(1)},${(h - (v / max) * (h - 2) - 1).toFixed(1)}`).join(' ');
-    },
-
-    formatTs(ts) {
-      if (!ts) return '';
-      const d = new Date(ts.includes('T') ? ts : ts.replace(' ', 'T') + 'Z');
-      if (isNaN(d.getTime())) return '';
-      return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+      this.$nextTick(() => { if (this.$refs.chatBox) this.$refs.chatBox.scrollTop = this.$refs.chatBox.scrollHeight; });
     },
   };
 }
