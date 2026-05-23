@@ -11,6 +11,8 @@ from denzo.agents.base_agent import TenantAwareBaseAgent, ClientContext, db_exec
 
 class WordPressPublisher(TenantAwareBaseAgent):
 
+    PREREQUISITES = ["Programmatic SEO"]
+
     def __init__(self, ctx: ClientContext):
         super().__init__("WordPress Publisher", ctx, layer=5, color="sky")
 

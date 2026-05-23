@@ -8,6 +8,8 @@ from denzo.agents.base_agent import TenantAwareBaseAgent, ClientContext, db_exec
 
 class SchemaEngineer(TenantAwareBaseAgent):
 
+    MIN_KEYWORDS = 5
+
     def __init__(self, ctx: ClientContext):
         super().__init__("Schema Engineer", ctx, layer=2, color="violet")
 
@@ -151,111 +153,83 @@ Return ONLY valid JSON array.
         services_list = ctx.services[:6] if ctx.services else ["our services"]
         certifications_list = ctx.certifications[:6] if ctx.certifications else []
 
-        additional_prompt = f"""{ctx.to_prompt_block()}
+        domain = ctx.domain or ctx.website_url or ""
+        primary_svc = services_list[0] if services_list else "our services"
+        svc_slug = primary_svc.lower().replace(" ", "-").replace("&", "and")
 
-You are a Schema.org structured data specialist. Generate the following 4 schemas for this business.
-Return a JSON array with exactly 4 objects in this order: [review, breadcrumb, service, howto_list, speakable].
-Actually return a JSON object with these 5 keys.
+        # ── Breadcrumb + Speakable: generated in pure Python (no Claude needed) ──
+        schema_breadcrumb = {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": "Home", "item": domain},
+                {"@type": "ListItem", "position": 2, "name": primary_svc, "item": f"{domain}/services/{svc_slug}"}
+            ]
+        }
+        schema_speakable = {
+            "@context": "https://schema.org",
+            "@type": "WebPage",
+            "speakable": {
+                "@type": "SpeakableSpecification",
+                "cssSelector": ["h1", ".hero-lead", ".schema-speakable"]
+            }
+        }
 
-Services: {json.dumps(services_list)}
-Cities served: {json.dumps(all_cities[:8])}
-Certifications: {json.dumps(certifications_list)}
-Primary domain: {ctx.domain or ctx.website_url}
-Primary city: {ctx.primary_city}
-Industry vertical: {ctx.industry_vertical}
+        # ── Call 1: Review + Service schema (structured, predictable) ──────────
+        review_service_prompt = f"""You are a Schema.org specialist for local SEO.
 
-Return a JSON object with exactly these 5 keys:
+Business: {ctx.client_name}
+Services: {json.dumps(services_list[:6])}
+Cities: {json.dumps(all_cities[:8])}
+Domain: {domain}
+Industry: {ctx.industry_vertical}
 
-{{
-  "review": {{
-    "@context": "https://schema.org",
-    "@type": "Review",
-    "itemReviewed": {{
-      "@type": "LocalBusiness",
-      "name": "{ctx.client_name}"
-    }},
-    "reviewRating": {{
-      "@type": "Rating",
-      "ratingValue": "5",
-      "bestRating": "5"
-    }},
-    "author": {{"@type": "Person", "name": "Satisfied Customer"}},
-    "reviewBody": "<WRITE an authentic 2-3 sentence review specific to this business vertical and services>"
-  }},
-  "breadcrumb": {{
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    "itemListElement": [
-      {{"@type": "ListItem", "position": 1, "name": "Home", "item": "<domain>/"}},
-      {{"@type": "ListItem", "position": 2, "name": "<primary_service>", "item": "<domain>/services/<slug>"}}
-    ]
-  }},
-  "service": {{
-    "@context": "https://schema.org",
-    "@type": "Service",
-    "serviceType": "<primary service name>",
-    "provider": {{
-      "@type": "LocalBusiness",
-      "name": "{ctx.client_name}"
-    }},
-    "areaServed": [<list of {{"@type": "City", "name": "..."}} objects for each city>],
-    "hasOfferCatalog": {{
-      "@type": "OfferCatalog",
-      "name": "<primary service> Services"
-    }}
-  }},
-  "howto_list": [
-    {{
-      "@context": "https://schema.org",
-      "@type": "HowTo",
-      "name": "How to <action relevant to {ctx.industry_vertical}>",
-      "description": "<2 sentences>",
-      "step": [
-        {{"@type": "HowToStep", "name": "Step 1", "text": "..."}},
-        {{"@type": "HowToStep", "name": "Step 2", "text": "..."}},
-        {{"@type": "HowToStep", "name": "Step 3", "text": "..."}}
-      ]
-    }}
-  ],
-  "speakable": {{
-    "@context": "https://schema.org",
-    "@type": "WebPage",
-    "speakable": {{
-      "@type": "SpeakableSpecification",
-      "cssSelector": ["h1", ".hero-lead", ".schema-speakable"]
-    }}
-  }}
-}}
+Return a JSON object with 2 keys: "review" and "service".
 
-Rules:
-- Fill in ALL placeholder values with real, specific content for this business
-- howto_list must have 2-3 HowTo schemas relevant to the industry vertical
-- For auto body: "How to file an insurance claim", "How to choose a body shop"
-- For dental: "How to prepare for a root canal", "How to choose a dentist"
-- For law firms: "How to find a personal injury attorney", "How to file a claim"
-- breadcrumb item should use the actual domain and primary service slug
-- service areaServed must list all cities provided
-- Return ONLY valid JSON. No markdown fences, no extra text.
-"""
+review: A Review schema with a realistic 2-3 sentence customer review about their experience with this {ctx.industry_vertical} business. Include reviewRating (5/5).
 
-        raw_extra = self.call_claude(additional_prompt, max_tokens=3000, model="claude-sonnet-4-6")
+service: A Service schema for "{primary_svc}". Include provider as LocalBusiness, areaServed as list of City objects for each city above, and hasOfferCatalog with 3-5 services.
 
-        schema_review   = {}
-        schema_breadcrumb = {}
-        schema_service  = {}
-        howto_list      = []
-        schema_speakable = {}
+Return ONLY valid JSON, no markdown."""
 
-        if raw_extra:
+        raw_rs = self.call_claude(review_service_prompt, max_tokens=1500, model="claude-sonnet-4-6")
+        schema_review = {}
+        schema_service = {}
+        if raw_rs:
             try:
-                extra = json.loads(strip_json_fences(raw_extra, "{"))
-                schema_review      = extra.get("review", {})
-                schema_breadcrumb  = extra.get("breadcrumb", {})
-                schema_service     = extra.get("service", {})
-                howto_list         = extra.get("howto_list", [])
-                schema_speakable   = extra.get("speakable", {})
+                rs = json.loads(strip_json_fences(raw_rs, "{"))
+                schema_review = rs.get("review", {})
+                schema_service = rs.get("service", {})
             except Exception as e:
-                self.log(f"Extra schemas parse error: {str(e)[:80]}", "warning")
+                self.log(f"Review/Service schema parse error: {str(e)[:80]}", "warning")
+
+        # ── Call 2: HowTo schemas (creative, needs its own call) ──────────────
+        howto_prompt = f"""Generate 2-3 HowTo schemas for a {ctx.industry_vertical} business called {ctx.client_name}.
+
+Each HowTo must have:
+- name: actionable title relevant to this industry
+- description: 1-2 sentences
+- step: 3-4 HowToStep objects each with name and text
+
+Examples by industry:
+- auto_body_shop: "How to File an Insurance Claim After an Accident", "How to Choose a Collision Repair Shop", "How to Get a Free Repair Estimate"
+- automotive_dealership: "How to Test Drive a Car", "How to Apply for Auto Financing", "How to Trade In Your Vehicle"
+- dental_clinic: "How to Prepare for a Root Canal", "How to Choose a Family Dentist"
+- law_firm: "How to Find a Personal Injury Attorney", "How to File an Insurance Claim After an Accident"
+
+Return a JSON object with key "howto_list" containing an array of 2-3 HowTo schemas.
+Return ONLY valid JSON, no markdown."""
+
+        raw_ht = self.call_claude(howto_prompt, max_tokens=1200, model="claude-sonnet-4-6")
+        howto_list = []
+        if raw_ht:
+            try:
+                ht = json.loads(strip_json_fences(raw_ht, "{"))
+                howto_list = ht.get("howto_list", [])
+            except Exception as e:
+                self.log(f"HowTo schema parse error: {str(e)[:80]}", "warning")
+        if not isinstance(howto_list, list):
+            howto_list = []
 
         # Save all additional schemas to DB settings
         db_write(

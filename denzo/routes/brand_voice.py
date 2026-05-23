@@ -4,14 +4,14 @@ Stores brand voice configuration as JSON in the settings table.
 """
 import json
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
-from denzo.auth import login_required
+from denzo.auth import tenant_access_required
 from denzo.db import get_db
 
 bp = Blueprint("brand_voice", __name__, url_prefix="/clients/<tenant_id>/brand-voice")
 
 
 @bp.route("/", methods=["GET", "POST"])
-@login_required
+@tenant_access_required
 def index(tenant_id):
     db = get_db()
 

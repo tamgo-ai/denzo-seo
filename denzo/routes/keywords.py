@@ -1,7 +1,7 @@
 import csv
 import io
-from flask import Blueprint, render_template, request, abort, Response
-from denzo.auth import login_required
+from flask import Blueprint, render_template, request, abort, Response, jsonify
+from denzo.auth import tenant_access_required
 from denzo.db import get_db
 
 bp = Blueprint("keywords", __name__, url_prefix="/clients/<tenant_id>")
@@ -27,7 +27,7 @@ def _get_sidebar_clients():
 
 
 @bp.route("/keywords")
-@login_required
+@tenant_access_required
 def index(tenant_id):
     db = get_db()
 
@@ -99,7 +99,7 @@ def index(tenant_id):
 
 
 @bp.route("/keywords/export.csv")
-@login_required
+@tenant_access_required
 def export_keywords_csv(tenant_id):
     db = get_db()
     client = db.execute("SELECT name FROM clients WHERE tenant_id=?", (tenant_id,)).fetchone()
@@ -143,3 +143,70 @@ def export_keywords_csv(tenant_id):
         mimetype="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+
+@bp.route("/keywords/check-duplicates", methods=["POST"])
+@tenant_access_required
+def check_duplicates(tenant_id):
+    db = get_db()
+    client = db.execute("SELECT name FROM clients WHERE tenant_id=?", (tenant_id,)).fetchone()
+    if not client:
+        db.close()
+        return jsonify({"error": "Client not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    raw      = data.get("keywords", "")
+    location = (data.get("location") or "").strip()
+
+    lines = [ln.strip() for ln in raw.splitlines() if ln.strip()]
+    lines = list(dict.fromkeys(lines))  # deduplicate within the pasted list itself
+    if not lines:
+        db.close()
+        return jsonify({"error": "No keywords provided"}), 400
+
+    duplicates = []
+    new_kws    = []
+    for kw in lines:
+        exists = db.execute(
+            "SELECT 1 FROM keywords WHERE tenant_id=? AND LOWER(keyword)=LOWER(?)",
+            (tenant_id, kw)
+        ).fetchone()
+        if exists:
+            duplicates.append(kw)
+        else:
+            new_kws.append(kw)
+
+    db.close()
+    return jsonify({"new": new_kws, "duplicates": duplicates})
+
+
+@bp.route("/keywords/import", methods=["POST"])
+@tenant_access_required
+def import_keywords(tenant_id):
+    db = get_db()
+    client = db.execute("SELECT name FROM clients WHERE tenant_id=?", (tenant_id,)).fetchone()
+    if not client:
+        db.close()
+        return jsonify({"error": "Client not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    lines    = data.get("keywords", [])   # already-vetted list from frontend
+    location = (data.get("location") or "").strip()
+    priority = (data.get("priority") or "media").strip()
+
+    if not lines:
+        db.close()
+        return jsonify({"error": "No keywords provided"}), 400
+
+    inserted = 0
+    for kw in lines:
+        db.execute(
+            """INSERT OR IGNORE INTO keywords (tenant_id, keyword, location, category, priority, status)
+               VALUES (?, ?, ?, 'Human-Added', ?, 'identified')""",
+            (tenant_id, kw.strip(), location or None, priority)
+        )
+        inserted += 1
+
+    db.commit()
+    db.close()
+    return jsonify({"inserted": inserted})

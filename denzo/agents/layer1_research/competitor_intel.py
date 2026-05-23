@@ -404,6 +404,108 @@ Return ONLY valid JSON array, no markdown. If uncertain about a business type, o
         except Exception:
             return []
 
+    def _search_dealership_competitors(self, primary_city: str) -> list[dict]:
+        """
+        Dealership-specific competitor search.
+        Tier 1 = same brand/make in nearby cities (strongest threat — same product, nearby market).
+        Tier 2 = other automotive brands in same/nearby cities (competing for same buyer).
+        Never returns collision repair shops or non-dealer businesses.
+        """
+        our_brands = self.ctx.certifications or []
+        brand_names = ", ".join(our_brands[:5]) or "automotive"
+
+        prompt = f"""{self.ctx.to_prompt_block()}
+
+You are finding competitors for an AUTOMOTIVE DEALERSHIP.
+
+Dealership competition has two tiers:
+
+TIER 1 — Same Brand, Different Territory (strongest threat):
+Customers shop their preferred brand across a wide radius. Find OTHER dealerships selling
+the SAME brand(s) [{brand_names}] within ~35 miles of {primary_city}, {self.ctx.state}.
+Example: BMW of Murrieta competes with BMW of Temecula, BMW of Riverside, BMW of San Diego.
+
+TIER 2 — Other Brands, Same Territory (secondary threat):
+Buyers comparison-shop between brands. Find dealers of OTHER automotive brands (Toyota, Honda,
+Ford, Mercedes, etc.) in {primary_city} and immediately nearby cities.
+
+Return a JSON array:
+[
+  {{
+    "name": "Dealer Name",
+    "url": "https://...",
+    "city": "City, {self.ctx.state}",
+    "business_type": "automotive_dealership",
+    "brand_make": "BMW",
+    "competition_tier": 1,
+    "source": "known"
+  }}
+]
+
+NEVER include: collision repair shops, body shops, auto parts stores, mechanic shops, or insurance companies.
+Return ONLY valid JSON array."""
+
+        raw = self.call_claude(prompt, max_tokens=2000, model="claude-sonnet-4-6")
+        if not raw:
+            return []
+        try:
+            data = json.loads(strip_json_fences(raw, start_char="["))
+            return data if isinstance(data, list) else []
+        except Exception:
+            return []
+
+    def _verify_keyword_industry_relevance(self, keywords: list, industry: str) -> tuple:
+        """
+        Before saving gap keywords, verify that the typical SERP for each keyword
+        would be populated by businesses in the SAME industry as our client.
+        Catches cross-industry contamination (e.g. collision center keywords
+        leaking into dealership clients because both appear in auto-related SERPs).
+
+        Returns (relevant: list, filtered_out: list).
+        """
+        if not keywords:
+            return [], []
+
+        kw_list = "\n".join(f"- {kw}" for kw in keywords[:40])
+
+        prompt = f"""You are a search-intent analyst for LOCAL SEO.
+
+Our client industry: "{industry}"
+
+For each keyword below, determine: if someone searches this on Google locally, would the
+TOP organic results primarily come from "{industry}" businesses?
+
+Mark RELEVANT if: top rankers are typically from the "{industry}" category.
+Mark FILTERED if: top rankers are typically from a DIFFERENT industry category.
+  - Directories (Yelp, Angi, Thumbtack) dominating = still RELEVANT (they list our industry)
+  - Dealerships ranking for body-shop keywords = FILTERED
+  - Body shops ranking for dealership keywords = FILTERED
+  - Insurance companies ranking for repair keywords = FILTERED
+  - Manufacturers ranking for local service keywords = FILTERED
+
+Keywords to classify:
+{kw_list}
+
+Return ONLY valid JSON:
+{{
+  "relevant": ["keyword 1", "keyword 2"],
+  "filtered": ["keyword 3"],
+  "filter_reasons": {{"keyword 3": "why it was filtered"}}
+}}"""
+
+        raw = self.call_claude(prompt, max_tokens=1500, model="claude-haiku-4-5-20251001")
+        if not raw:
+            return keywords, []
+        try:
+            data = json.loads(strip_json_fences(raw))
+            relevant = data.get("relevant", [])
+            filtered = data.get("filtered", [])
+            for kw, reason in data.get("filter_reasons", {}).items():
+                self.log(f"[SERP Industry Filter] Dropped '{kw}': {reason}", "warning")
+            return relevant, filtered
+        except Exception:
+            return keywords, []
+
     def _is_different_industry(self, competitor_data: dict) -> bool:
         """
         Return True if this competitor appears to be a DIFFERENT industry than our client.
@@ -677,9 +779,45 @@ Return ONLY valid JSON array, no markdown. If uncertain about a business type, o
                     "info"
                 )
 
-        if our_brands and primary_city:
+        our_vertical  = (self.ctx.industry_vertical or "").lower()
+        we_are_collision = any(v in our_vertical for v in ["collision", "body", "auto_body"])
+        we_are_dealer    = any(v in our_vertical for v in ["dealership", "dealer"])
+
+        # ── Dealership branch: same-brand-different-territory + other-brand-same-territory ──
+        if we_are_dealer and primary_city:
+            self.set_status("working", "Discovering dealership competitors (same brand + other brands)")
+            self.log(
+                f"Dealership client — searching: (1) same-brand nearby dealers, "
+                f"(2) other-brand dealers in {primary_city} area..."
+            )
+            dealer_found = self._search_dealership_competitors(primary_city)
+            for comp in dealer_found:
+                cname = comp.get("name", "").strip()
+                curl  = comp.get("url", "").strip()
+                ccity = comp.get("city", "").strip()
+                tier_hint = comp.get("competition_tier", 2)  # 1=same brand, 2=other brand
+                brand_make = comp.get("brand_make", "")
+                if not cname:
+                    continue
+                if self.ctx.client_name.lower() in cname.lower():
+                    continue
+                if cname.lower() in existing_names:
+                    continue
+                existing_names.add(cname.lower())
+                cert_json = json.dumps([brand_make]) if brand_make else "[]"
+                db_write(
+                    "INSERT OR IGNORE INTO competitors "
+                    "(tenant_id, name, url, location, certified_brands, discovery_method, tier) "
+                    "VALUES (?,?,?,?,?,?,?)",
+                    (self.ctx.tenant_id, cname, curl, ccity,
+                     cert_json, "geo_radius", tier_hint)
+                )
+                tier_label = "Tier 1 (same brand)" if tier_hint == 1 else "Tier 2 (other brand)"
+                self.log(f"Discovered dealer [{tier_label}]: {cname} ({ccity}) — {brand_make}", "info")
+
+        # ── Non-dealership branch: brand-certified geo-radius search ──
+        elif our_brands and primary_city:
             self.set_status("working", "Discovering geo-radius brand-certified competitors")
-            nearby = _nearby_cities_for(primary_city)
 
             for brand in our_brands[:3]:   # top 3 brands to avoid over-calling
                 if self.should_stop():
@@ -693,16 +831,10 @@ Return ONLY valid JSON array, no markdown. If uncertain about a business type, o
                     btype = comp.get("business_type", "unknown")
                     if not cname:
                         continue
-                    # Skip our own business
                     if self.ctx.client_name.lower() in cname.lower():
                         continue
                     if cname.lower() in existing_names:
                         continue
-                    # Industry gate: only filter dealerships if WE are a collision/body shop
-                    # If WE are a dealership, other dealerships ARE our competitors
-                    our_vertical = (self.ctx.industry_vertical or "").lower()
-                    we_are_collision = any(v in our_vertical for v in ["collision", "body", "auto_body"])
-                    we_are_dealer = any(v in our_vertical for v in ["dealership", "dealer"])
 
                     if we_are_collision:
                         if _is_dealership_by_name(cname) or _is_dealership_by_url(curl) or btype == "dealership":
@@ -710,14 +842,12 @@ Return ONLY valid JSON array, no markdown. If uncertain about a business type, o
                                 f"Filtered (dealership): {cname} — not same industry as collision shop", "warning"
                             )
                             continue
-                    elif not we_are_dealer:
-                        # Non-collision, non-dealer: still filter obvious dealerships to avoid noise
+                    else:
+                        # Non-collision non-dealer: still block obvious dealerships
                         if _is_dealership_by_name(cname) or _is_dealership_by_url(curl):
-                            self.log(
-                                f"Filtered (dealership): {cname} — not same industry", "warning"
-                            )
+                            self.log(f"Filtered (dealership): {cname} — not same industry", "warning")
                             continue
-                    # Brand tier mismatch gate — skip budget shops for premium clients etc.
+
                     if self._is_tier_mismatch(cname, curl):
                         inferred_tier = self._infer_competitor_tier(cname, curl)
                         self.log(
@@ -733,8 +863,7 @@ Return ONLY valid JSON array, no markdown. If uncertain about a business type, o
                         "INSERT OR IGNORE INTO competitors "
                         "(tenant_id, name, url, location, certified_brands, discovery_method) "
                         "VALUES (?,?,?,?,?,?)",
-                        (self.ctx.tenant_id, cname, curl, ccity,
-                         certified_brands, "geo_radius")
+                        (self.ctx.tenant_id, cname, curl, ccity, certified_brands, "geo_radius")
                     )
                     self.log(f"Discovered: {cname} ({ccity}) — {brand} certified", "info")
 
@@ -966,9 +1095,27 @@ Return ONLY valid JSON (no markdown):
                  self.ctx.tenant_id, cname)
             )
 
-        # ── Step 7: Save gap keywords ────────────────────────────────────────
+        # ── Step 7: Save gap keywords (with SERP industry filter) ───────────
         gap_kw_list = result.get("gap_keywords", [])
-        for kw in gap_kw_list:
+        if gap_kw_list:
+            self.set_status("working", "Verifying gap keywords — SERP industry filter")
+            self.log(
+                f"Running SERP industry filter on {len(gap_kw_list)} gap keywords "
+                f"(industry: {industry})..."
+            )
+            relevant_kws, dropped_kws = self._verify_keyword_industry_relevance(gap_kw_list, industry)
+            if dropped_kws:
+                self.log(
+                    f"[SERP Filter] Removed {len(dropped_kws)} cross-industry keywords: "
+                    + ", ".join(f'"{k}"' for k in dropped_kws[:6])
+                    + ("…" if len(dropped_kws) > 6 else ""),
+                    "warning"
+                )
+            self.log(f"[SERP Filter] Keeping {len(relevant_kws)} industry-relevant gap keywords.", "info")
+        else:
+            relevant_kws = []
+
+        for kw in relevant_kws:
             self.add_keyword(kw, category="competitor_gap", priority="high")
 
         # ── Step 8: Cannibalization detection ────────────────────────────────

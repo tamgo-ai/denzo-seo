@@ -10,6 +10,8 @@ from denzo.agents.base_agent import TenantAwareBaseAgent, ClientContext, db_exec
 
 class GEOOptimizer(TenantAwareBaseAgent):
 
+    PREREQUISITES = ["Programmatic SEO"]
+
     def __init__(self, ctx: ClientContext):
         super().__init__("GEO Optimizer", ctx, layer=4, color="teal")
 

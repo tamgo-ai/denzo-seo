@@ -20,23 +20,53 @@ def create_app():
         raise RuntimeError("SECRET_KEY must be at least 32 characters long.")
     app.secret_key = _secret
 
+    # Session security
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["PERMANENT_SESSION_LIFETIME"] = 86400  # 24h
+
     sock.init_app(app)
 
     from denzo.db import init_db
 
+    @app.before_request
+    def _refresh_session_plan():
+        """Keep session plan in sync with DB on every request."""
+        from flask import session as _sess
+        if "user_id" in _sess and request.endpoint not in ("static", "api.ws_logs"):
+            try:
+                from denzo.billing.enforce import get_user_plan
+                _sess["plan"] = get_user_plan(_sess["user_id"])
+            except Exception:
+                pass
+
     @app.context_processor
     def inject_sidebar_clients():
-        """Always inject clients list into every template for the sidebar."""
+        """Inject clients list into every template for the sidebar.
+        Admins see all clients; client users see only their own."""
         try:
+            from flask import session
             from denzo.db import get_db
             db = get_db()
-            rows = db.execute("""
-                SELECT c.tenant_id, c.name, ag.name AS active_agent_name
-                FROM clients c
-                LEFT JOIN agents ag ON ag.tenant_id = c.tenant_id AND ag.status = 'working'
-                GROUP BY c.tenant_id
-                ORDER BY c.name
-            """).fetchall()
+            user_id = session.get("user_id")
+            role = session.get("role", "client")
+            if role == "admin":
+                rows = db.execute("""
+                    SELECT c.tenant_id, c.name, ag.name AS active_agent_name
+                    FROM clients c
+                    LEFT JOIN agents ag ON ag.tenant_id = c.tenant_id AND ag.status = 'working'
+                    GROUP BY c.tenant_id
+                    ORDER BY c.name
+                """).fetchall()
+            else:
+                rows = db.execute("""
+                    SELECT c.tenant_id, c.name, ag.name AS active_agent_name
+                    FROM clients c
+                    LEFT JOIN agents ag ON ag.tenant_id = c.tenant_id AND ag.status = 'working'
+                    WHERE c.owner_user_id = ?
+                    GROUP BY c.tenant_id
+                    ORDER BY c.name
+                """, (user_id,)).fetchall()
             clients = [
                 {"tenant_id": r["tenant_id"], "name": r["name"], "active_agent": r["active_agent_name"]}
                 for r in rows
@@ -78,6 +108,21 @@ def create_app():
 
     for bp in [public_bp, auth_bp, dash_bp, clients_bp, pipeline_bp, keywords_bp, pages_bp, competitors_bp, settings_bp, api_bp, audit_bp, images_bp, brand_voice_bp, data_intel_bp, geo_bp, reviews_bp, lite_bp, reporting_bp, oauth_bp, mission_control_bp, billing_bp, jarvis_bp]:
         app.register_blueprint(bp)
+
+    # ── Custom error handlers ──────────────────────────────────────────────────
+    from flask import render_template as _render
+
+    @app.errorhandler(403)
+    def _forbidden(e):
+        return _render("errors/403.html"), 403
+
+    @app.errorhandler(404)
+    def _not_found(e):
+        return _render("errors/404.html"), 404
+
+    @app.errorhandler(500)
+    def _server_error(e):
+        return _render("errors/500.html"), 500
 
     with app.app_context():
         init_db()

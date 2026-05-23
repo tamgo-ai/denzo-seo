@@ -8,7 +8,7 @@ from datetime import datetime, timedelta  # timedelta kept for next_run calc
 from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify
 
 logger = logging.getLogger(__name__)
-from denzo.auth import login_required
+from denzo.auth import tenant_access_required
 from denzo.db import get_db
 
 bp = Blueprint("lite", __name__, url_prefix="/lite")
@@ -77,7 +77,7 @@ def _autopilot_on(db, tenant_id):
 
 # ── Index: redirect to first client or onboarding ────────────────────────────
 @bp.route("/")
-@login_required
+@tenant_access_required
 def index():
     from flask import session as _sess
     db = get_db()
@@ -97,7 +97,7 @@ def index():
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 @bp.route("/<tenant_id>/")
 @bp.route("/<tenant_id>/dashboard")
-@login_required
+@tenant_access_required
 def dashboard(tenant_id):
     db, client, ctx = _get_client_and_ctx(tenant_id)
     if not client:
@@ -147,7 +147,7 @@ def dashboard(tenant_id):
 
 
 @bp.route("/<tenant_id>/toggle-autopilot", methods=["POST"])
-@login_required
+@tenant_access_required
 def toggle_autopilot(tenant_id):
     data = request.get_json(silent=True) or {}
     enabled = bool(data.get("enabled", False))
@@ -166,7 +166,7 @@ def toggle_autopilot(tenant_id):
 PAGE_SIZE = 20
 
 @bp.route("/<tenant_id>/content")
-@login_required
+@tenant_access_required
 def content(tenant_id):
     db, client, ctx = _get_client_and_ctx(tenant_id)
     if not client:
@@ -220,7 +220,7 @@ def content(tenant_id):
 
 # ── Rankings ──────────────────────────────────────────────────────────────────
 @bp.route("/<tenant_id>/rankings")
-@login_required
+@tenant_access_required
 def rankings(tenant_id):
     db, client, ctx = _get_client_and_ctx(tenant_id)
     if not client:
@@ -247,7 +247,7 @@ def rankings(tenant_id):
 
 # ── GEO ───────────────────────────────────────────────────────────────────────
 @bp.route("/<tenant_id>/geo")
-@login_required
+@tenant_access_required
 def geo(tenant_id):
     db, client, ctx = _get_client_and_ctx(tenant_id)
     if not client:
@@ -280,7 +280,7 @@ def geo(tenant_id):
 
 # ── Settings ──────────────────────────────────────────────────────────────────
 @bp.route("/<tenant_id>/settings")
-@login_required
+@tenant_access_required
 def settings_view(tenant_id):
     db, client, ctx = _get_client_and_ctx(tenant_id)
     if not client:
@@ -303,7 +303,7 @@ def settings_view(tenant_id):
 
 
 @bp.route("/<tenant_id>/settings/update", methods=["POST"])
-@login_required
+@tenant_access_required
 def update_settings(tenant_id):
     f = request.form
     section = f.get("section", "")

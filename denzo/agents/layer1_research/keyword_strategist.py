@@ -9,6 +9,75 @@ from denzo.agents.base_agent import TenantAwareBaseAgent, ClientContext, db_exec
 
 _NUM_PREFIX = re.compile(r"^\d+[\.\)]\s*")
 
+# Allowed enum values — strictly enforced to prevent language contamination
+VALID_INTENT    = {"informational", "navigational", "commercial", "transactional"}
+VALID_DIFFICULTY = {"easy", "medium", "hard"}
+VALID_PRIORITY   = {"high", "medium", "low"}
+VALID_CATEGORY   = {"service", "brand", "location", "comparison", "question", "conversion", "competitor_gap", "insurance", "luxury"}
+
+
+def _clean_keyword(kw: dict) -> dict:
+    """Normalize and validate a keyword dict. Fixes common Claude output issues."""
+    # Clean keyword text
+    keyword = _NUM_PREFIX.sub("", kw.get("keyword", "").strip()).strip()
+    kw["keyword"] = keyword
+
+    # Normalize intent to valid values
+    intent = (kw.get("intent") or "").strip().lower()
+    if intent not in VALID_INTENT:
+        intent_map = {
+            "transaccional": "transactional", "transactional": "transactional",
+            "informacional": "informational", "informativo": "informational",
+            "navegacional": "navigational", "navigational": "navigational",
+            "comercial": "commercial", "commercial": "commercial",
+            "local": "commercial", "urgencia": "commercial",
+            "emergencia": "commercial", "compra": "transactional",
+        }
+        kw["intent"] = intent_map.get(intent, "commercial")
+    else:
+        kw["intent"] = intent
+
+    # Normalize difficulty — Claude sometimes returns numbers instead of labels
+    diff = str(kw.get("difficulty", "")).strip().lower()
+    if diff not in VALID_DIFFICULTY:
+        try:
+            d = int(diff)
+            if d <= 25: kw["difficulty"] = "easy"
+            elif d <= 55: kw["difficulty"] = "medium"
+            else: kw["difficulty"] = "hard"
+        except ValueError:
+            kw["difficulty"] = "medium"
+
+    # Normalize priority
+    prio = (kw.get("priority") or "").strip().lower()
+    if prio == "media":
+        prio = "medium"
+    if prio not in VALID_PRIORITY:
+        kw["priority"] = "medium"
+    else:
+        kw["priority"] = prio
+
+    # Normalize category
+    cat = (kw.get("category") or "").strip().lower()
+    cat_map = {
+        "servicio": "service", "lujo": "luxury", "seguro": "insurance",
+        "seguros": "insurance", "marca": "brand", "ubicacion": "location",
+        "ubicación": "location", "comparacion": "comparison", "comparación": "comparison",
+        "pregunta": "question", "conversion": "conversion", "competidor": "competitor_gap",
+        "local": "location",
+    }
+    kw["category"] = cat_map.get(cat, cat if cat in VALID_CATEGORY else "service")
+
+    # Clean volume — strip /mo suffix, keep numbers only
+    vol = str(kw.get("volume", "")).strip().lower()
+    if "/mo" in vol:
+        vol = vol.replace("/mo", "").strip()
+    if vol in ("", "none", "null", "0"):
+        vol = ""
+    kw["volume"] = vol
+
+    return kw
+
 
 def _recover_truncated_json_array(text: str):
     """
@@ -162,19 +231,22 @@ Return ONLY the JSON array, no markdown.
         for kw in keywords:
             if self.should_stop():
                 break
-            keyword = _NUM_PREFIX.sub("", kw.get("keyword", "").strip()).strip()
+            kw = _clean_keyword(kw)
+            keyword = kw["keyword"]
             if not keyword:
                 continue
             self.add_keyword(
                 keyword=keyword,
-                volume=str(kw.get("volume", "")),
-                difficulty=kw.get("difficulty", "medium"),
-                intent=kw.get("intent", "commercial"),
+                volume=kw["volume"],
+                difficulty=kw["difficulty"],
+                intent=kw["intent"],
                 location=kw.get("location", ""),
-                category=kw.get("category", "service"),
-                priority=kw.get("priority", "medium"),
+                category=kw["category"],
+                priority=kw["priority"],
             )
             saved += 1
 
-        self.log(f"Saved {saved} keywords (had {existing_count} before).", "success")
+        # Show examples of top keywords generated
+        top_kws = [kw.get("keyword", "") for kw in keywords[:5] if kw.get("keyword")]
+        self.log_result("Keywords generated", saved, top_kws)
         self.set_status("done", f"{saved} keywords generated")

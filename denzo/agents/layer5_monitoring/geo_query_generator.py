@@ -82,7 +82,7 @@ Return ONLY valid JSON. Max 30 queries.
     def _queries_from_gaps(self) -> list:
         """Find queries where business was NOT cited → prioritize those."""
         rows = db_execute(
-            """SELECT query, COUNT(*) as checks, SUM(client_mentioned) as cited
+            """SELECT query, COUNT(*) as checks, COALESCE(SUM(client_mentioned), 0) as cited
                FROM geo_queries
                WHERE tenant_id=?
                GROUP BY query

@@ -3,7 +3,7 @@ TenantAwareBaseAgent — the backbone of DENZO-SEO.
 Every agent inherits from this. ClientContext carries all client-specific data.
 No hardcoded business info anywhere — everything flows from the DB via ClientContext.
 """
-import sqlite3, os, time, threading, random
+import sqlite3, os, time, threading
 from dataclasses import dataclass, field
 from typing import List
 from datetime import datetime
@@ -13,10 +13,59 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "denzo.db")
 
-# Global API rate limiter — shared across ALL tenants and ALL agents
+# ── Global API rate limiter — shared across ALL tenants and ALL agents ────────
 _api_semaphore = threading.Semaphore(2)
 _last_api_call = 0.0
 _api_lock = threading.Lock()
+
+# Singleton Anthropic client — created ONCE, reused by all agents
+_anthropic_client = None
+_anthropic_client_lock = threading.Lock()
+
+
+def _get_anthropic_client():
+    """Return the module-level singleton Anthropic client. Thread-safe lazy init."""
+    global _anthropic_client
+    if _anthropic_client is None:
+        with _anthropic_client_lock:
+            if _anthropic_client is None:
+                import anthropic
+                _anthropic_client = anthropic.Anthropic(
+                    api_key=os.getenv("ANTHROPIC_API_KEY", ""),
+                    timeout=90.0,
+                    max_retries=0,  # we handle retries ourselves
+                )
+    return _anthropic_client
+
+
+# ── Thread-local SQLite connections ───────────────────────────────────────────
+
+_sqlite_local = threading.local()
+
+
+def _get_conn():
+    """Return this thread's persistent SQLite connection. Creates it on first use."""
+    conn = getattr(_sqlite_local, "conn", None)
+    if conn is None:
+        conn = sqlite3.connect(DB_PATH, timeout=30)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn.execute("PRAGMA busy_timeout=5000")  # 5s busy wait before raising locked
+        conn.row_factory = sqlite3.Row
+        _sqlite_local.conn = conn
+    return conn
+
+
+def close_thread_connection():
+    """Close this thread's SQLite connection. Call on thread exit for cleanup."""
+    conn = getattr(_sqlite_local, "conn", None)
+    if conn:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        _sqlite_local.conn = None
 
 
 # ── Client Context ──────────────────────────────────────────────────────────
@@ -51,13 +100,13 @@ class ClientContext:
     github_repo:        str        = ""
     github_branch:      str        = "main"
     github_token:       str        = ""
-    github_format:      str        = "html"   # "html" | "nextjs"
-    github_path_prefix: str        = ""       # e.g. "public/" for Next.js sites
-    pages_domain:       str        = ""       # e.g. "https://www.nohocollisioncenter.com"
+    github_format:      str        = "html"
+    github_path_prefix: str        = ""
+    pages_domain:       str        = ""
     wp_url:             str        = ""
     wp_user:            str        = ""
     wp_app_password:    str        = ""
-    dont_sell:          List[str]  = field(default_factory=list)  # topics/keywords to NEVER target
+    dont_sell:          List[str]  = field(default_factory=list)
 
     def to_prompt_block(self) -> str:
         """Inject this into every agent prompt — replaces NOHO_CONTEXT."""
@@ -68,7 +117,6 @@ class ClientContext:
         ins       = ", ".join(self.insurance_partners) or "All major insurers"
         comp_list = ", ".join(c.get("name", "") for c in self.competitors) or "N/A"
 
-        # Industry-aware labels
         industry = self.industry_vertical or "general"
         cert_label = "CERTIFICATIONS"
         ins_line = ""
@@ -113,21 +161,10 @@ KNOWN COMPETITORS: {comp_list}
 
 # ── DB helpers ───────────────────────────────────────────────────────────────
 
-def _connect():
-    conn = sqlite3.connect(DB_PATH, timeout=20)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA synchronous=NORMAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
 def strip_json_fences(raw: str, start_char: str = "{") -> str:
     """
     Robustly extract a JSON object or array from a Claude response
     that may be wrapped in markdown code fences (```json ... ```).
-    Works correctly even when the response has exactly 2 fences — unlike
-    the fragile `split('```', 2)[-1]` and `lstrip('```json')` patterns.
     """
     cleaned = raw.strip()
     if "```" in cleaned:
@@ -142,11 +179,11 @@ def strip_json_fences(raw: str, start_char: str = "{") -> str:
 
 
 def db_execute(sql: str, params=(), retries=5):
+    """Execute a read query. Uses thread-local connection pool."""
     for attempt in range(retries):
         try:
-            conn = _connect()
+            conn = _get_conn()
             rows = conn.execute(sql, params).fetchall()
-            conn.close()
             return rows
         except sqlite3.OperationalError as e:
             if "locked" in str(e) and attempt < retries - 1:
@@ -156,12 +193,12 @@ def db_execute(sql: str, params=(), retries=5):
 
 
 def db_write(sql: str, params=()):
+    """Execute a write query. Uses thread-local connection pool."""
     for attempt in range(5):
         try:
-            conn = _connect()
+            conn = _get_conn()
             conn.execute(sql, params)
             conn.commit()
-            conn.close()
             return
         except sqlite3.OperationalError as e:
             if "locked" in str(e) and attempt < 4:
@@ -194,10 +231,14 @@ GEO RULES — what makes LLMs cite your content:
 
 class TenantAwareBaseAgent:
     """
-    All 15 agents inherit from this.
+    All agents inherit from this.
     ctx (ClientContext) carries all client-specific data.
     Every DB operation is scoped to self.tenant_id — no cross-tenant leaks.
     """
+
+    # ── Prerequisites — override in subclasses ────────────────────────────────
+    PREREQUISITES: List[str] = []     # agent names that must be 'done' before running
+    MIN_KEYWORDS: int = 0             # minimum keywords needed in DB
 
     def __init__(self, name: str, ctx: ClientContext, layer: int = 1, color: str = "blue"):
         self.name       = name
@@ -207,6 +248,34 @@ class TenantAwareBaseAgent:
         self.color      = color
         self.running    = False
         self._stop      = threading.Event()
+
+    # ── Prerequisites check ──────────────────────────────────────────────────
+
+    def check_prerequisites(self) -> tuple[bool, str]:
+        """
+        Verify this agent's prerequisites are met.
+        Returns (ready: bool, reason: str).
+        Called by AgentRunner before calling run().
+        """
+        if self.MIN_KEYWORDS > 0:
+            rows = db_execute(
+                "SELECT COUNT(*) AS n FROM keywords WHERE tenant_id=?",
+                (self.tenant_id,)
+            )
+            count = rows[0]["n"] if rows else 0
+            if count < self.MIN_KEYWORDS:
+                return False, f"Need {self.MIN_KEYWORDS} keywords, have {count}"
+
+        for prereq_name in self.PREREQUISITES:
+            rows = db_execute(
+                "SELECT status FROM agents WHERE tenant_id=? AND name=?",
+                (self.tenant_id, prereq_name)
+            )
+            status = rows[0]["status"] if rows else "unknown"
+            if status != "done":
+                return False, f"Prerequisite '{prereq_name}' not done (status: {status})"
+
+        return True, "OK"
 
     # ── Logging ───────────────────────────────────────────────────────────────
 
@@ -220,7 +289,7 @@ class TenantAwareBaseAgent:
             "UPDATE agents SET last_message=?, updated_at=? WHERE tenant_id=? AND name=?",
             (message, now, self.tenant_id, self.name)
         )
-        # Trim activity log every 50 calls — not every call (too expensive at scale)
+        # Trim activity log every 50 calls
         self._log_call_count = getattr(self, "_log_call_count", 0) + 1
         if self._log_call_count % 50 == 0:
             db_write(
@@ -245,6 +314,27 @@ class TenantAwareBaseAgent:
 
     def should_stop(self) -> bool:
         return self._stop.is_set()
+
+    # ── Structured output ─────────────────────────────────────────────────────
+
+    def save_output(self, key: str, data: dict):
+        """Persist agent output to settings so downstream agents can read it."""
+        import json
+        db_write(
+            "INSERT OR REPLACE INTO settings (tenant_id, key, value, updated_at) "
+            "VALUES (?,?,?,CURRENT_TIMESTAMP)",
+            (self.tenant_id, key, json.dumps(data, ensure_ascii=False))
+        )
+
+    def log_result(self, what: str, count: int, examples: list[str] = None, score: str = ""):
+        """Standardized completion log showing what the agent produced with examples."""
+        parts = [f"{what}: {count}"]
+        if score:
+            parts.append(f"score={score}")
+        if examples:
+            sample = ", ".join(f'"{ex}"' for ex in examples[:3])
+            parts.append(f"examples=[{sample}]")
+        self.log(" | ".join(parts), "success" if count > 0 else "warning")
 
     # ── Tenant-scoped DB helpers ──────────────────────────────────────────────
 
@@ -291,20 +381,16 @@ class TenantAwareBaseAgent:
                 (self.tenant_id, name, url, location, strengths, weaknesses, notes)
             )
 
-    # ── Claude API (global rate limiter, shared Anthropic key) ───────────────
+    # ── Claude API ───────────────────────────────────────────────────────────
 
     def call_claude(self, prompt: str, max_tokens: int = 1500,
                     system: str = None, model: str = "claude-haiku-4-5-20251001") -> str:
+        import anthropic
         if system is None:
             system = SEO_EXPERTISE
         global _last_api_call
-        import anthropic
 
-        client = anthropic.Anthropic(
-            api_key=os.getenv("ANTHROPIC_API_KEY", ""),
-            timeout=90.0
-        )
-
+        client = _get_anthropic_client()
         messages = [{"role": "user", "content": prompt}]
         kwargs = dict(model=model, max_tokens=max_tokens, messages=messages)
         if system:
@@ -333,29 +419,23 @@ class TenantAwareBaseAgent:
                     else:
                         self.log(f"API error: {str(e)[:80]}", "error")
                         return ""
-            # Sleep OUTSIDE the semaphore so other agents can proceed
             if retry_wait:
                 time.sleep(retry_wait)
         return ""
 
     def call_claude_vision(self, image_url: str, prompt: str, max_tokens: int = 500) -> str:
-        """
-        Send an image URL to Claude Vision and return the text response.
-        Downloads the image and sends as base64 — works for any publicly accessible URL.
-        """
+        """Send an image URL to Claude Vision and return the text response."""
         import anthropic
         import base64
         import requests as _req
 
         global _last_api_call
 
-        # Download image
         try:
             r = _req.get(image_url, timeout=12, headers={"User-Agent": "Mozilla/5.0"})
             r.raise_for_status()
             image_data = base64.b64encode(r.content).decode("utf-8")
             content_type = r.headers.get("content-type", "image/jpeg").split(";")[0].strip()
-            # Normalize media type
             ct_map = {"image/jpg": "image/jpeg", "image/svg+xml": "image/png"}
             media_type = ct_map.get(content_type, content_type)
             if media_type not in ("image/jpeg", "image/png", "image/gif", "image/webp"):
@@ -363,7 +443,7 @@ class TenantAwareBaseAgent:
         except Exception as e:
             return f"__download_error__: {e}"
 
-        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""), timeout=60.0)
+        client = _get_anthropic_client()
         messages = [{
             "role": "user",
             "content": [

@@ -9,6 +9,8 @@ from denzo.agents.base_agent import TenantAwareBaseAgent, ClientContext, db_exec
 
 class EEATArchitect(TenantAwareBaseAgent):
 
+    MIN_KEYWORDS = 10
+
     def __init__(self, ctx: ClientContext):
         super().__init__("E-E-A-T Architect", ctx, layer=2, color="indigo")
 

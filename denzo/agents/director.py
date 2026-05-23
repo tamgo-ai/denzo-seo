@@ -1,21 +1,14 @@
 """
-Pipeline Director — The AI Brain of DENZO SEO
-==============================================
-The Director is the autonomous orchestrator of the entire SEO pipeline.
-It thinks, decides, and acts like a Senior SEO Marketing Director with 15 years
-of experience. It doesn't just run agents in sequence — it evaluates quality,
-detects problems, retries intelligently, and adapts the strategy based on results.
+Pipeline Director — Autonomous SEO Pipeline Orchestrator
+=========================================================
+Deterministic Python state machine that drives the 26-agent pipeline.
+No Claude API calls in the decision loop — only ONE strategic planning
+call at startup.
 
-Personality:
-- Obsessed with results, not process
-- Zero tolerance for agents that produce empty or low-quality output
-- Proactive: doesn't wait for problems, anticipates them
-- Decisive: makes calls quickly with available data
-- Transparent: logs every decision with reasoning
+Dependency rules are enforced in code, not in prompts.
 """
 import json
 import time
-import threading
 
 from denzo.agents.base_agent import (
     TenantAwareBaseAgent,
@@ -25,18 +18,38 @@ from denzo.agents.base_agent import (
     strip_json_fences,
 )
 
+# ── Agent names by layer ──────────────────────────────────────────────────────
+
+LAYER_1 = [
+    "Keyword Strategist", "Competitor Intel", "Technical Auditor",
+    "Site Style Analyzer", "Data Intelligence", "GBP Optimizer",
+]
+LAYER_2 = ["E-E-A-T Architect", "Schema Engineer"]
+LAYER_2B = ["Vertical Matrix Generator"]  # needs EEAT done
+LAYER_3 = ["Programmatic SEO"]
+LAYER_4 = ["Content Optimizer", "Visual Content Optimizer", "GEO Optimizer", "Internal Linker"]
+LAYER_4B = ["Content Freshness"]  # needs pages published
+LAYER_5 = ["GitHub Publisher", "WordPress Publisher"]
+LAYER_6 = [
+    "Rank Tracker", "GEO Query Generator", "GEO Monitor",
+    "SERP Intelligence", "Reviews Intelligence", "ROI Attribution",
+]
+
+ALL_AGENTS = LAYER_1 + LAYER_2 + LAYER_2B + LAYER_3 + LAYER_4 + LAYER_4B + LAYER_5 + LAYER_6
+
 
 class PipelineDirector(TenantAwareBaseAgent):
     """
-    Autonomous orchestrator that drives the full SEO pipeline using Claude
-    as its decision engine. Runs every 30 seconds, assesses state, decides
-    what to start/stop/retry, and logs all reasoning.
+    Autonomous orchestrator using a deterministic state machine.
+    Evaluates pipeline state every 30 seconds and starts/retries agents
+    based on dependency rules enforced in Python code.
     """
 
     def __init__(self, ctx: ClientContext):
         super().__init__("Pipeline Director", ctx, layer=0, color="indigo")
         self._stop_flag = False
-        self._consecutive_parse_failures = 0
+        self._strategy = None  # populated by _generate_strategy() on first run
+        self._publisher_skip_warned = False
 
     # ── State Assessment ──────────────────────────────────────────────────────
 
@@ -44,16 +57,15 @@ class PipelineDirector(TenantAwareBaseAgent):
         """Build a complete picture of the pipeline state."""
         tid = self.ctx.tenant_id
 
-        # Single query for all keyword + page counts
         counts = db_execute(
             """SELECT
-                (SELECT COUNT(*) FROM keywords WHERE tenant_id=?)                                   AS kw_total,
-                (SELECT COUNT(*) FROM keywords WHERE tenant_id=? AND priority = 'high')             AS kw_high,
-                (SELECT COUNT(*) FROM pages    WHERE tenant_id=?)                                   AS pg_total,
-                (SELECT COUNT(*) FROM pages    WHERE tenant_id=? AND status='published')            AS pg_pub,
-                (SELECT COUNT(*) FROM pages    WHERE tenant_id=? AND status='ready')                AS pg_ready,
-                (SELECT COUNT(*) FROM pages    WHERE tenant_id=? AND status='draft')                AS pg_draft,
-                (SELECT COUNT(*) FROM competitors WHERE tenant_id=?)                                AS comp_total
+                (SELECT COUNT(*) FROM keywords WHERE tenant_id=?)     AS kw_total,
+                (SELECT COUNT(*) FROM keywords WHERE tenant_id=? AND priority='high') AS kw_high,
+                (SELECT COUNT(*) FROM pages    WHERE tenant_id=?)     AS pg_total,
+                (SELECT COUNT(*) FROM pages    WHERE tenant_id=? AND status='published') AS pg_pub,
+                (SELECT COUNT(*) FROM pages    WHERE tenant_id=? AND status='ready')     AS pg_ready,
+                (SELECT COUNT(*) FROM pages    WHERE tenant_id=? AND status='draft')     AS pg_draft,
+                (SELECT COUNT(*) FROM competitors WHERE tenant_id=?)  AS comp_total
             """,
             (tid, tid, tid, tid, tid, tid, tid)
         )
@@ -67,23 +79,23 @@ class PipelineDirector(TenantAwareBaseAgent):
         comp_count = c["comp_total"] or 0
 
         agent_rows = db_execute(
-            """SELECT name, status, current_task, last_run_at, run_count, layer
+            """SELECT name, status, current_task, run_count, layer
                FROM agents WHERE tenant_id=? AND name != 'Pipeline Director'
                ORDER BY layer, name""",
             (tid,),
         )
         agents = [dict(r) for r in agent_rows] if agent_rows else []
 
-        error_rows = db_execute(
-            """SELECT agent, message, created_at FROM activity
-               WHERE tenant_id=? AND level='error'
-               AND created_at > datetime('now', '-30 minutes')
-               ORDER BY id DESC LIMIT 10""",
-            (tid,),
+        # Data samples for visibility
+        sample_kws = db_execute(
+            "SELECT keyword, priority, location FROM keywords WHERE tenant_id=? ORDER BY id DESC LIMIT 5",
+            (tid,)
         )
-        errors = [dict(r) for r in error_rows] if error_rows else []
+        sample_pages = db_execute(
+            "SELECT title, status, quality_score FROM pages WHERE tenant_id=? AND content IS NOT NULL ORDER BY id DESC LIMIT 3",
+            (tid,)
+        )
 
-        # Quality metrics
         quality_rows = db_execute(
             """SELECT
                 COUNT(*) as total,
@@ -95,331 +107,344 @@ class PipelineDirector(TenantAwareBaseAgent):
             (tid,)
         )
         quality = dict(quality_rows[0]) if quality_rows else {"total": 0, "unscored": 0, "low_quality": 0, "avg_score": 0}
-        # Round avg_score
         if quality.get("avg_score"):
             quality["avg_score"] = round(float(quality["avg_score"]), 1)
 
         return {
             "keywords": {"total": kw_count, "high_priority": kw_high},
-            "pages": {
-                "total": page_total,
-                "draft": page_draft,
-                "ready": page_ready,
-                "published": page_pub,
-            },
+            "pages": {"total": page_total, "draft": page_draft, "ready": page_ready, "published": page_pub},
             "quality": quality,
             "competitors": comp_count,
             "agents": agents,
-            "recent_errors": errors,
+            "sample_keywords": [dict(r) for r in (sample_kws or [])],
+            "sample_pages": [dict(r) for r in (sample_pages or [])],
         }
 
-    # ── AI Decision Engine ────────────────────────────────────────────────────
+    # ── Helpers ────────────────────────────────────────────────────────────────
 
-    def _decide(self, state: dict) -> dict:
-        """Ask Claude what to do next. Returns structured decision."""
+    def _agent_status(self, name: str, agents: list) -> str:
+        """Return the status string for a named agent, or 'unknown'."""
+        for a in agents:
+            if a["name"] == name:
+                return a["status"]
+        return "unknown"
 
-        system = """You are the Pipeline Director AI for DENZO SEO — the world's most advanced multi-vertical SEO + GEO platform. You operate as an autonomous Senior SEO Director with 15 years of experience across local SEO, GEO (Generative Engine Optimization), content strategy, and AI-powered marketing for ANY business vertical.
+    def _agent_run_count(self, name: str, agents: list) -> int:
+        for a in agents:
+            if a["name"] == name:
+                return a.get("run_count", 0) or 0
+        return 0
 
-Your personality:
-- Results-obsessed: keywords ranked, pages published, GEO citations earned — not just "agents running"
-- Zero bullshit: if an agent produces no data, retry or escalate immediately
-- Strategic: understand the dependency chain; never waste tokens running Layer 3 without Layer 1 data
-- Proactive: spot problems before they become failures
-- Decisive: clear calls with brief reasoning, always
+    def _all_done(self, names: list[str], agents: list) -> bool:
+        """True if ALL named agents are 'done'."""
+        statuses = {a["name"]: a["status"] for a in agents}
+        for name in names:
+            st = statuses.get(name, "unknown")
+            # Publisher self-skip counts as done
+            if st == "done":
+                continue
+            if name in LAYER_5 and st == "error":
+                # Check if it self-skipped (missing config)
+                task = next((a.get("current_task", "") for a in agents if a["name"] == name), "")
+                if "Skipped" in task or "skip" in task.lower():
+                    continue
+            return False
+        return True
 
-You orchestrate a world-class 26-agent SEO pipeline:
+    def _any_done(self, names: list[str], agents: list) -> bool:
+        """True if at least one named agent is 'done'."""
+        statuses = {a["name"]: a["status"] for a in agents}
+        return any(statuses.get(n) == "done" for n in names)
 
-LAYER 1 — Intelligence (run ALL simultaneously — they're independent):
-  Keyword Strategist      → discovers and scores keywords for this vertical/location
-  Keyword Clusterer       → groups keywords into semantic clusters (needs ≥10 keywords first)
-  Competitor Intel        → maps competitors, tier analysis, positioning gaps
-  Technical Auditor       → site audit, CWV, crawlability, schema validation
-  Site Style Analyzer     → brand colors, fonts, visual identity extraction
-  Data Intelligence       → citation-bait data, statistics, authority content
-  GBP Optimizer           → Google Business Profile analysis + optimization plan
+    def _idle_in_layer(self, names: list[str], agents: list) -> list[str]:
+        """Return names of idle agents within a list."""
+        statuses = {a["name"]: a["status"] for a in agents}
+        return [n for n in names if statuses.get(n) == "idle"]
 
-LAYER 2 — Strategy (after Layer 1 has ≥20 keywords):
-  E-E-A-T Architect       → authority pillars, content priorities, trust signals
-  Schema Engineer         → LocalBusiness + FAQ + Review + HowTo + Service + SpeakableSpec
-  Vertical Matrix Gen.    → expands page matrix for specific vertical (damage types, insurance KWs, procedures, etc.)
+    def _retriable_errors(self, names: list[str], agents: list, max_retries: int = 3) -> list[str]:
+        """Return names of agents in 'error' state with run_count < max_retries."""
+        result = []
+        for a in agents:
+            if a["name"] in names and a["status"] == "error":
+                if (a.get("run_count") or 0) < max_retries:
+                    result.append(a["name"])
+        return result
 
-LAYER 3 — Generation (after ALL Layer 2 agents done + ≥20 keywords):
-  Programmatic SEO        → AI-writes full page content for all draft stubs
+    def _layer_summary(self, names: list[str], agents: list) -> str:
+        """Compact status summary for a layer."""
+        statuses = {a["name"]: a["status"] for a in agents}
+        parts = []
+        for n in names:
+            st = statuses.get(n, "unknown")[:1].upper()  # I/W/D/E
+            parts.append(f"{n}={st}")
+        return ", ".join(parts)
 
-LAYER 4 — Optimization (after Programmatic SEO done + pages.ready ≥ 10):
-  Content Optimizer       → quality scoring + rewrite to ≥70 score
-  Visual Content Optimizer→ hero images, visual elements, brand alignment
-  GEO Optimizer           → optimize for AI Answer Engines (Perplexity, ChatGPT, Gemini AI Overviews)
-  Internal Linker         → hub-and-spoke link architecture
-  Content Freshness       → refresh published pages older than 90 days (Layer 4 but runs after publishing)
+    # ── Strategic Plan (ONE Claude call at startup) ───────────────────────────
 
-LAYER 5 — Publishing (pages.ready ≥ 1, quality gate passed):
-  GitHub Publisher        → HTML pages + sitemap.xml + robots.txt + llms.txt
-  WordPress Publisher     → WP posts + sitemap ping + llms.txt page
+    def _generate_strategy(self):
+        """Generate the strategic plan ONCE. Stored in self._strategy and DB."""
+        tid = self.ctx.tenant_id
 
-LAYER 6 — Analytics (pages.published ≥ 1):
-  GEO Query Generator     → generates AI search query bank for monitoring
-  GEO Monitor             → tracks citations in ChatGPT, Perplexity, Gemini, Claude
-  Rank Tracker            → estimates keyword positions (Apify real data or AI estimates)
-  SERP Intelligence       → featured snippet opportunities, PAA, local pack analysis
-  Reviews Intelligence    → competitor review analysis, pain points, content opportunities
-  ROI Attribution         → citation rate, ranking improvements, traffic attribution
-
-DEPENDENCY RULES (enforce strictly):
-- Keyword Clusterer: requires ≥10 keywords (run after Keyword Strategist produces results)
-- Layer 2: requires ≥20 keywords in DB
-- Vertical Matrix Generator: requires E-E-A-T Architect status='done' (needs the page strategy first)
-- Layer 3 (Programmatic SEO): requires ALL three Layer 2 agents status='done' AND keywords ≥ 20
-- Layer 4: requires Programmatic SEO status='done' + pages.ready ≥ 10
-- Content Freshness: requires pages.published ≥ 1 (refreshes existing published content)
-- Layer 5: requires pages.ready ≥ 1 + quality gate passed
-- Layer 6: requires pages.published ≥ 1
-
-QUALITY GATE (non-negotiable):
-- Keyword Strategist: must produce ≥30 keywords. Retry if fewer.
-- Competitor Intel: must produce ≥3 competitors. Log warning if fewer, but continue.
-- Programmatic SEO: must produce ≥10 ready pages. Retry once if fewer.
-- Content quality: avg quality_score ≥ 70 before publishing.
-  → If unscored > 0 and Content Optimizer idle: start Content Optimizer
-  → If avg_score < 70 and Content Optimizer run_count < 5: start Content Optimizer
-  → If avg_score ≥ 70 OR Content Optimizer run_count ≥ 5: proceed to publish
-
-EXECUTION RULES:
-- Never start an agent currently 'working'
-- Layer 1: start ALL idle Layer 1 agents simultaneously when keywords < 20
-- After Keyword Strategist done with ≥10 KWs: also start Keyword Clusterer if idle
-- Layer 2: start E-E-A-T Architect + Schema Engineer together when keywords ≥ 20; start Vertical Matrix Generator once E-E-A-T is done
-- Layer 3: start when ALL Layer 2 done (E-E-A-T + Schema + Vertical Matrix)
-- Layer 4: start Content Optimizer, GEO Optimizer, Visual Content Optimizer, Internal Linker simultaneously when Programmatic SEO done + pages.ready ≥ 10
-- Layer 5: start GitHub Publisher (if github_repo set) OR WordPress Publisher (if wp_url set) after quality gate
-- Layer 6: start all analytics agents after first pages published OR after publishers reach status='done'
-- Content Freshness: start after pages.published ≥ 5 (only if not already running)
-- GBP Optimizer: start alongside other Layer 1 agents — it's independent
-- Error handling: retry if run_count < 3; skip and move forward if run_count ≥ 3
-- Publisher self-skip: If a publisher's status is 'done' and its current_task contains "Skipped",
-  treat that as a successful end-state for that publisher. The user has chosen not to configure it
-  (or hasn't yet) — DO NOT mark the pipeline blocked because of this. Move to Layer 6 anyway and
-  run the analytics agents on the pages that exist in 'ready' state. Mention once in your
-  reasoning that publishing is pending user config, then continue.
-- pipeline_complete: declare when:
-    (a) at least one publisher is 'done' with pages.published ≥ 10 + quality.avg_score ≥ 70
-        (or Content Optimizer run_count ≥ 5), OR
-    (b) all configured publishers self-skipped + pages.ready ≥ 10 + quality.avg_score ≥ 70
-        (or Content Optimizer run_count ≥ 5) + Layer 6 agents have all run at least once.
-  Case (b) means "the pipeline did everything it could; only thing left is for the user to
-  add publishing credentials". Declare complete and stop, don't loop.
-- After pipeline_complete: Director stops. Analytics agents are self-sufficient and run independently.
-
-GEO AWARENESS: This platform serves ANY vertical — auto body shops, dental, law firms, HVAC, restaurants, real estate, etc. Keyword Strategist and Vertical Matrix Generator adapt automatically. Your decisions should be vertical-agnostic.
-
-Your output must be valid JSON with no markdown:
-{
-  "assessment": "one sentence on the current state",
-  "action": "start_layer|wait|retry_agent|stop_agent|pipeline_complete|pipeline_blocked",
-  "targets": ["Agent Name 1", "Agent Name 2"],
-  "reasoning": "why you're making this call (2-3 sentences max)",
-  "urgency": "high|medium|low",
-  "next_check_seconds": 30
-}"""
-
-        state_json = json.dumps(state, indent=2, default=str)
-        prompt = f"""Current pipeline state for {self.ctx.client_name}:
-
-{state_json}
-
-What is your decision? Return JSON only, no markdown."""
-
-        raw = self.call_claude(
-            prompt,
-            max_tokens=800,
-            system=system,
-            model="claude-sonnet-4-6",
+        # Check for existing plan
+        existing = db_execute(
+            "SELECT value FROM settings WHERE tenant_id=? AND key='pipeline_plan'",
+            (tid,)
         )
+        if existing:
+            try:
+                self._strategy = json.loads(existing[0]["value"])
+                self.log(f"[Director] Loaded existing pipeline plan: {self._strategy.get('strategy', '')[:100]}", "info")
+                return
+            except Exception:
+                pass
+
+        # Gather context for strategy
+        kw_sample = db_execute(
+            "SELECT keyword, priority, category FROM keywords WHERE tenant_id=? ORDER BY id LIMIT 30",
+            (tid,)
+        )
+        kw_list = [dict(r) for r in (kw_sample or [])]
+
+        comp_sample = db_execute(
+            "SELECT name, location, tier FROM competitors WHERE tenant_id=? LIMIT 10",
+            (tid,)
+        )
+        comp_list = [dict(r) for r in (comp_sample or [])]
+
+        prompt = f"""{self.ctx.to_prompt_block()}
+
+You are planning the SEO pipeline execution for this business.
+
+Current state:
+- Keywords in DB: {len(kw_list)}
+- Competitors analyzed: {len(comp_list)}
+- Industry: {self.ctx.industry_vertical}
+
+Sample keywords: {json.dumps(kw_list[:10], ensure_ascii=False)}
+Sample competitors: {json.dumps(comp_list[:5], ensure_ascii=False)}
+
+Design a ONE-SENTENCE strategy, then list priority keywords and content pillars.
+
+Return JSON:
+{{
+  "strategy": "one-sentence high-level plan",
+  "priority_keywords": ["kw1", "kw2", "kw3"],
+  "content_pillars": ["pillar 1", "pillar 2", "pillar 3"],
+  "estimated_pages": 50,
+  "target_verticals": ["service pages", "location pages", "brand pages"],
+  "notes": "any special considerations"
+}}
+Return ONLY valid JSON."""
+
+        raw = self.call_claude(prompt, max_tokens=800, model="claude-sonnet-4-6")
         if not raw:
-            return {
-                "action": "wait",
-                "targets": [],
-                "reasoning": "Empty response from AI — will retry next cycle.",
-                "next_check_seconds": 60,
-            }
-
-        try:
-            result = json.loads(strip_json_fences(raw))
-            self._consecutive_parse_failures = 0
-            return result
-        except Exception as exc:
-            self._consecutive_parse_failures += 1
-            self.log(
-                f"[Director] Could not parse AI decision "
-                f"(consecutive failure #{self._consecutive_parse_failures}): {exc}",
-                "warning",
-            )
-            if self._consecutive_parse_failures >= 3:
-                return {
-                    "action": "pipeline_blocked",
-                    "targets": [],
-                    "reasoning": (
-                        f"AI decision engine returned unparseable JSON "
-                        f"{self._consecutive_parse_failures} times in a row. "
-                        "Pipeline cannot continue autonomously."
-                    ),
-                    "next_check_seconds": 60,
-                }
-            return {
-                "action": "wait",
-                "targets": [],
-                "reasoning": "Could not parse AI decision — retrying next cycle.",
-                "next_check_seconds": 30,
-            }
-
-    # ── Execution Engine ──────────────────────────────────────────────────────
-
-    def _execute_decision(self, decision: dict):
-        """Execute the Director's decision."""
-        action = decision.get("action", "wait")
-        targets = decision.get("targets", [])
-        reason = decision.get("reasoning", "")
-        assessment = decision.get("assessment", "")
-        urgency = decision.get("urgency", "low")
-
-        if assessment:
-            self.log(f"[Director] {assessment}", "info")
-
-        log_level = "warning" if urgency == "high" else "info"
-        self.log(
-            f"[Director] Action: {action} → {', '.join(targets) or 'none'} | {reason}",
-            log_level,
-        )
-
-        if action in ("start_layer", "retry_agent"):
-            for agent_name in targets:
-                self._start_agent(agent_name)
-
-        elif action == "stop_agent":
-            for agent_name in targets:
-                self._stop_agent(agent_name)
-
-        elif action == "pipeline_complete":
-            self.log(
-                "[Director] Pipeline complete — all layers executed successfully.",
-                "success",
-            )
-            self.set_status("done", "Pipeline complete")
-            self._stop_flag = True
-
-        elif action == "pipeline_blocked":
-            self.log(f"[Director] Pipeline blocked — {reason}", "error")
-            self.set_status("error", reason[:200])
-
-        # "wait" — do nothing, next cycle will re-evaluate
-
-    def _start_agent(self, agent_name: str):
-        """Start an agent in its own daemon thread."""
-        from denzo.agents.registry import AGENT_REGISTRY, get_agent
-
-        if agent_name not in AGENT_REGISTRY:
-            self.log(f"[Director] Unknown agent: {agent_name}", "error")
+            self._strategy = {"strategy": "Default pipeline execution", "priority_keywords": [], "content_pillars": [], "estimated_pages": 0}
             return
 
-        # Check not already running
-        rows = db_execute(
-            "SELECT status FROM agents WHERE tenant_id=? AND name=?",
-            (self.ctx.tenant_id, agent_name),
+        try:
+            self._strategy = json.loads(strip_json_fences(raw))
+            self.save_output("pipeline_plan", self._strategy)
+            self.log(f"[Director] Strategic plan generated: {self._strategy.get('strategy', '')[:120]}", "success")
+        except Exception:
+            self._strategy = {"strategy": "Default pipeline execution", "priority_keywords": [], "content_pillars": [], "estimated_pages": 0}
+
+    # ── State Machine ──────────────────────────────────────────────────────────
+
+    def _evaluate(self, state: dict) -> list[str]:
+        """
+        Python state machine — evaluates pipeline state and returns
+        a list of agent names to start this cycle. NO Claude API calls.
+        """
+        agents = state["agents"]
+        kw_total = state["keywords"]["total"]
+        kw_high = state["keywords"]["high_priority"]
+        pg_ready = state["pages"]["ready"]
+        pg_pub = state["pages"]["published"]
+        pg_draft = state["pages"]["draft"]
+        comp_count = state["competitors"]
+        avg_score = state["quality"].get("avg_score", 0) or 0
+        unscored = state["quality"].get("unscored", 0) or 0
+
+        to_start = []
+
+        # ── Layer 1: Intelligence ───────────────────────────────────────────
+        l1_idle = self._idle_in_layer(LAYER_1, agents)
+        l1_retry = self._retriable_errors(LAYER_1, agents)
+
+        if kw_total < 20:
+            # Need keywords → start ALL idle Layer 1
+            for name in l1_idle:
+                to_start.append(name)
+            for name in l1_retry:
+                to_start.append(name)
+            if to_start:
+                self.log(f"[Director] L1 — starting intelligence agents (keywords={kw_total}, need ≥20)", "info")
+        elif comp_count < 3 and "Competitor Intel" in (l1_idle + l1_retry):
+            # Still need competitors
+            if "Competitor Intel" in l1_idle:
+                to_start.append("Competitor Intel")
+            elif "Competitor Intel" in l1_retry:
+                to_start.append("Competitor Intel")
+
+        # Keyword Clusterer: needs ≥10 keywords
+        if kw_total >= 10:
+            kc_status = self._agent_status("Keyword Clusterer", agents)
+            if kc_status == "idle":
+                to_start.append("Keyword Clusterer")
+            elif kc_status == "error" and self._agent_run_count("Keyword Clusterer", agents) < 3:
+                to_start.append("Keyword Clusterer")
+
+        # ── Layer 2: Strategy ──────────────────────────────────────────────
+        l2_idle = self._idle_in_layer(LAYER_2, agents)
+        l2_retry = self._retriable_errors(LAYER_2, agents)
+
+        if kw_total >= 20:
+            for name in l2_idle:
+                to_start.append(name)
+            for name in l2_retry:
+                to_start.append(name)
+
+        # Vertical Matrix Generator: needs E-E-A-T Architect done
+        if self._agent_status("E-E-A-T Architect", agents) == "done":
+            vmg_status = self._agent_status("Vertical Matrix Generator", agents)
+            if vmg_status == "idle":
+                to_start.append("Vertical Matrix Generator")
+            elif vmg_status == "error" and self._agent_run_count("Vertical Matrix Generator", agents) < 3:
+                to_start.append("Vertical Matrix Generator")
+
+        # ── Layer 3: Generation ────────────────────────────────────────────
+        l2_all = LAYER_2 + LAYER_2B
+        if kw_total >= 20 and self._all_done(l2_all, agents):
+            l3_idle = self._idle_in_layer(LAYER_3, agents)
+            l3_retry = self._retriable_errors(LAYER_3, agents)
+            for name in l3_idle:
+                to_start.append(name)
+            for name in l3_retry:
+                to_start.append(name)
+
+        # ── Layer 4: Optimization ──────────────────────────────────────────
+        if self._agent_status("Programmatic SEO", agents) == "done" and pg_ready >= 5:
+            l4_idle = self._idle_in_layer(LAYER_4, agents)
+            l4_retry = self._retriable_errors(LAYER_4, agents)
+            for name in l4_idle:
+                to_start.append(name)
+            for name in l4_retry:
+                to_start.append(name)
+
+        # ── Layer 5: Publishing ────────────────────────────────────────────
+        quality_ok = avg_score >= 70 or self._agent_run_count("Content Optimizer", agents) >= 5
+        publisher_ran = self._any_done(LAYER_5, agents)
+
+        if pg_ready >= 1 and quality_ok and not publisher_ran:
+            for pub_name in LAYER_5:
+                pub_status = self._agent_status(pub_name, agents)
+                if pub_status == "idle":
+                    to_start.append(pub_name)
+                elif pub_status == "error":
+                    # Check if it self-skipped (missing config)
+                    task = next((a.get("current_task", "") for a in agents if a["name"] == pub_name), "")
+                    if "Skipped" not in task and self._agent_run_count(pub_name, agents) < 3:
+                        to_start.append(pub_name)
+
+        # ── Layer 4B: Content Freshness ────────────────────────────────────
+        if pg_pub >= 1:
+            cf_status = self._agent_status("Content Freshness", agents)
+            if cf_status == "idle":
+                to_start.append("Content Freshness")
+
+        # ── Layer 6: Analytics ─────────────────────────────────────────────
+        if pg_pub >= 1 or publisher_ran:
+            l6_idle = self._idle_in_layer(LAYER_6, agents)
+            for name in l6_idle:
+                # Only start analytics once
+                rc = self._agent_run_count(name, agents)
+                if rc == 0:
+                    to_start.append(name)
+
+        # ── Quality gate: re-run Content Optimizer if needed ───────────────
+        if unscored > 0 and self._agent_status("Content Optimizer", agents) == "idle":
+            co_rc = self._agent_run_count("Content Optimizer", agents)
+            if co_rc < 5:
+                to_start.append("Content Optimizer")
+
+        # Log the decision
+        if to_start:
+            self.log(f"[Director] This cycle: starting {to_start}", "info")
+            self.log(
+                f"[Director] State: kw={kw_total} comp={comp_count} "
+                f"pages(draft={pg_draft} ready={pg_ready} pub={pg_pub}) "
+                f"quality(avg={avg_score} unscored={unscored})",
+                "info"
+            )
+
+        return to_start
+
+    # ── Pipeline complete detection ──────────────────────────────────────────
+
+    def _is_pipeline_complete(self, state: dict) -> bool:
+        """Determine if the pipeline has reached a natural end state."""
+        agents = state["agents"]
+        pg_ready = state["pages"]["ready"]
+        pg_pub = state["pages"]["published"]
+        avg_score = state["quality"].get("avg_score", 0) or 0
+
+        quality_ok = avg_score >= 70
+        co_exhausted = self._agent_run_count("Content Optimizer", agents) >= 5
+
+        publisher_done = False
+        publisher_skipped = False
+        for pub_name in LAYER_5:
+            st = self._agent_status(pub_name, agents)
+            task = next((a.get("current_task", "") for a in agents if a["name"] == pub_name), "")
+            if st == "done":
+                if "Skipped" in task:
+                    publisher_skipped = True
+                else:
+                    publisher_done = True
+
+        l6_all_ran = all(
+            self._agent_run_count(n, agents) > 0
+            for n in LAYER_6
         )
-        if rows and rows[0]["status"] == "working":
-            return  # already running — skip silently
 
-        ctx = self.ctx
+        # Case A: real publishing succeeded
+        if publisher_done and pg_pub >= 10 and (quality_ok or co_exhausted):
+            return True
 
-        def _thread():
-            try:
-                db_write(
-                    """UPDATE agents
-                       SET status='working', current_task='Starting...', updated_at=CURRENT_TIMESTAMP,
-                           last_run_at=CURRENT_TIMESTAMP, run_count=run_count+1
-                       WHERE tenant_id=? AND name=?""",
-                    (ctx.tenant_id, agent_name),
+        # Case B: publishers skipped but everything else is done
+        if publisher_skipped and pg_ready >= 10 and (quality_ok or co_exhausted) and l6_all_ran:
+            if not self._publisher_skip_warned:
+                self.log(
+                    "[Director] Publishers skipped (no credentials configured). "
+                    "Pipeline did everything it could. Configure publisher settings to go live.",
+                    "warning"
                 )
-                agent = get_agent(agent_name, ctx)
-                agent.run()
+                self._publisher_skip_warned = True
+            return True
 
-                # Only override status if it's still 'working' (agent didn't self-set)
-                status_rows = db_execute(
-                    "SELECT status FROM agents WHERE tenant_id=? AND name=?",
-                    (ctx.tenant_id, agent_name),
-                )
-                if status_rows and status_rows[0]["status"] == "working":
-                    db_write(
-                        """UPDATE agents
-                           SET status='done', current_task='Completed', updated_at=CURRENT_TIMESTAMP
-                           WHERE tenant_id=? AND name=?""",
-                        (ctx.tenant_id, agent_name),
-                    )
-            except Exception as exc:
-                db_write(
-                    """UPDATE agents
-                       SET status='error', current_task=?, updated_at=CURRENT_TIMESTAMP
-                       WHERE tenant_id=? AND name=?""",
-                    (str(exc)[:200], ctx.tenant_id, agent_name),
-                )
-                # Log error to activity
-                db_write(
-                    "INSERT INTO activity (tenant_id,type,message,agent,level,created_at) VALUES (?,?,?,?,?,datetime('now'))",
-                    (ctx.tenant_id, "agent", f"{agent_name} crashed: {str(exc)[:150]}", agent_name, "error"),
-                )
-
-        t = threading.Thread(
-            target=_thread,
-            daemon=True,
-            name=f"director:{ctx.tenant_id}:{agent_name}",
-        )
-        t.start()
-        self.log(f"[Director] Started {agent_name}", "info")
-
-    def _stop_agent(self, agent_name: str):
-        """Signal an agent to stop by marking it idle in the DB."""
-        db_write(
-            """UPDATE agents
-               SET status='idle', current_task='Stopped by Director', updated_at=CURRENT_TIMESTAMP
-               WHERE tenant_id=? AND name=?""",
-            (self.ctx.tenant_id, agent_name),
-        )
-        self.log(f"[Director] Stopped {agent_name}", "warning")
+        return False
 
     # ── Deadlock Detection ────────────────────────────────────────────────────
 
     def _check_deadlock(self, agents: list) -> str | None:
-        """
-        Returns a blocked reason string if all agents in the lowest active layer
-        are stuck in 'error' with run_count >= 3. Returns None if pipeline is healthy.
-        """
-        # Group non-done/idle agents by layer
+        """Returns reason string if pipeline is deadlocked, None if healthy."""
         active = [a for a in agents if a["status"] not in ("done", "idle")]
         if not active:
             return None
 
-        # Find lowest layer with active (working/error) agents
         min_layer = min(a["layer"] for a in active if a["layer"] is not None)
         layer_agents = [a for a in active if a["layer"] == min_layer]
 
-        # Deadlock: every agent in this layer is in error with run_count >= 3
         errored = [a for a in layer_agents if a["status"] == "error" and (a.get("run_count") or 0) >= 3]
         if errored and len(errored) == len(layer_agents):
             names = ", ".join(a["name"] for a in errored)
-            return (
-                f"Layer {min_layer} deadlock: all agents failed ≥3 times — {names}. "
-                "Manual intervention required."
-            )
+            return f"Layer {min_layer} deadlock: all agents failed ≥3 times — {names}. Manual intervention required."
         return None
 
     # ── Watchdog ──────────────────────────────────────────────────────────────
 
     def _watchdog(self):
-        """
-        Reset agents that have been 'working' for >10 minutes with no recent
-        activity log entry. These are zombie threads from a previous server run
-        or a hung agent.
-        """
+        """Reset agents that have been stuck in 'working' for >10 minutes."""
         stale = db_execute(
             """SELECT name FROM agents
                WHERE tenant_id=? AND status='working'
@@ -439,19 +464,14 @@ What is your decision? Return JSON only, no markdown."""
     # ── Publisher error recovery ───────────────────────────────────────────────
 
     def _reset_blocked_publishers(self):
-        """
-        If a publisher is in 'error' state but credentials are now available,
-        reset it to 'idle' so the Director can retry it this cycle.
-        """
+        """If publisher creds are now available, reset errored publishers to idle."""
         tid = self.ctx.tenant_id
-        # GitHub Publisher
         if self.ctx.github_repo and self.ctx.github_token:
             db_write(
                 """UPDATE agents SET status='idle', current_task=NULL, last_message=NULL
                    WHERE tenant_id=? AND name='GitHub Publisher' AND status='error'""",
                 (tid,)
             )
-        # WordPress Publisher
         if self.ctx.wp_url and self.ctx.wp_user and self.ctx.wp_app_password:
             db_write(
                 """UPDATE agents SET status='idle', current_task=NULL, last_message=NULL
@@ -462,11 +482,7 @@ What is your decision? Return JSON only, no markdown."""
     # ── Quality Gate ──────────────────────────────────────────────────────────
 
     def _run_quality_gate(self):
-        """
-        Check published pages for quality issues.
-        Re-queue low-quality pages for Content Optimizer to re-process.
-        Returns number of pages re-queued.
-        """
+        """Re-queue low-quality published pages for Content Optimizer."""
         tid = self.ctx.tenant_id
         low_quality = db_execute(
             """SELECT id, title, quality_score
@@ -484,19 +500,16 @@ What is your decision? Return JSON only, no markdown."""
             pid = page["id"]
             score = page["quality_score"]
             db_write(
-                """UPDATE pages SET status='ready', quality_score=NULL,
-                   updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?""",
+                "UPDATE pages SET status='ready', quality_score=NULL, updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
                 (pid, tid)
             )
-            self.log(f"[QA Gate] Re-queued page id={pid} score={score} for re-optimization", "warning")
+            self.log(f"[QA Gate] Re-queued page id={pid} score={score}", "warning")
             requeued += 1
 
         if requeued:
-            self.log(f"[QA Gate] {requeued} pages below quality threshold — re-queuing for Content Optimizer", "warning")
-            # Reset Content Optimizer to idle so it can re-run
+            self.log(f"[QA Gate] {requeued} pages below quality threshold — re-queuing", "warning")
             db_write(
-                """UPDATE agents SET status='idle', current_task='Re-running for quality gate',
-                   updated_at=CURRENT_TIMESTAMP WHERE tenant_id=? AND name='Content Optimizer'""",
+                "UPDATE agents SET status='idle', current_task='Re-running for quality gate' WHERE tenant_id=? AND name='Content Optimizer'",
                 (tid,)
             )
 
@@ -505,53 +518,66 @@ What is your decision? Return JSON only, no markdown."""
     # ── Main Run Loop ─────────────────────────────────────────────────────────
 
     def run(self):
-        self.log("[Director] Autonomous pipeline director activated.", "success")
+        self.log("[Director] Autonomous pipeline director activated (state machine mode).", "success")
         self.set_status("working", "Orchestrating pipeline")
         self._stop_flag = False
 
-        MAX_CYCLES = 120  # 120 × 30s = 60 minutes max
+        # Generate strategy plan (one Claude call)
+        try:
+            self._generate_strategy()
+        except Exception as e:
+            self.log(f"[Director] Strategy generation failed (non-fatal): {e}", "warning")
+
+        MAX_CYCLES = 60  # 60 × 30s = 30 minutes max (can be re-started)
         cycles = 0
 
         while not self.should_stop() and not self._stop_flag and cycles < MAX_CYCLES:
             cycles += 1
             try:
-                # Watchdog: reset zombie agents before assessing state
                 self._watchdog()
                 self._reset_blocked_publishers()
 
-                # Quality gate: run BEFORE assessing state so Claude sees re-queued pages
+                # Quality gate: run after publisher is done
                 pub_rows = db_execute(
                     "SELECT status, run_count FROM agents WHERE tenant_id=? AND name='GitHub Publisher'",
                     (self.ctx.tenant_id,)
                 )
                 if pub_rows and pub_rows[0]["status"] == "done" and pub_rows[0]["run_count"] > 0:
-                    requeued = self._run_quality_gate()
-                    if requeued > 0:
-                        self.log(f"[Director] Quality gate found {requeued} pages needing improvement — pipeline continuing", "warning")
+                    self._run_quality_gate()
 
                 state = self._assess_state()
 
-                # Deadlock guard: if a whole layer is permanently errored, stop now
+                # Deadlock guard
                 deadlock_reason = self._check_deadlock(state.get("agents", []))
                 if deadlock_reason:
                     self.log(f"[Director] {deadlock_reason}", "error")
                     self.set_status("error", deadlock_reason[:200])
                     break
 
-                decision = self._decide(state)
-                self._execute_decision(decision)
+                # Check pipeline complete
+                if self._is_pipeline_complete(state):
+                    self.log("[Director] Pipeline complete — all layers executed successfully.", "success")
+                    self.set_status("done", "Pipeline complete")
+                    break
 
-                wait_secs = max(15, min(120, decision.get("next_check_seconds", 30)))
+                # Decide and execute
+                to_start = self._evaluate(state)
+                for agent_name in to_start:
+                    if self.should_stop() or self._stop_flag:
+                        break
+                    self._start_agent(agent_name)
 
-                # Poll should_stop() while waiting (0.5s granularity)
-                for _ in range(wait_secs * 2):
+                if not to_start:
+                    self.log(f"[Director] No agents to start this cycle — waiting.", "info")
+
+                # Wait 30s, polling for stop signal
+                for _ in range(60):
                     if self.should_stop() or self._stop_flag:
                         break
                     time.sleep(0.5)
 
             except Exception as exc:
                 self.log(f"[Director] Cycle error: {exc}", "error")
-                # Wait 30s on unexpected errors
                 for _ in range(60):
                     if self.should_stop() or self._stop_flag:
                         break
@@ -560,3 +586,26 @@ What is your decision? Return JSON only, no markdown."""
         if not self._stop_flag:
             self.set_status("done", "Orchestration complete")
         self.log("[Director] Director shutting down.", "info")
+
+    def _start_agent(self, agent_name: str):
+        """Start an agent via the unified AgentRunner."""
+        from denzo.agents.runner import AgentRunner
+
+        result = AgentRunner.start(self.ctx.tenant_id, agent_name, ctx=self.ctx)
+        status = result.get("status", "error")
+
+        if status == "started":
+            self.log(f"[Director] Started {agent_name}", "info")
+        elif status == "already_running":
+            pass
+        elif status == "prereq_failed":
+            self.log(f"[Director] {agent_name} prerequisites not met: {result.get('message')}", "warning")
+        else:
+            self.log(f"[Director] Failed to start {agent_name}: {result.get('message')}", "error")
+
+    def _stop_agent(self, agent_name: str):
+        """Signal an agent to stop via the unified AgentRunner."""
+        from denzo.agents.runner import AgentRunner
+
+        AgentRunner.stop(self.ctx.tenant_id, agent_name)
+        self.log(f"[Director] Stopped {agent_name}", "warning")

@@ -1301,13 +1301,23 @@ def wizard_complete():
         return redirect(url_for("public.wizard_step", step=1))
     db.close()
 
-    # Log in
+    # Log in and auto-activate 14-day trial
+    trial_ends = datetime.utcnow() + timedelta(days=14)
+    db2 = get_db()
+    db2.execute(
+        "UPDATE users SET plan='trial', trial_ends_at=? WHERE id=?",
+        (trial_ends.isoformat(), user_id)
+    )
+    db2.commit()
+    db2.close()
+
     session.clear()
     session["user_id"] = user_id
     session["username"] = email
-    session["plan"] = "free"
+    session["plan"] = "trial"
 
-    return redirect(url_for("public.upgrade_page"))
+    # Redirect to Lite dashboard — show them their results first, then upsell
+    return redirect(url_for("lite.dashboard", tenant_id=tenant_id))
 
 
 # ── Upgrade / trial ────────────────────────────────────────────────────────────
@@ -1390,7 +1400,7 @@ def upgrade_page_legacy():
 @login_required
 def activate_trial():
     user_id    = session["user_id"]
-    trial_ends = datetime.utcnow() + timedelta(days=3)
+    trial_ends = datetime.utcnow() + timedelta(days=14)
     db = get_db()
     db.execute(
         "UPDATE users SET plan='trial', trial_ends_at=? WHERE id=?",

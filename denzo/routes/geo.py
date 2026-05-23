@@ -3,7 +3,7 @@ GEO Monitoring dashboard — query bank management + citation tracking.
 """
 import json
 from flask import Blueprint, render_template, request, abort, redirect, url_for
-from denzo.auth import login_required
+from denzo.auth import tenant_access_required
 from denzo.db import get_db
 
 bp = Blueprint("geo", __name__, url_prefix="/clients/<tenant_id>")
@@ -27,7 +27,7 @@ def _sidebar_clients():
 
 
 @bp.route("/geo")
-@login_required
+@tenant_access_required
 def index(tenant_id):
     db = get_db()
     client = db.execute("SELECT name FROM clients WHERE tenant_id=?", (tenant_id,)).fetchone()
@@ -109,7 +109,7 @@ def index(tenant_id):
 
 
 @bp.route("/geo/queries/add", methods=["POST"])
-@login_required
+@tenant_access_required
 def add_query(tenant_id):
     db = get_db()
     query    = request.form.get("query", "").strip()
@@ -128,7 +128,7 @@ def add_query(tenant_id):
 
 
 @bp.route("/geo/queries/<int:query_id>/toggle", methods=["POST"])
-@login_required
+@tenant_access_required
 def toggle_query(tenant_id, query_id):
     db = get_db()
     db.execute(
@@ -141,7 +141,7 @@ def toggle_query(tenant_id, query_id):
 
 
 @bp.route("/geo/queries/<int:query_id>/delete", methods=["POST"])
-@login_required
+@tenant_access_required
 def delete_query(tenant_id, query_id):
     db = get_db()
     db.execute("DELETE FROM geo_query_bank WHERE id=? AND tenant_id=?", (query_id, tenant_id))

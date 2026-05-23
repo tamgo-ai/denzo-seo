@@ -11,6 +11,9 @@ from denzo.agents.base_agent import TenantAwareBaseAgent, ClientContext, db_exec
 
 class VerticalMatrixGenerator(TenantAwareBaseAgent):
 
+    PREREQUISITES = ["E-E-A-T Architect"]
+    MIN_KEYWORDS = 10
+
     def __init__(self, ctx: ClientContext):
         super().__init__("Vertical Matrix Generator", ctx, layer=2, color="fuchsia")
 

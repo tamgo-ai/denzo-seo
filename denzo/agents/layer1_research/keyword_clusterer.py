@@ -9,6 +9,8 @@ from denzo.agents.base_agent import TenantAwareBaseAgent, ClientContext, db_exec
 
 class KeywordClusterer(TenantAwareBaseAgent):
 
+    MIN_KEYWORDS = 10
+
     def __init__(self, ctx: ClientContext):
         super().__init__("Keyword Clusterer", ctx, layer=1, color="cyan")
 

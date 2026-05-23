@@ -8,6 +8,8 @@ from denzo.agents.base_agent import TenantAwareBaseAgent, ClientContext, db_exec
 
 class ContentOptimizer(TenantAwareBaseAgent):
 
+    PREREQUISITES = ["Programmatic SEO"]
+
     def __init__(self, ctx: ClientContext):
         super().__init__("Content Optimizer", ctx, layer=4, color="yellow")
 
@@ -214,5 +216,10 @@ Rules:
             (self.ctx.tenant_id, self.MIN_SCORE)
         )
         left = remaining[0]["n"] if remaining else 0
-        self.log(f"Optimization complete: {improved} improved, {skipped} already good. {left} pages remaining unscored.", "success")
+        self.log_result(
+            "Content optimization", improved,
+            examples=None if improved == 0 else [f"{improved} pages improved to ≥{self.MIN_SCORE}"],
+            score=f"avg quality threshold={self.MIN_SCORE}"
+        )
+        self.log(f"{skipped} already good, {left} remaining unscored.", "info")
         self.set_status("done", f"{improved} improved · {skipped} passed · {left} remaining")

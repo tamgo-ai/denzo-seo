@@ -11,6 +11,8 @@ from denzo.agents.base_agent import TenantAwareBaseAgent, ClientContext, db_exec
 
 class ContentFreshness(TenantAwareBaseAgent):
 
+    PREREQUISITES = ["GitHub Publisher"]
+
     def __init__(self, ctx: ClientContext):
         super().__init__("Content Freshness", ctx, layer=4, color="lime")
 

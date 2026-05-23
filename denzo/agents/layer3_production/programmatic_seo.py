@@ -9,6 +9,9 @@ from denzo.agents.base_agent import TenantAwareBaseAgent, ClientContext, db_exec
 
 class ProgrammaticSEO(TenantAwareBaseAgent):
 
+    PREREQUISITES = ["E-E-A-T Architect", "Schema Engineer", "Vertical Matrix Generator"]
+    MIN_KEYWORDS = 10
+
     def __init__(self, ctx: ClientContext):
         super().__init__("Programmatic SEO", ctx, layer=3, color="orange")
 
@@ -399,5 +402,11 @@ WRITING RULES:
             done += 1
             self.log(f"✓ {title} ({len(content)} chars)", "success")
 
-        self.log(f"Programmatic SEO complete: {done}/{len(pages)} pages generated.", "success")
+        # Get examples of generated page titles
+        example_rows = db_execute(
+            "SELECT title FROM pages WHERE tenant_id=? AND status='ready' AND content IS NOT NULL ORDER BY id DESC LIMIT 3",
+            (self.ctx.tenant_id,)
+        )
+        examples = [r["title"] for r in (example_rows or [])] if example_rows else []
+        self.log_result("Pages generated", done, examples)
         self.set_status("done", f"{done} pages written")

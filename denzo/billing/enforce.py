@@ -43,10 +43,18 @@ def get_user_plan(user_id: int | None = None) -> str:
         return sub["plan"]
 
     user = db.execute(
-        "SELECT plan FROM users WHERE id=?", (user_id,)
+        "SELECT plan, trial_ends_at FROM users WHERE id=?", (user_id,)
     ).fetchone()
     db.close()
     if user and user["plan"]:
+        # Check if trial expired
+        if user["plan"] == "trial" and user["trial_ends_at"]:
+            from datetime import datetime
+            try:
+                if datetime.utcnow() > datetime.fromisoformat(user["trial_ends_at"]):
+                    return PLAN_FREE  # expired trial → free
+            except (ValueError, TypeError):
+                pass
         return user["plan"]
     return PLAN_FREE
 

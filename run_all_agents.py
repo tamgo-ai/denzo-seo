@@ -1,6 +1,9 @@
 """
 run_all_agents.py — Full pipeline runner for all tenants.
 Runs agents sequentially to avoid API rate limit conflicts.
+
+SAFETY: Checks for running agents before starting. Will NOT execute
+if any agents are already working (e.g., Director is running).
 """
 import sys
 import traceback
@@ -10,10 +13,34 @@ sys.path.insert(0, '/root/denzo-seo')
 
 from denzo.context.builder import build_client_context
 from denzo.agents.base_agent import db_execute, db_write
+from denzo.agents.runner import AgentRunner
+
 
 def log(msg):
     ts = datetime.utcnow().strftime("%H:%M:%S")
     print(f"[{ts}] {msg}", flush=True)
+
+
+def check_running_agents():
+    """Abort if any agents are currently working across all tenants."""
+    rows = db_execute(
+        "SELECT tenant_id, name FROM agents WHERE status='working'"
+    )
+    if rows:
+        log("WARNING: Agents are currently running:")
+        for r in rows:
+            log(f"  - {r['tenant_id']} / {r['name']}")
+        log("")
+        log("This means the Pipeline Director (or another process) is active.")
+        log("Running this script simultaneously will cause double-execution and resource contention.")
+        log("")
+        response = input("Continue anyway? This is DANGEROUS. [y/N]: ")
+        if response.lower() != 'y':
+            log("Aborted.")
+            sys.exit(0)
+        log("Proceeding despite running agents — YOU HAVE BEEN WARNED.")
+    else:
+        log("No running agents detected — safe to proceed.")
 
 
 def run_agent(agent_class, ctx, label=None):
@@ -77,6 +104,8 @@ from denzo.agents.layer5_monitoring.roi_attribution import ROIAttribution
 if __name__ == "__main__":
     log("Starting full pipeline for all tenants...")
     log(f"Start time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
+
+    check_running_agents()
 
     # ── 1. ACG ──────────────────────────────────────────────────────────────────
     run_tenant('auto-collision-group', [

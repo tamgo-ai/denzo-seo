@@ -27,6 +27,8 @@ from denzo.agents.base_agent import (
 
 class VisualContentOptimizer(TenantAwareBaseAgent):
 
+    PREREQUISITES = ["Programmatic SEO"]
+
     def __init__(self, ctx: ClientContext):
         super().__init__("Visual Content Optimizer", ctx, layer=4, color="pink")
 
@@ -333,12 +335,14 @@ Return ONLY a JSON object mapping filename → alt text:
                     new_html = self._apply_visual_fixes(html, page_dict, alt_map, fixes_needed)
 
                     if new_html != html:
+                        # Bump score to reflect fixes applied (alt text, lazy loading, dims, filenames)
+                        fixed_score = min(100, score + min(30, len(fixes_needed) * 5))
                         db_write(
                             "UPDATE pages SET content=?, visual_score=?, updated_at=CURRENT_TIMESTAMP "
                             "WHERE id=? AND tenant_id=?",
-                            (new_html, score, page_dict["id"], self.ctx.tenant_id)
+                            (new_html, fixed_score, page_dict["id"], self.ctx.tenant_id)
                         )
-                        self.log(f"✓ Visual fixes applied: {title[:50]} (was {score}/100)", "success")
+                        self.log(f"✓ Visual fixes applied: {title[:50]} ({score} → {fixed_score}/100)", "success")
                         optimized += 1
                     else:
                         db_write(

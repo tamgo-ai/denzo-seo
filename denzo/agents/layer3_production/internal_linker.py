@@ -13,6 +13,8 @@ PLAN_BATCH_RETRY = 5   # sub-batch size on retry after JSON parse failure
 
 class InternalLinker(TenantAwareBaseAgent):
 
+    PREREQUISITES = ["Programmatic SEO"]
+
     def __init__(self, ctx: ClientContext):
         super().__init__("Internal Linker", ctx, layer=4, color="green")
 

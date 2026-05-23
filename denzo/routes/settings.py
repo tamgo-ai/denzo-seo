@@ -3,7 +3,7 @@ Global platform settings — API keys for GEO Monitor, etc.
 Stored in settings table with tenant_id='__global__'
 """
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
-from denzo.auth import login_required
+from denzo.auth import tenant_access_required
 from denzo.db import get_db
 
 bp = Blueprint("settings", __name__, url_prefix="/settings")
@@ -37,7 +37,7 @@ def get_global_setting(key: str) -> str:
 
 
 @bp.route("/", methods=["GET", "POST"])
-@login_required
+@tenant_access_required
 def index():
     saved = False
 

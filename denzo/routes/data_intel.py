@@ -1,13 +1,13 @@
 import json
 from flask import Blueprint, render_template, flash, redirect, url_for
-from denzo.auth import login_required
+from denzo.auth import tenant_access_required
 from denzo.db import get_db
 
 bp = Blueprint("data_intel", __name__, url_prefix="/clients")
 
 
 @bp.route("/<tenant_id>/data-intel")
-@login_required
+@tenant_access_required
 def index(tenant_id):
     db = get_db()
     client = db.execute("SELECT * FROM clients WHERE tenant_id=?", (tenant_id,)).fetchone()

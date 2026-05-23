@@ -3,129 +3,18 @@ API blueprint — agent control, WebSocket log streaming, stats.
 """
 import json
 import time
-import threading
-from flask import Blueprint, jsonify, request, session, redirect, url_for
+from flask import Blueprint, jsonify, request
 from denzo import sock
 from denzo.auth import login_required, can_access_tenant
 from denzo.db import get_db
-from denzo.agents.registry import get_agent, AGENT_REGISTRY
-from denzo.context.builder import build_client_context
+from denzo.agents.registry import AGENT_REGISTRY
+from denzo.agents.runner import AgentRunner
 
 bp = Blueprint("api", __name__, url_prefix="/api")
-
-# Module-level thread tracker: tenant_id -> {agent_name -> Thread}
-_agent_threads: dict[str, dict[str, threading.Thread]] = {}
-# Stop signals: tenant_id -> {agent_name -> threading.Event}
-_stop_events: dict[str, dict[str, threading.Event]] = {}
-
-_lock = threading.Lock()
-
-
 _can_access_tenant = can_access_tenant
 
 
-# ── Agent helpers ──────────────────────────────────────────────────────────────
-
-def _mark_agent(tenant_id: str, name: str, status: str, task: str = ""):
-    db = get_db()
-    db.execute(
-        """UPDATE agents SET status=?, current_task=?, updated_at=CURRENT_TIMESTAMP
-           WHERE tenant_id=? AND name=?""",
-        (status, task, tenant_id, name)
-    )
-    if status == "working":
-        db.execute(
-            "UPDATE agents SET last_run_at=CURRENT_TIMESTAMP, run_count=run_count+1 WHERE tenant_id=? AND name=?",
-            (tenant_id, name)
-        )
-    db.commit()
-    db.close()
-
-
-def _log(tenant_id: str, agent: str, message: str, level: str = "info"):
-    db = get_db()
-    db.execute(
-        "INSERT INTO activity (tenant_id, type, message, agent, level) VALUES (?,?,?,?,?)",
-        (tenant_id, "agent", message, agent, level)
-    )
-    db.commit()
-    db.close()
-
-
-def _run_agent_thread(tenant_id: str, agent_name: str, stop_event: threading.Event):
-    """Target function for agent threads."""
-    run_id = None
-    try:
-        _mark_agent(tenant_id, agent_name, "working", "Initializing…")
-        _log(tenant_id, agent_name, f"Starting {agent_name}…", "info")
-
-        # Record pipeline run start
-        db = get_db()
-        cur = db.execute(
-            "INSERT INTO pipeline_runs (tenant_id, triggered_by, agents_run, status) VALUES (?,?,?,?)",
-            (tenant_id, "manual", json.dumps([agent_name]), "running")
-        )
-        run_id = cur.lastrowid
-        db.commit()
-        db.close()
-
-        ctx = build_client_context(tenant_id)
-        agent = get_agent(agent_name, ctx)
-
-        # Wire the stop event directly to the agent's internal _stop Event
-        # so that should_stop() correctly detects stop requests.
-        agent._stop = stop_event
-
-        agent.run()
-
-        if stop_event.is_set():
-            _mark_agent(tenant_id, agent_name, "idle", "Stopped by user")
-            _log(tenant_id, agent_name, f"{agent_name} stopped by user.", "warning")
-            _finish_run(run_id, "stopped")
-        else:
-            # Respect status the agent set for itself; only override if still "working"
-            db = get_db()
-            row = db.execute(
-                "SELECT status FROM agents WHERE tenant_id=? AND name=?",
-                (tenant_id, agent_name)
-            ).fetchone()
-            db.close()
-            final_status = row["status"] if row else "working"
-
-            if final_status == "working":
-                _mark_agent(tenant_id, agent_name, "done", "Completed")
-                _log(tenant_id, agent_name, f"{agent_name} completed.", "success")
-
-            _finish_run(run_id, "completed")
-
-    except Exception as e:
-        _mark_agent(tenant_id, agent_name, "error", str(e)[:200])
-        _log(tenant_id, agent_name, f"{agent_name} error: {e}", "error")
-        _finish_run(run_id, "error")
-    finally:
-        with _lock:
-            if tenant_id in _agent_threads:
-                _agent_threads[tenant_id].pop(agent_name, None)
-            if tenant_id in _stop_events:
-                _stop_events[tenant_id].pop(agent_name, None)
-
-
-def _finish_run(run_id, status: str):
-    if not run_id:
-        return
-    try:
-        db = get_db()
-        db.execute(
-            "UPDATE pipeline_runs SET status=?, completed_at=CURRENT_TIMESTAMP WHERE id=?",
-            (status, run_id)
-        )
-        db.commit()
-        db.close()
-    except Exception:
-        pass
-
-
-# ── Pipeline Director endpoint ─────────────────────────────────────────────────
+# ── Pipeline Director endpoints ─────────────────────────────────────────────────
 
 @bp.route("/<tenant_id>/pipeline/run", methods=["POST"])
 @login_required
@@ -133,68 +22,37 @@ def run_pipeline(tenant_id):
     """Start the autonomous Director which orchestrates the full pipeline."""
     if not _can_access_tenant(tenant_id):
         return jsonify({"error": "Access denied"}), 403
-    agent_name = "Pipeline Director"
-    with _lock:
-        threads = _agent_threads.setdefault(tenant_id, {})
-        if agent_name in threads and threads[agent_name].is_alive():
-            return jsonify({"error": "Director already running"}), 409
 
-        stop_event = threading.Event()
-        _stop_events.setdefault(tenant_id, {})[agent_name] = stop_event
-
-        t = threading.Thread(
-            target=_run_agent_thread,
-            args=(tenant_id, agent_name, stop_event),
-            daemon=True,
-            name=f"{tenant_id}:director",
-        )
-        threads[agent_name] = t
-        t.start()
-
+    result = AgentRunner.start(tenant_id, "Pipeline Director")
+    if result["status"] == "already_running":
+        return jsonify({"error": "Director already running"}), 409
+    if result["status"] == "error":
+        return jsonify({"error": result.get("message", "Unknown error")}), 500
     return jsonify({"status": "director_started"})
 
 
 @bp.route("/<tenant_id>/pipeline/stop", methods=["POST"])
 @login_required
 def stop_pipeline(tenant_id):
-    """Stop the autonomous Director (and let it wind down agents gracefully)."""
+    """Stop the autonomous Director and all child agents."""
     if not _can_access_tenant(tenant_id):
         return jsonify({"error": "Access denied"}), 403
-    agent_name = "Pipeline Director"
-    with _lock:
-        events = _stop_events.get(tenant_id, {})
-        event = events.get(agent_name)
 
-    if event:
-        event.set()
-        return jsonify({"status": "stop_requested"})
-    else:
-        _mark_agent(tenant_id, agent_name, "idle", "")
-        return jsonify({"status": "idle"})
+    # Stop child agents first, then Director
+    AgentRunner.stop_all(tenant_id)
+    return jsonify({"status": "stop_requested"})
 
 
 @bp.route("/<tenant_id>/pipeline/reset", methods=["POST"])
 @login_required
 def reset_pipeline(tenant_id):
-    """Reset ALL agents to idle without deleting any data. Emergency recovery button."""
+    """Reset ALL agents to idle. Emergency recovery button."""
     if not _can_access_tenant(tenant_id):
         return jsonify({"error": "Access denied"}), 403
 
-    # Signal all running stop events
-    with _lock:
-        for evt in _stop_events.get(tenant_id, {}).values():
-            evt.set()
-        _stop_events[tenant_id] = {}
-        _agent_threads[tenant_id] = {}
+    count = AgentRunner.stop_all(tenant_id)["count"]
 
-    # Reset all agents to idle in DB
     db = get_db()
-    db.execute(
-        """UPDATE agents SET status='idle', current_task='Reset by user',
-           next_task='', updated_at=CURRENT_TIMESTAMP
-           WHERE tenant_id=?""",
-        (tenant_id,)
-    )
     db.execute(
         "INSERT INTO activity (tenant_id, type, message, agent, level) VALUES (?,?,?,?,?)",
         (tenant_id, "system", "Pipeline reset by user — all agents set to idle.", "System", "warning")
@@ -202,7 +60,7 @@ def reset_pipeline(tenant_id):
     db.commit()
     db.close()
 
-    return jsonify({"status": "reset", "message": "All agents reset to idle"})
+    return jsonify({"status": "reset", "stopped": count, "message": "All agents reset to idle"})
 
 
 # ── Agent control endpoints ────────────────────────────────────────────────────
@@ -215,24 +73,14 @@ def start_agent(tenant_id, agent_name):
     if agent_name not in AGENT_REGISTRY:
         return jsonify({"error": f"Unknown agent: {agent_name}"}), 400
 
-    with _lock:
-        threads = _agent_threads.setdefault(tenant_id, {})
-        if agent_name in threads and threads[agent_name].is_alive():
-            return jsonify({"error": "Agent already running"}), 409
-
-        stop_event = threading.Event()
-        _stop_events.setdefault(tenant_id, {})[agent_name] = stop_event
-
-        t = threading.Thread(
-            target=_run_agent_thread,
-            args=(tenant_id, agent_name, stop_event),
-            daemon=True,
-            name=f"{tenant_id}:{agent_name}"
-        )
-        threads[agent_name] = t
-        t.start()
-
-    return jsonify({"status": "started", "agent": agent_name})
+    result = AgentRunner.start(tenant_id, agent_name)
+    if result["status"] == "already_running":
+        return jsonify({"error": "Agent already running"}), 409
+    if result["status"] == "prereq_failed":
+        return jsonify({"error": result.get("message", "Prerequisites not met")}), 409
+    if result["status"] == "error":
+        return jsonify({"error": result.get("message", "Unknown error")}), 500
+    return jsonify(result)
 
 
 @bp.route("/<tenant_id>/agents/stop/<agent_name>", methods=["POST"])
@@ -240,17 +88,9 @@ def start_agent(tenant_id, agent_name):
 def stop_agent(tenant_id, agent_name):
     if not _can_access_tenant(tenant_id):
         return jsonify({"error": "Access denied"}), 403
-    with _lock:
-        events = _stop_events.get(tenant_id, {})
-        event = events.get(agent_name)
 
-    if event:
-        event.set()
-        return jsonify({"status": "stop_requested", "agent": agent_name})
-    else:
-        # Agent not running — just mark as idle
-        _mark_agent(tenant_id, agent_name, "idle", "")
-        return jsonify({"status": "idle", "agent": agent_name})
+    result = AgentRunner.stop(tenant_id, agent_name)
+    return jsonify(result)
 
 
 @bp.route("/<tenant_id>/agents/status")
@@ -310,7 +150,7 @@ def stats(tenant_id):
 def ws_logs(ws, tenant_id):
     """
     Push real-time activity logs + agent statuses to the pipeline UI.
-    Sends JSON every 800ms: {"logs": [...], "agents": [...], "stats": {...}}
+    Polling interval adapts: 2s when idle, 1s when agents are working.
     """
     if not _can_access_tenant(tenant_id):
         ws.close()
@@ -371,12 +211,14 @@ def ws_logs(ws, tenant_id):
             }
 
             ws.send(json.dumps(payload))
-            time.sleep(0.8)
+
+            # Adaptive polling: faster when agents are working, slower when idle
+            has_working = any(a["status"] == "working" for a in agents)
+            time.sleep(1.0 if has_working else 2.0)
 
         except (BrokenPipeError, OSError):
             break
         except Exception:
-            # DB error — reopen connection and retry
             try:
                 db.close()
             except Exception:

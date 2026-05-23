@@ -205,7 +205,7 @@ Return JSON only:
         # Save report — only factual metrics + strategic recommendations, no invented numbers
         db_write(
             "INSERT OR REPLACE INTO settings (tenant_id, key, value) VALUES (?,?,?)",
-            (ctx.tenant_id, "roi_report", json.dumps({**metrics, **report, "disclaimer": "Traffic/revenue projections require Analytics integration"}, ensure_ascii=False))
+            (ctx.tenant_id, "roi_report", json.dumps({**report, **metrics, "disclaimer": "Traffic/revenue projections require Analytics integration"}, ensure_ascii=False))
         )
 
         self.log("ROI Attribution report complete.", "success")

@@ -358,6 +358,8 @@ def _build_html_wrapper_compat(title, meta_description, content, style_guide=Non
 
 class GitHubPublisher(TenantAwareBaseAgent):
 
+    PREREQUISITES = ["Programmatic SEO"]
+
     def __init__(self, ctx: ClientContext):
         super().__init__("GitHub Publisher", ctx, layer=5, color="slate")
 

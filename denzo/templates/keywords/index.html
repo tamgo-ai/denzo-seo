@@ -16,6 +16,15 @@
 <a href="/clients/{{ tenant_id }}/pipeline"
    style="font-size:12px;color:rgba(255,255,255,0.4);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
    onmouseover="this.style.color='rgba(255,255,255,0.87)'" onmouseout="this.style.color='rgba(255,255,255,0.4)'">← Pipeline</a>
+
+<button onclick="document.getElementById('importModal').style.display='flex'"
+        style="display:inline-flex;align-items:center;gap:6px;background:#6366f1;border:none;color:#fff;font-size:12px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;transition:background 0.15s;"
+        onmouseover="this.style.background='#4f46e5'" onmouseout="this.style.background='#6366f1'">
+  <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+  </svg>
+  Add Keywords
+</button>
 {% endblock %}
 
 {% block content %}
@@ -210,5 +219,250 @@
 {% endif %}
 
 {% endif %}
+
+<!-- ── Import Keywords Modal ────────────────────────────────────────────── -->
+<div id="importModal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1000;align-items:center;justify-content:center;padding:20px;"
+     onclick="if(event.target===this)closeImportModal()">
+
+  <div style="background:#111111;border:1px solid rgba(255,255,255,0.1);border-radius:16px;width:100%;max-width:560px;padding:28px;max-height:90vh;overflow-y:auto;">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;">
+      <div>
+        <h3 id="importModalTitle" style="font-size:16px;font-weight:700;color:rgba(255,255,255,0.87);margin:0;">Add Keywords</h3>
+        <p id="importModalSubtitle" style="font-size:12px;color:rgba(255,255,255,0.4);margin:4px 0 0;">
+          One keyword per line. Saved as <span style="color:#6366f1;font-weight:600;">Human-Added</span> · used by all agents.
+        </p>
+      </div>
+      <button onclick="closeImportModal()"
+              style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:20px;cursor:pointer;padding:4px;line-height:1;flex-shrink:0;"
+              onmouseover="this.style.color='rgba(255,255,255,0.87)'" onmouseout="this.style.color='rgba(255,255,255,0.4)'">✕</button>
+    </div>
+
+    <!-- ── STEP 1: Input ── -->
+    <div id="importStep1">
+      <div style="margin-bottom:14px;">
+        <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);margin-bottom:6px;">Keywords (one per line)</label>
+        <textarea id="importKwText" rows="10"
+                  placeholder="bmw collision repair north hollywood&#10;auto body shop burbank&#10;certified bmw repair van nuys"
+                  style="width:100%;padding:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:8px;color:rgba(255,255,255,0.87);font-size:13px;font-family:inherit;resize:vertical;outline:none;box-sizing:border-box;line-height:1.6;"
+                  onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='rgba(255,255,255,0.08)'"></textarea>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-bottom:20px;">
+        <div style="flex:1;">
+          <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);margin-bottom:6px;">Location <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+          <input id="importLocation" type="text" placeholder="e.g. North Hollywood, CA"
+                 style="width:100%;padding:9px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:8px;color:rgba(255,255,255,0.7);font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;height:38px;"
+                 onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='rgba(255,255,255,0.08)'">
+        </div>
+        <div style="width:130px;">
+          <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);margin-bottom:6px;">Priority</label>
+          <select id="importPriority"
+                  style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0 12px;color:rgba(255,255,255,0.7);font-size:13px;font-family:inherit;height:38px;outline:none;">
+            <option value="alta"  style="background:#1a1a1a;">Alta</option>
+            <option value="media" selected style="background:#1a1a1a;">Media</option>
+            <option value="baja"  style="background:#1a1a1a;">Baja</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="step1Error" style="display:none;font-size:13px;padding:10px 14px;border-radius:8px;margin-bottom:16px;background:rgba(248,113,113,0.1);color:#f87171;border:1px solid rgba(248,113,113,0.2);"></div>
+
+      <div style="display:flex;justify-content:flex-end;gap:10px;">
+        <button onclick="closeImportModal()"
+                style="background:transparent;border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);font-size:13px;font-weight:500;padding:8px 18px;border-radius:8px;cursor:pointer;"
+                onmouseover="this.style.borderColor='rgba(255,255,255,0.25)';this.style.color='rgba(255,255,255,0.87)'"
+                onmouseout="this.style.borderColor='rgba(255,255,255,0.1)';this.style.color='rgba(255,255,255,0.5)'">Cancel</button>
+        <button onclick="checkDuplicates()" id="checkBtn"
+                style="background:#6366f1;border:none;color:#fff;font-size:13px;font-weight:600;padding:8px 20px;border-radius:8px;cursor:pointer;transition:background 0.15s;"
+                onmouseover="this.style.background='#4f46e5'" onmouseout="this.style.background='#6366f1'">Check &amp; Preview →</button>
+      </div>
+    </div>
+
+    <!-- ── STEP 2: Review ── -->
+    <div id="importStep2" style="display:none;">
+
+      <!-- New keywords -->
+      <div id="newKwSection" style="margin-bottom:16px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#4ade80;flex-shrink:0;"></span>
+          <span id="newKwCount" style="font-size:13px;font-weight:600;color:#4ade80;"></span>
+          <span style="font-size:12px;color:rgba(255,255,255,0.4);">— will be imported</span>
+        </div>
+        <div id="newKwList" style="background:rgba(74,222,128,0.04);border:1px solid rgba(74,222,128,0.12);border-radius:8px;padding:10px 14px;max-height:160px;overflow-y:auto;"></div>
+      </div>
+
+      <!-- Duplicate keywords -->
+      <div id="dupKwSection" style="display:none;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#fbbf24;flex-shrink:0;"></span>
+          <span id="dupKwCount" style="font-size:13px;font-weight:600;color:#fbbf24;"></span>
+          <span style="font-size:12px;color:rgba(255,255,255,0.4);">— already exist, will be skipped</span>
+        </div>
+        <div id="dupKwList" style="background:rgba(251,191,36,0.04);border:1px solid rgba(251,191,36,0.12);border-radius:8px;padding:10px 14px;max-height:120px;overflow-y:auto;"></div>
+      </div>
+
+      <!-- All duplicates warning -->
+      <div id="allDupWarning" style="display:none;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:8px;padding:14px;margin-bottom:16px;text-align:center;">
+        <p style="font-size:13px;color:#fbbf24;font-weight:600;margin:0 0 4px;">All keywords already exist in this client.</p>
+        <p style="font-size:12px;color:rgba(255,255,255,0.4);margin:0;">Nothing new to import. Edit your list and try again.</p>
+      </div>
+
+      <div id="step2Error" style="display:none;font-size:13px;padding:10px 14px;border-radius:8px;margin-bottom:16px;background:rgba(248,113,113,0.1);color:#f87171;border:1px solid rgba(248,113,113,0.2);"></div>
+
+      <div style="display:flex;justify-content:space-between;gap:10px;">
+        <button onclick="backToStep1()"
+                style="background:transparent;border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);font-size:13px;font-weight:500;padding:8px 18px;border-radius:8px;cursor:pointer;"
+                onmouseover="this.style.borderColor='rgba(255,255,255,0.25)';this.style.color='rgba(255,255,255,0.87)'"
+                onmouseout="this.style.borderColor='rgba(255,255,255,0.1)';this.style.color='rgba(255,255,255,0.5)'">← Edit List</button>
+        <button onclick="confirmImport()" id="confirmBtn"
+                style="background:#4ade80;border:none;color:#0a0a0a;font-size:13px;font-weight:700;padding:8px 22px;border-radius:8px;cursor:pointer;transition:background 0.15s;"
+                onmouseover="this.style.background='#22c55e'" onmouseout="this.style.background='#4ade80'">Confirm Import</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const TENANT_ID = '{{ tenant_id }}';
+let _newKws = [];
+
+function closeImportModal() {
+  document.getElementById('importModal').style.display = 'none';
+  document.getElementById('importKwText').value = '';
+  document.getElementById('importLocation').value = '';
+  document.getElementById('importPriority').value = 'media';
+  document.getElementById('step1Error').style.display = 'none';
+  document.getElementById('step2Error').style.display = 'none';
+  document.getElementById('checkBtn').disabled = false;
+  document.getElementById('checkBtn').textContent = 'Check & Preview →';
+  showStep(1);
+  _newKws = [];
+}
+
+function backToStep1() {
+  document.getElementById('step2Error').style.display = 'none';
+  showStep(1);
+}
+
+function showStep(n) {
+  document.getElementById('importStep1').style.display = n === 1 ? 'block' : 'none';
+  document.getElementById('importStep2').style.display = n === 2 ? 'block' : 'none';
+  const subtitles = {
+    1: 'One keyword per line. Saved as <span style="color:#6366f1;font-weight:600;">Human-Added</span> · used by all agents.',
+    2: 'Review before confirming. Duplicates are automatically excluded.'
+  };
+  document.getElementById('importModalSubtitle').innerHTML = subtitles[n];
+}
+
+async function checkDuplicates() {
+  const text     = document.getElementById('importKwText').value.trim();
+  const location = document.getElementById('importLocation').value.trim();
+  const btn      = document.getElementById('checkBtn');
+  const errEl    = document.getElementById('step1Error');
+
+  errEl.style.display = 'none';
+  if (!text) { showErr(errEl, 'Paste at least one keyword.'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
+
+  try {
+    const res  = await fetch('/clients/' + TENANT_ID + '/keywords/check-duplicates', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({keywords: text, location})
+    });
+    const data = await res.json();
+
+    if (!res.ok) { showErr(errEl, data.error || 'Error checking keywords.'); btn.disabled=false; btn.textContent='Check & Preview →'; return; }
+
+    _newKws = data.new;
+    renderReview(data.new, data.duplicates);
+    showStep(2);
+
+  } catch(e) {
+    showErr(errEl, 'Network error. Try again.');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Check & Preview →';
+}
+
+function renderReview(newKws, dups) {
+  // New section
+  const newSection = document.getElementById('newKwSection');
+  const newList    = document.getElementById('newKwList');
+  document.getElementById('newKwCount').textContent = newKws.length + ' new keyword' + (newKws.length !== 1 ? 's' : '');
+  newList.innerHTML = newKws.length
+    ? newKws.map(k => '<div style="font-size:12px;color:rgba(255,255,255,0.7);padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.04);line-height:1.8;">' + escHtml(k) + '</div>').join('')
+    : '<div style="font-size:12px;color:rgba(255,255,255,0.3);font-style:italic;">None</div>';
+  newSection.style.display = newKws.length ? 'block' : 'none';
+
+  // Duplicates section
+  const dupSection = document.getElementById('dupKwSection');
+  const dupList    = document.getElementById('dupKwList');
+  document.getElementById('dupKwCount').textContent = dups.length + ' duplicate' + (dups.length !== 1 ? 's' : '');
+  dupList.innerHTML = dups.map(k => '<div style="font-size:12px;color:rgba(255,255,255,0.5);padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.04);line-height:1.8;">' + escHtml(k) + '</div>').join('');
+  dupSection.style.display = dups.length ? 'block' : 'none';
+
+  // All-duplicates warning + disable confirm
+  const allDup = document.getElementById('allDupWarning');
+  const confirmBtn = document.getElementById('confirmBtn');
+  if (newKws.length === 0) {
+    allDup.style.display = 'block';
+    confirmBtn.disabled  = true;
+    confirmBtn.style.opacity = '0.4';
+    confirmBtn.style.cursor  = 'not-allowed';
+  } else {
+    allDup.style.display = 'none';
+    confirmBtn.disabled  = false;
+    confirmBtn.style.opacity = '1';
+    confirmBtn.style.cursor  = 'pointer';
+  }
+}
+
+async function confirmImport() {
+  const location = document.getElementById('importLocation').value.trim();
+  const priority = document.getElementById('importPriority').value;
+  const btn      = document.getElementById('confirmBtn');
+  const errEl    = document.getElementById('step2Error');
+
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Importing…';
+
+  try {
+    const res  = await fetch('/clients/' + TENANT_ID + '/keywords/import', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({keywords: _newKws, location, priority})
+    });
+    const data = await res.json();
+
+    if (!res.ok) { showErr(errEl, data.error || 'Error importing.'); btn.disabled=false; btn.textContent='Confirm Import'; return; }
+
+    btn.textContent = '✓ ' + data.inserted + ' imported!';
+    btn.style.background = '#22c55e';
+    setTimeout(() => { closeImportModal(); window.location.reload(); }, 1400);
+
+  } catch(e) {
+    showErr(errEl, 'Network error. Try again.');
+    btn.disabled = false;
+    btn.textContent = 'Confirm Import';
+  }
+}
+
+function showErr(el, msg) {
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
 
 {% endblock %}

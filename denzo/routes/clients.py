@@ -7,7 +7,7 @@ import anthropic
 import requests as http_requests
 from bs4 import BeautifulSoup
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from denzo.auth import login_required
+from denzo.auth import tenant_access_required
 from denzo.db import get_db, slugify
 from denzo.agents.registry import DEFAULT_AGENTS, AGENT_REGISTRY
 from denzo.agents.utils.stealth_fetch import fetch_html
@@ -56,7 +56,7 @@ def _get_all_clients_slim():
 
 
 @bp.route("/")
-@login_required
+@tenant_access_required
 def list_clients():
     db = get_db()
     rows = db.execute("""
@@ -77,14 +77,14 @@ def list_clients():
 
 
 @bp.route("/new")
-@login_required
+@tenant_access_required
 def new_client():
     clients = _get_all_clients_slim()
     return render_template("clients/new.html", clients=clients)
 
 
 @bp.route("/analyze", methods=["POST"])
-@login_required
+@tenant_access_required
 def analyze_website():
     """Scrape a website and use Claude to extract all business context."""
     data = request.get_json(silent=True) or {}
@@ -264,8 +264,26 @@ Additionally, analyze:
 
 
 @bp.route("/create", methods=["POST"])
-@login_required
+@tenant_access_required
 def create_client():
+    # Enforce max_clients limit for non-admin users
+    if session.get("role") != "admin":
+        from denzo.billing.enforce import get_user_entitlements
+        entitlements = get_user_entitlements(session.get("user_id"))
+        max_clients = entitlements.get("max_clients", 1)
+        db_check = get_db()
+        current_count = db_check.execute(
+            "SELECT COUNT(*) as n FROM clients WHERE owner_user_id=?", (session["user_id"],)
+        ).fetchone()["n"]
+        db_check.close()
+        if current_count >= max_clients:
+            flash(
+                f"You've reached the limit of {max_clients} client(s) on your {entitlements['plan_name']} plan. "
+                f"Upgrade to add more.",
+                "error"
+            )
+            return redirect(url_for("public.upgrade_page"))
+
     f = request.form
 
     name          = f.get("name", "").strip()
@@ -428,7 +446,7 @@ def create_client():
 
 
 @bp.route("/<tenant_id>/edit")
-@login_required
+@tenant_access_required
 def edit_client(tenant_id):
     db = get_db()
     client = db.execute(
@@ -541,7 +559,7 @@ def edit_client(tenant_id):
 
 
 @bp.route("/<tenant_id>/update", methods=["POST"])
-@login_required
+@tenant_access_required
 def update_client(tenant_id):
     f = request.form
     db = get_db()
@@ -704,7 +722,7 @@ def update_client(tenant_id):
 
 
 @bp.route("/<tenant_id>/delete", methods=["POST"])
-@login_required
+@tenant_access_required
 def delete_client(tenant_id):
     db = get_db()
     client = db.execute("SELECT name FROM clients WHERE tenant_id=?", (tenant_id,)).fetchone()
