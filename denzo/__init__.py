@@ -109,6 +109,19 @@ def create_app():
     for bp in [public_bp, auth_bp, dash_bp, clients_bp, pipeline_bp, keywords_bp, pages_bp, competitors_bp, settings_bp, api_bp, audit_bp, images_bp, brand_voice_bp, data_intel_bp, geo_bp, reviews_bp, lite_bp, reporting_bp, oauth_bp, mission_control_bp, billing_bp, jarvis_bp]:
         app.register_blueprint(bp)
 
+    # ── Rate limiting ─────────────────────────────────────────────────────────
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+    limiter = Limiter(
+        get_remote_address,
+        app=app,
+        default_limits=["200 per day", "60 per hour"],
+        storage_uri="memory://",
+    )
+    # Stricter limits on auth endpoints
+    limiter.limit("10 per minute")(app.view_functions.get("auth.login"))
+    app.config["LIMITER"] = limiter
+
     # ── Custom error handlers ──────────────────────────────────────────────────
     from flask import render_template as _render
 
