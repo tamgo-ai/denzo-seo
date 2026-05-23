@@ -256,6 +256,42 @@ def agent_detail(tenant_id, agent_name):
     })
 
 
+# ── Smart suggestions ────────────────────────────────────────────────────────
+
+@bp.route("/suggestions")
+@login_required
+def suggestions(tenant_id):
+    """Return 2-3 AI-powered suggestions based on current pipeline state."""
+    if not can_access_tenant(tenant_id):
+        abort(403)
+
+    db = get_db()
+    def n(sql, *args):
+        return int((db.execute(sql, args).fetchone() or {}).get("n", 0) or 0)
+    kw = n("SELECT COUNT(*) AS n FROM keywords WHERE tenant_id=?", tenant_id)
+    pg = n("SELECT COUNT(*) AS n FROM pages WHERE tenant_id=?", tenant_id)
+    pg_pub = n("SELECT COUNT(*) AS n FROM pages WHERE tenant_id=? AND status='published'", tenant_id)
+    pg_draft = n("SELECT COUNT(*) AS n FROM pages WHERE tenant_id=? AND status='draft'", tenant_id)
+    working = db.execute("SELECT name FROM agents WHERE tenant_id=? AND status='working'", (tenant_id,)).fetchall()
+    errors = db.execute("SELECT name, current_task FROM agents WHERE tenant_id=? AND status='error'", (tenant_id,)).fetchall()
+    db.close()
+
+    suggestions = []
+    if kw < 10:
+        suggestions.append({"icon": "🔍", "text": f"Start with keyword research — you only have {kw}", "action": "start_agent", "target": "Keyword Strategist"})
+    elif pg_draft > 0 and kw >= 10:
+        suggestions.append({"icon": "✍️", "text": f"{pg_draft} page drafts waiting for content generation", "action": "start_agent", "target": "Programmatic SEO"})
+    elif pg_pub == 0 and pg > 0:
+        suggestions.append({"icon": "🚀", "text": "Pages ready but not published — run a publisher", "action": "start_agent", "target": "GitHub Publisher"})
+    if errors:
+        err_names = ", ".join(e["name"] for e in errors[:2])
+        suggestions.append({"icon": "⚠️", "text": f"Agents with errors: {err_names}. Click to retry.", "action": "retry_errors", "target": None})
+    if not working and kw >= 10 and pg_draft == 0:
+        suggestions.append({"icon": "▶️", "text": "Pipeline is idle — start the Director to auto-orchestrate", "action": "run_pipeline", "target": ""})
+
+    return jsonify({"suggestions": suggestions[:3]})
+
+
 # ── Chat with Denzo Operator (streaming + memory) ────────────────────────────
 
 @bp.route("/chat", methods=["POST"])

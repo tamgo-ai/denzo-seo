@@ -4,772 +4,427 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Denzo Operator · {{ client.name }}</title>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
   <style>
-    *, *::before, *::after { box-sizing: border-box; }
-    :root {
-      --bg:        #050610;
-      --bg-2:      #07091a;
-      --surface:   rgba(20, 22, 38, 0.55);
-      --surface-2: rgba(14, 16, 28, 0.65);
-      --border:    rgba(120, 130, 200, 0.10);
-      --border-h:  rgba(140, 150, 220, 0.25);
-      --text:      #f4f4f5;
-      --muted:     rgba(255, 255, 255, 0.50);
-      --muted2:    rgba(255, 255, 255, 0.28);
-      --cyan:      #22d3ee;
-      --indigo:    #818cf8;
-      --violet:    #a78bfa;
-      --pink:      #f472b6;
-      --green:     #4ade80;
-      --amber:     #fbbf24;
-      --rose:      #fb7185;
+    *,*::before,*::after{box-sizing:border-box}
+    :root{
+      --bg:#030308;--bg2:#06060f;--surface:rgba(12,12,24,0.65);--surface2:rgba(18,18,32,0.8);
+      --border:rgba(255,255,255,0.05);--border2:rgba(255,255,255,0.1);
+      --text:#f0f0f5;--muted:rgba(255,255,255,0.45);--muted2:rgba(255,255,255,0.22);
+      --cyan:#22d3ee;--indigo:#818cf8;--violet:#a78bfa;--green:#4ade80;--amber:#fbbf24;--rose:#fb7185;
+      --font:'Inter',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;
     }
-    html, body { height: 100%; }
-    body {
-      margin: 0; min-height: 100vh;
-      background: var(--bg);
-      color: var(--text);
-      font-family: Inter, system-ui, sans-serif;
-      -webkit-font-smoothing: antialiased;
-      overflow: hidden;
-    }
+    html,body{height:100%}
+    body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased;overflow:hidden}
 
-    /* ── Cosmic bg ─────────────────────────────────────────────────────── */
-    body::before { content:''; position:fixed; inset:0; z-index:0;
-      background:
-        radial-gradient(ellipse 50% 40% at 50% 35%, rgba(99,102,241,0.16), transparent 60%),
-        radial-gradient(ellipse 40% 40% at 15% 90%, rgba(34,211,238,0.10), transparent 70%),
-        radial-gradient(ellipse 40% 40% at 85% 90%, rgba(167,139,250,0.10), transparent 70%); }
-    body::after { content:''; position:fixed; inset:0; z-index:0;
-      background-image:
-        radial-gradient(circle at 12% 22%, rgba(255,255,255,0.4) 0.5px, transparent 1px),
-        radial-gradient(circle at 78% 18%, rgba(255,255,255,0.3) 0.5px, transparent 1px),
-        radial-gradient(circle at 38% 70%, rgba(255,255,255,0.35) 0.5px, transparent 1px),
-        radial-gradient(circle at 92% 64%, rgba(255,255,255,0.3) 0.5px, transparent 1px),
-        radial-gradient(circle at 24% 88%, rgba(255,255,255,0.25) 0.5px, transparent 1px),
-        radial-gradient(circle at 60% 30%, rgba(255,255,255,0.3) 0.5px, transparent 1px);
-      opacity:0.6; pointer-events:none; }
+    body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+      background:radial-gradient(ellipse 60% 50% at 50% 40%,rgba(99,102,241,0.10),transparent 60%),
+                radial-gradient(ellipse 40% 30% at 80% 20%,rgba(34,211,238,0.06),transparent 50%),
+                radial-gradient(ellipse 50% 40% at 20% 80%,rgba(167,139,250,0.06),transparent 50%);}
+    body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.04;
+      background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);
+      background-size:64px 64px;}
 
-    /* ── Layout ────────────────────────────────────────────────────────── */
-    .hud { position:relative; z-index:1; width:100%; height:100vh;
-      display:grid;
-      grid-template-columns:340px 1fr 340px;
-      grid-template-rows:56px 1fr 160px;
-      grid-template-areas:"top top top" "left core right" "chat chat chat";
-      gap:16px; padding:16px; }
-    @media (max-width:1280px) { .hud {
-      grid-template-columns:1fr 1fr;
-      grid-template-rows:56px 280px 1fr 160px;
-      grid-template-areas:"top top" "core core" "left right" "chat chat"; } }
-    @media (max-width:768px) { .hud {
-      grid-template-columns:1fr;
-      grid-template-rows:48px 200px 1fr 140px;
-      grid-template-areas:"top" "core" "right" "chat"; } }
+    .hud{position:relative;z-index:1;width:100%;height:100vh;display:grid;
+      grid-template-columns:280px 1fr 340px;grid-template-rows:52px 1fr;
+      grid-template-areas:"top top top" "left center right";gap:1px;padding:20px;}
+    @media(max-width:1280px){.hud{grid-template-columns:240px 1fr;grid-template-rows:48px 1fr auto;grid-template-areas:"top top" "center right" "left left"}}
+    @media(max-width:768px){.hud{grid-template-columns:1fr;grid-template-rows:44px 1fr auto;grid-template-areas:"top" "center" "right";padding:12px}}
 
-    /* ── Topbar ────────────────────────────────────────────────────────── */
-    .topbar { grid-area:top; display:flex; align-items:center; justify-content:space-between; padding:0 8px; }
-    .brand { display:flex; align-items:center; gap:14px; font-size:13px; font-weight:600;
-      letter-spacing:0.04em; text-transform:uppercase; color:rgba(255,255,255,0.85);
-      font-family:'JetBrains Mono',monospace; }
-    .brand .dot { width:8px; height:8px; border-radius:50%; background:var(--green);
-      box-shadow:0 0 12px var(--green), 0 0 24px rgba(74,222,128,0.4);
-      animation:pulse-dot 1.8s ease-in-out infinite; }
-    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.4} }
-    .brand .sep { width:1px; height:14px; background:var(--border-h); }
-    .brand .label-muted { color:var(--muted2); font-weight:400; }
+    .topbar{grid-area:top;display:flex;align-items:center;justify-content:space-between;padding:0 4px}
+    .t-left{display:flex;align-items:center;gap:16px}
+    .t-logo{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text)}
+    .t-logo span{color:var(--indigo)}
+    .t-badge{font-family:var(--mono);font-size:10px;padding:3px 10px;border-radius:999px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.15);color:var(--indigo);letter-spacing:.04em}
+    .t-center{display:flex;align-items:center;gap:24px}
+    .t-metric{text-align:center}
+    .t-metric .val{font-family:var(--mono);font-size:18px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+    .t-metric .lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono)}
+    .t-right{display:flex;align-items:center;gap:12px}
+    .t-clock{font-family:var(--mono);font-size:12px;color:var(--muted2)}
+    .t-btn{background:rgba(255,255,255,.03);border:1px solid var(--border);color:var(--muted);padding:6px 14px;border-radius:8px;font-size:11px;cursor:pointer;font-family:var(--mono);letter-spacing:.04em;transition:all .15s}
+    .t-btn:hover{border-color:var(--border2);color:#fff;background:rgba(255,255,255,.05)}
+    .t-btn.accent{background:rgba(99,102,241,.12);border-color:rgba(99,102,241,.2);color:var(--indigo)}
+    .t-btn.accent:hover{background:rgba(99,102,241,.25);color:#fff}
 
-    .topbar-center { display:flex; align-items:center; gap:20px; flex:1; justify-content:center; }
-    .progress-bar-wrap { width:200px; height:3px; background:rgba(255,255,255,0.06); border-radius:2px; overflow:hidden; }
-    .progress-bar-fill { height:100%; background:linear-gradient(90deg,var(--cyan),var(--indigo),var(--violet));
-      transition:width 0.8s ease; border-radius:2px; }
-    .progress-label { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted2);
-      letter-spacing:0.04em; white-space:nowrap; }
+    .panel{background:var(--surface);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:20px;padding:20px;position:relative;overflow:hidden}
+    .panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 
-    .topbar-right { display:flex; align-items:center; gap:16px;
-      font-size:11px; font-family:'JetBrains Mono',monospace; color:var(--muted); }
-    .topbar-right .pill { padding:4px 10px; border-radius:999px;
-      background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.18);
-      color:#a5b4fc; font-weight:600; letter-spacing:0.06em; }
-    .topbar-right button { background:transparent; border:1px solid var(--border);
-      color:var(--muted); padding:6px 12px; border-radius:8px; font-size:11px; cursor:pointer;
-      font-family:inherit; letter-spacing:0.04em; transition:border-color 0.15s,color 0.15s; }
-    .topbar-right button:hover { border-color:var(--border-h); color:#fff; }
-    .bell-btn { position:relative; }
-    .bell-btn .badge { position:absolute; top:-4px; right:-4px; width:16px; height:16px;
-      background:var(--rose); border-radius:50%; font-size:9px; display:flex;
-      align-items:center; justify-content:center; font-weight:700; }
+    .p-left{grid-area:left;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+    .agent-list{display:flex;flex-direction:column;gap:4px;overflow-y:auto;flex:1}
+    .agent-list::-webkit-scrollbar{width:3px}
+    .agent-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+    .agent-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;cursor:pointer;transition:all .15s;position:relative}
+    .agent-row:hover{background:rgba(255,255,255,.03)}
+    .agent-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:box-shadow .3s}
+    .agent-dot.idle{background:var(--muted2)}
+    .agent-dot.working{background:var(--cyan);box-shadow:0 0 8px var(--cyan);animation:dot-pulse 1.2s ease-in-out infinite}
+    .agent-dot.done{background:var(--green)}
+    .agent-dot.error{background:var(--rose);box-shadow:0 0 6px var(--rose)}
+    @keyframes dot-pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    .agent-info{flex:1;min-width:0}
+    .agent-name{font-size:11.5px;font-weight:600;color:var(--text);letter-spacing:-.01em}
+    .agent-task{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .agent-layer{font-family:var(--mono);font-size:9px;color:var(--muted2);background:rgba(255,255,255,.03);padding:1px 6px;border-radius:4px;flex-shrink:0}
 
-    /* ── Panels ────────────────────────────────────────────────────────── */
-    .panel { background:var(--surface); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
-      border:1px solid var(--border); border-radius:18px; padding:18px; position:relative; overflow:hidden; }
-    .panel::before { content:''; position:absolute; top:0; left:12%; right:12%; height:1px;
-      background:linear-gradient(90deg,transparent,var(--border-h),transparent); }
-    .panel-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;
-      font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:600;
-      letter-spacing:0.12em; text-transform:uppercase; color:var(--muted); }
-    .panel-head .count { background:rgba(255,255,255,0.04); border:1px solid var(--border);
-      padding:2px 8px; border-radius:999px; color:var(--text); font-size:9px; }
+    .p-center{grid-area:center;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:24px}
+    .canvas{width:100%;max-width:600px;text-align:center}
+    .canvas-icon{font-size:64px;margin-bottom:12px;opacity:.9}
+    .canvas-title{font-size:28px;font-weight:800;letter-spacing:-.03em;margin:0 0 8px;line-height:1.1}
+    .canvas-sub{font-size:13px;color:var(--muted);margin:0 0 24px;line-height:1.5}
+    .canvas-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+    .canvas-btn{display:flex;align-items:center;gap:8px;padding:14px 28px;border-radius:14px;font-family:var(--mono);font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border2);background:var(--surface2);color:var(--text);transition:all .2s;letter-spacing:.02em}
+    .canvas-btn:hover{transform:translateY(-1px);box-shadow:0 8px 32px rgba(0,0,0,.3)}
+    .canvas-btn.primary{background:var(--indigo);border-color:var(--indigo);color:#fff;font-size:14px;padding:16px 36px;box-shadow:0 4px 24px rgba(99,102,241,.3)}
+    .canvas-btn.primary:hover{box-shadow:0 8px 40px rgba(99,102,241,.5)}
 
-    /* ── LEFT: Activity ────────────────────────────────────────────────── */
-    .panel-activity { grid-area:left; overflow:hidden; display:flex; flex-direction:column; }
-    .activity-feed { overflow-y:auto; flex:1; margin:0 -8px; padding:0 8px; }
-    .activity-feed::-webkit-scrollbar { width:4px; }
-    .activity-feed::-webkit-scrollbar-thumb { background:var(--border-h); border-radius:2px; }
-    .activity-item { padding:10px 4px; border-left:1px solid var(--border); margin-left:6px;
-      padding-left:14px; position:relative; cursor:pointer; transition:background 0.15s; }
-    .activity-item:hover { background:rgba(255,255,255,0.02); }
-    .activity-item::before { content:''; position:absolute; left:-3px; top:14px;
-      width:5px; height:5px; border-radius:50%; background:var(--muted); }
-    .activity-item.lvl-success::before { background:var(--green); box-shadow:0 0 6px var(--green); }
-    .activity-item.lvl-warning::before { background:var(--amber); box-shadow:0 0 6px var(--amber); }
-    .activity-item.lvl-error::before   { background:var(--rose);  box-shadow:0 0 6px var(--rose); }
-    .activity-item.lvl-info::before    { background:var(--indigo); box-shadow:0 0 6px var(--indigo); }
-    .activity-agent { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:600;
-      color:var(--text); letter-spacing:0.02em; }
-    .activity-ts { float:right; font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--muted2); }
-    .activity-msg { font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.5; }
-    .activity-empty { text-align:center; padding:30px 12px; font-size:11px; color:var(--muted2); }
+    .agent-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;width:100%;max-width:600px}
+    .agent-card{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:14px;cursor:pointer;transition:all .15s}
+    .agent-card:hover{border-color:var(--border2);transform:translateY(-2px)}
+    .agent-card .ac-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+    .agent-card .ac-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .agent-card .ac-dot.working{background:var(--cyan);box-shadow:0 0 8px var(--cyan);animation:dot-pulse 1.2s ease-in-out infinite}
+    .agent-card .ac-name{font-size:12px;font-weight:600}
+    .agent-card .ac-task{font-size:10px;color:var(--muted);line-height:1.4}
 
-    /* ── CENTER: Pipeline Phase Core ──────────────────────────────────── */
-    .panel-core { grid-area:core; display:flex; align-items:center; justify-content:center;
-      background:transparent; border:none; position:relative; flex-direction:column; }
-    .panel-core::before { display:none; }
-    .core-wrap { position:relative; width:380px; height:380px; max-width:90%; max-height:90%; }
+    .p-right{grid-area:right;display:flex;flex-direction:column;gap:16px;overflow:hidden}
+    .suggestions{display:flex;flex-direction:column;gap:6px}
+    .sug-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;transition:all .15s;border:1px solid var(--border);background:rgba(255,255,255,.01)}
+    .sug-item:hover{border-color:var(--border2);background:rgba(255,255,255,.03)}
+    .sug-icon{font-size:16px;flex-shrink:0}
+    .sug-text{font-size:11px;color:var(--muted);line-height:1.4}
 
-    /* Phase rings — one per pipeline stage pair, filled by progress */
-    .phase-ring { position:absolute; border-radius:50%; border:2px solid transparent; }
-    .phase-ring.r1 { inset:12px;  border-color:rgba(99,102,241,0.15); }
-    .phase-ring.r2 { inset:50px;  border-color:rgba(99,102,241,0.12); }
-    .phase-ring.r3 { inset:88px;  border-color:rgba(99,102,241,0.10); }
-    .phase-ring.r4 { inset:126px; border-color:rgba(99,102,241,0.08); }
-    .phase-ring.done { border-color:rgba(74,222,128,0.35) !important; box-shadow:0 0 12px rgba(74,222,128,0.15); }
-    .phase-ring.working { border-color:rgba(34,211,238,0.45) !important; box-shadow:0 0 14px rgba(34,211,238,0.2); animation:ring-pulse 1.5s ease-in-out infinite; }
-    .phase-ring.error { border-color:rgba(251,113,133,0.45) !important; }
-    @keyframes ring-pulse { 0%,100%{box-shadow:0 0 14px rgba(34,211,238,0.2)} 50%{box-shadow:0 0 28px rgba(34,211,238,0.45)} }
+    .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .kpi{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:12px;padding:12px 14px;position:relative;overflow:hidden}
+    .kpi-label{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 4px}
+    .kpi-value{font-size:26px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
 
-    .ring-label {
-      position:absolute; top:-10px; left:50%; transform:translateX(-50%);
-      font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:600;
-      letter-spacing:0.06em; color:var(--muted2); white-space:nowrap;
-      transition:color 0.3s;
-    }
-    .phase-ring.done .ring-label { color:var(--green); }
-    .phase-ring.working .ring-label { color:var(--cyan); }
+    .mission{background:rgba(255,255,255,.01);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px;position:relative}
+    .mission::before{content:'';position:absolute;left:12px;top:14px;width:7px;height:7px;border-radius:50%}
+    .mission.s-green::before{background:var(--green);box-shadow:0 0 8px var(--green)}
+    .mission.s-yellow::before{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+    .mission.s-red::before{background:var(--rose);box-shadow:0 0 8px var(--rose)}
+    .m-label{font-size:12px;font-weight:600;padding-left:16px;margin:0}
+    .m-detail{font-size:10px;color:var(--muted);padding-left:16px;margin:3px 0 0}
+    .m-bar{height:2px;background:rgba(255,255,255,.04);border-radius:1px;margin:10px 0 8px;overflow:hidden}
+    .m-bar-fill{height:100%;border-radius:1px;background:linear-gradient(90deg,var(--cyan),var(--indigo));transition:width .6s}
+    .m-btn{display:block;width:100%;padding:6px;border-radius:6px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.15);color:var(--indigo);font-family:var(--mono);font-size:10px;cursor:pointer;letter-spacing:.04em;transition:all .15s}
+    .m-btn:hover{background:rgba(99,102,241,.2);border-color:var(--indigo);color:#fff}
 
-    /* Center — phase indicator + CTA */
-    .core-center { position:absolute; inset:140px; border-radius:50%;
-      background:radial-gradient(circle at 35% 30%, rgba(255,255,255,0.12) 0%, transparent 50%),
-                  radial-gradient(circle at 60% 70%, rgba(99,102,241,0.25) 0%, rgba(99,102,241,0.08) 30%, transparent 60%);
-      border:1px solid rgba(99,102,241,0.2);
-      display:flex; align-items:center; justify-content:center; flex-direction:column;
-      cursor:pointer; transition:all 0.3s; z-index:2;
-      box-shadow:0 0 40px rgba(99,102,241,0.25), inset 0 0 40px rgba(255,255,255,0.04);
-    }
-    .core-center:hover { border-color:var(--indigo); box-shadow:0 0 60px rgba(99,102,241,0.5); }
-    .core-center .phase-icon { font-size:28px; margin-bottom:2px; }
-    .core-center .phase-name { font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700;
-      letter-spacing:0.08em; color:rgba(255,255,255,0.95); }
-    .core-center .phase-pct { font-family:'JetBrains Mono',monospace; font-size:20px; font-weight:800;
-      color:var(--cyan); margin:2px 0; }
-    .core-center .phase-cta { font-family:'JetBrains Mono',monospace; font-size:9px;
-      color:var(--muted2); letter-spacing:0.06em; margin-top:2px;
-      background:rgba(99,102,241,0.12); padding:4px 10px; border-radius:999px;
-      border:1px solid rgba(99,102,241,0.25); transition:all 0.15s; }
-    .core-center:hover .phase-cta { background:rgba(99,102,241,0.3); color:#fff; border-color:var(--indigo); }
+    .chat-toggle{position:fixed;bottom:24px;right:24px;z-index:50;width:48px;height:48px;border-radius:50%;background:var(--indigo);border:none;color:#fff;font-size:18px;cursor:pointer;box-shadow:0 4px 24px rgba(99,102,241,.4);transition:all .15s}
+    .chat-toggle:hover{transform:scale(1.1);box-shadow:0 6px 32px rgba(99,102,241,.6)}
+    .chat-panel{position:fixed;bottom:24px;right:24px;width:440px;max-height:500px;z-index:49;background:var(--surface2);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid var(--border2);border-radius:20px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 16px 64px rgba(0,0,0,.5);transform:translateY(calc(100% + 32px));opacity:0;transition:all .3s cubic-bezier(.4,0,.2,1)}
+    .chat-panel.open{transform:translateY(0);opacity:1}
+    @media(max-width:768px){.chat-panel{width:calc(100vw - 24px);right:12px;bottom:12px}}
+    .chat-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;max-height:350px}
+    .chat-msgs::-webkit-scrollbar{width:3px}
+    .chat-msgs::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+    .c-msg{max-width:90%;font-size:12px;line-height:1.5}
+    .c-msg.user{align-self:flex-end;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.15);padding:8px 12px;border-radius:12px;color:var(--text)}
+    .c-msg.bot{align-self:flex-start;color:var(--muted);font-family:var(--mono);padding:4px 0}
+    .c-msg.bot::before{content:'◉ ';color:var(--cyan)}
+    .c-msg.bot.streaming::after{content:'▊';color:var(--cyan);animation:blink .5s step-end infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+    .chat-input-row{display:flex;align-items:center;padding:12px 16px;border-top:1px solid var(--border);gap:8px}
+    .chat-input-row input{flex:1;background:transparent;border:none;color:var(--text);font-size:13px;outline:none;font-family:var(--font)}
+    .chat-input-row input::placeholder{color:var(--muted2)}
 
-    /* Agent tokens on rings */
-    .agent-token { position:absolute; width:28px; height:28px; border-radius:50%;
-      background:var(--surface-2); border:1px solid;
-      display:flex; align-items:center; justify-content:center;
-      font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; color:#fff;
-      cursor:pointer; z-index:3; transition:transform 0.15s, box-shadow 0.3s;
-      animation:token-glow 1.6s ease-in-out infinite; }
-    .agent-token:hover { transform:scale(1.35) !important; animation:none; z-index:10; border-color:#fff !important; }
-    @keyframes token-glow { 0%,100%{box-shadow:0 0 8px currentColor} 50%{box-shadow:0 0 18px currentColor} }
+    .cmd-overlay{position:fixed;inset:0;z-index:200;background:rgba(3,3,8,.85);backdrop-filter:blur(16px);display:none;align-items:flex-start;justify-content:center;padding-top:15vh}
+    .cmd-overlay.open{display:flex}
+    .cmd-box{width:600px;max-width:90vw;background:var(--surface2);border:1px solid var(--border2);border-radius:18px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+    .cmd-input{width:100%;padding:16px 20px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:16px;font-family:var(--font);outline:none;caret-color:var(--indigo)}
+    .cmd-input::placeholder{color:var(--muted2)}
+    .cmd-results{max-height:300px;overflow-y:auto}
+    .cmd-item{padding:10px 20px;display:flex;align-items:center;gap:12px;cursor:pointer;font-size:12px;transition:background .1s}
+    .cmd-item:hover,.cmd-item.selected{background:rgba(99,102,241,.1)}
+    .cmd-item .cmd-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.04);font-size:14px;flex-shrink:0}
+    .cmd-item .cmd-label{flex:1;font-weight:500}
+    .cmd-item .cmd-hint{font-family:var(--mono);font-size:10px;color:var(--muted2)}
 
-    /* Phase legend below core */
-    .core-legend { display:flex; gap:10px; margin-top:8px; flex-wrap:wrap; justify-content:center; }
-    .core-legend-item { display:flex; align-items:center; gap:5px;
-      font-family:'JetBrains Mono',monospace; font-size:8px; color:var(--muted2);
-      letter-spacing:0.04em; }
-    .core-legend-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
-    .core-legend-dot.ldone { background:var(--green); }
-    .core-legend-dot.lworking { background:var(--cyan); }
-    .core-legend-dot.lidle { background:var(--muted2); }
-    .core-legend-dot.lerror { background:var(--rose); }
-
-    /* ── RIGHT: Missions + KPIs ────────────────────────────────────────── */
-    .right-col { grid-area:right; display:grid; grid-template-rows:auto 1fr; gap:16px; overflow:hidden; }
-    .panel-kpis { padding:14px 16px; }
-    .kpi-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    .kpi { background:rgba(255,255,255,0.02); border:1px solid var(--border);
-      border-radius:10px; padding:8px 10px; }
-    .kpi-label { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.08em;
-      text-transform:uppercase; color:var(--muted); margin:0 0 2px; }
-    .kpi-value { font-size:22px; font-weight:700; letter-spacing:-0.02em;
-      color:var(--text); line-height:1; font-variant-numeric:tabular-nums; }
-    .kpi-sub { font-size:9px; color:var(--muted2); margin-top:2px; }
-    .sparkline { width:100%; height:18px; margin-top:5px; }
-
-    .panel-missions { display:flex; flex-direction:column; overflow:hidden; }
-    .missions-list { overflow-y:auto; flex:1; margin:0 -8px; padding:0 8px; }
-    .missions-list::-webkit-scrollbar { width:4px; }
-    .missions-list::-webkit-scrollbar-thumb { background:var(--border-h); border-radius:2px; }
-    .mission { background:rgba(255,255,255,0.02); border:1px solid var(--border);
-      border-radius:12px; padding:12px 14px; margin-bottom:10px; position:relative; }
-    .mission::before { content:''; position:absolute; left:12px; top:12px;
-      width:8px; height:8px; border-radius:50%; }
-    .mission.s-green::before  { background:var(--green);  box-shadow:0 0 8px var(--green); }
-    .mission.s-yellow::before { background:var(--amber);  box-shadow:0 0 8px var(--amber); }
-    .mission.s-red::before    { background:var(--rose);   box-shadow:0 0 8px var(--rose); }
-    .mission-label { font-size:12px; font-weight:600; color:var(--text);
-      padding-left:18px; margin:0; letter-spacing:-0.005em; }
-    .mission-detail { font-size:11px; color:var(--muted); margin:4px 0 0; padding-left:18px; }
-    .mission-progress { margin:10px 0 8px; height:3px; background:rgba(255,255,255,0.04);
-      border-radius:2px; overflow:hidden; }
-    .mission-progress-fill { height:100%;
-      background:linear-gradient(90deg,var(--cyan),var(--indigo),var(--violet));
-      transition:width 0.6s ease; }
-    .mission-btn { margin-top:4px; padding:5px 12px; border-radius:6px;
-      background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.25);
-      color:#a5b4fc; font-family:'JetBrains Mono',monospace; font-size:10px;
-      cursor:pointer; letter-spacing:0.04em; transition:all 0.15s; }
-    .mission-btn:hover { background:rgba(99,102,241,0.25); border-color:var(--indigo); color:#fff; }
-    .mission-btn:disabled { opacity:0.3; cursor:not-allowed; }
-
-    /* ── Chat ──────────────────────────────────────────────────────────── */
-    .panel-chat { grid-area:chat; display:flex; flex-direction:column; padding:12px 16px; }
-    .chat-messages { flex:1; overflow-y:auto; padding:4px 4px 6px;
-      display:flex; flex-direction:column; gap:6px;
-      font-family:'JetBrains Mono',monospace; font-size:12px; }
-    .chat-messages::-webkit-scrollbar { width:4px; }
-    .chat-messages::-webkit-scrollbar-thumb { background:var(--border-h); border-radius:2px; }
-    .chat-msg { max-width:88%; line-height:1.5; }
-    .chat-msg.user { color:rgba(255,255,255,0.95); align-self:flex-end;
-      background:rgba(99,102,241,0.10); border:1px solid rgba(99,102,241,0.20);
-      padding:6px 12px; border-radius:12px; }
-    .chat-msg.bot { color:var(--muted); align-self:flex-start; padding:4px 0; }
-    .chat-msg.bot::before { content:'◉ '; color:var(--cyan); text-shadow:0 0 6px var(--cyan); }
-    .chat-msg.bot.streaming::after { content:'▊'; color:var(--cyan);
-      animation:blink-cursor 0.5s step-end infinite; margin-left:2px; }
-    @keyframes blink-cursor { 0%,100%{opacity:1} 50%{opacity:0} }
-    .chat-msg .cmd-highlight { color:var(--cyan); }
-    .chat-input-row { display:flex; align-items:center; gap:8px; margin-top:8px; }
-    .chat-input-row .prompt { font-family:'JetBrains Mono',monospace; font-size:14px;
-      color:var(--cyan); text-shadow:0 0 6px var(--cyan); }
-    .chat-input-row input { flex:1; background:transparent; border:none; color:var(--text);
-      font-family:'JetBrains Mono',monospace; font-size:13px; padding:8px 0;
-      outline:none; caret-color:var(--cyan); }
-    .chat-input-row input::placeholder { color:var(--muted2); }
-    .chat-hint { font-family:'JetBrains Mono',monospace; font-size:10px;
-      color:var(--muted2); letter-spacing:0.04em; }
-    .chat-hint kbd { background:rgba(255,255,255,0.06); padding:1px 5px; border-radius:3px;
-      font-family:inherit; font-size:9px; }
-
-    /* ── Agent detail panel ────────────────────────────────────────────── */
-    .agent-detail-overlay { position:fixed; inset:0; z-index:80;
-      background:rgba(5,6,16,0.85); backdrop-filter:blur(12px);
-      display:none; align-items:center; justify-content:center; }
-    .agent-detail-overlay.open { display:flex; }
-    .agent-detail-card { background:var(--surface); border:1px solid var(--border-h);
-      border-radius:18px; padding:24px; max-width:500px; width:90%; }
-    .agent-detail-card h3 { font-family:'JetBrains Mono',monospace; font-size:14px; margin:0 0 4px; }
-    .agent-detail-card .ad-status { font-size:11px; color:var(--muted); margin:0 0 16px; }
-    .agent-detail-card .ad-log { font-size:10px; color:var(--muted2); max-height:200px; overflow-y:auto; }
-    .agent-detail-card .ad-log p { margin:4px 0; padding:4px 0; border-bottom:1px solid var(--border); }
-    .agent-detail-card button { margin-top:16px; background:var(--rose); border:none; color:#fff;
-      padding:8px 16px; border-radius:8px; cursor:pointer; font-family:inherit; font-size:12px; }
-
-    /* ── Alerts ────────────────────────────────────────────────────────── */
-    .alerts { position:fixed; bottom:180px; right:24px; z-index:50;
-      display:flex; flex-direction:column-reverse; gap:8px; pointer-events:none; }
-    .alert { background:var(--surface); backdrop-filter:blur(12px);
-      border:1px solid var(--border-h); border-radius:999px; padding:8px 14px;
-      font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text);
-      display:flex; align-items:center; gap:10px;
-      animation:alert-in 0.35s ease-out, alert-out 0.5s ease-in 4.5s forwards;
-      box-shadow:0 8px 32px rgba(99,102,241,0.2); }
-    .alert .dot { width:6px; height:6px; border-radius:50%; background:var(--cyan);
-      box-shadow:0 0 8px var(--cyan); }
-    .alert.kind-success .dot { background:var(--green); box-shadow:0 0 8px var(--green); }
-    .alert.kind-warning .dot { background:var(--amber); box-shadow:0 0 8px var(--amber); }
-    .alert.kind-error   .dot { background:var(--rose);  box-shadow:0 0 8px var(--rose); }
-    @keyframes alert-in  { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
-    @keyframes alert-out { to{transform:translateY(-10px);opacity:0} }
-
-    /* ── ⌘K overlay ────────────────────────────────────────────────────── */
-    .internals-overlay { position:fixed; inset:0; z-index:100;
-      background:rgba(5,6,16,0.92); backdrop-filter:blur(20px);
-      display:none; align-items:center; justify-content:center; }
-    .internals-overlay.open { display:flex; }
-    .internals-overlay iframe { width:100%; height:100%; border:none; }
-    .internals-close { position:fixed; top:16px; right:16px;
-      background:rgba(20,22,38,0.9); border:1px solid var(--border-h);
-      color:var(--text); padding:8px 14px; border-radius:8px;
-      font-family:'JetBrains Mono',monospace; font-size:11px; cursor:pointer; z-index:101; }
-
-    /* ── Notifications drawer ──────────────────────────────────────────── */
-    .notif-drawer { position:fixed; top:60px; right:24px; z-index:60;
-      width:320px; max-height:400px; background:var(--surface-2);
-      border:1px solid var(--border-h); border-radius:14px; overflow-y:auto;
-      display:none; backdrop-filter:blur(16px); padding:12px; }
-    .notif-drawer.open { display:block; }
-    .notif-item { padding:8px 4px; border-bottom:1px solid var(--border);
-      font-size:10px; font-family:'JetBrains Mono',monospace; color:var(--muted); }
-    .notif-item .nf-time { font-size:8px; color:var(--muted2); float:right; }
+    .modal-overlay{position:fixed;inset:0;z-index:150;background:rgba(3,3,8,.8);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center}
+    .modal-overlay.open{display:flex}
+    .modal{background:var(--surface2);border:1px solid var(--border2);border-radius:20px;padding:28px;max-width:480px;width:90%;max-height:80vh;overflow-y:auto}
+    .modal h3{font-family:var(--mono);font-size:16px;margin:0 0 6px}
+    .modal .m-status{font-size:11px;color:var(--muted);margin:0 0 20px}
+    .modal .m-log{font-size:10px;color:var(--muted);font-family:var(--mono)}
+    .modal .m-log p{margin:4px 0;padding:4px 0;border-bottom:1px solid var(--border)}
+    .modal .m-actions{display:flex;gap:8px;margin-top:20px}
+    .modal .m-actions button{padding:8px 16px;border-radius:8px;font-size:11px;cursor:pointer;font-family:var(--mono);border:1px solid var(--border2);background:rgba(255,255,255,.03);color:var(--text)}
+    .modal .m-actions button.danger{background:rgba(251,113,133,.1);border-color:rgba(251,113,133,.2);color:var(--rose)}
+    .modal .m-actions button:hover{border-color:#fff}
   </style>
 </head>
 <body>
 
 <div class="hud" x-data="jarvis('{{ client.tenant_id }}')" x-init="boot()">
 
-  {# ─── TOPBAR ─────────────────────────────────────────────────── #}
+  {# ─── TOPBAR ──────────────────────────────────────────────────── #}
   <div class="topbar">
-    <div class="brand">
-      <span class="dot" :class="{'is-warning': pipeline.agents_error > 0, 'is-done': pipeline.progress_pct >= 100}"></span>
-      <span>DENZO · OPERATOR</span>
-      <span class="sep"></span>
-      <span class="label-muted">{{ client.name }}</span>
+    <div class="t-left">
+      <div class="t-logo">Denzo<span>↗</span></div>
+      <div class="t-badge" x-text="pipeline.agents_working + ' active'"></div>
     </div>
-    <div class="topbar-center">
-      <div class="progress-bar-wrap">
-        <div class="progress-bar-fill" :style="'width:' + pipeline.progress_pct + '%'"></div>
-      </div>
-      <span class="progress-label" x-text="pipeline.progress_pct + '%'"></span>
-      <span class="progress-label" style="color:var(--cyan)" x-text="pipeline.eta"></span>
+    <div class="t-center">
+      <div class="t-metric"><div class="val" x-text="kpis.pages_published"></div><div class="lbl">Published</div></div>
+      <div class="t-metric"><div class="val" x-text="kpis.keywords_total"></div><div class="lbl">Keywords</div></div>
+      <div class="t-metric"><div class="val" x-text="kpis.geo_citations"></div><div class="lbl">GEO Cites</div></div>
     </div>
-    <div class="topbar-right">
-      <span class="meta"><span class="pill" x-text="pipeline.agents_working + ' LIVE'"></span></span>
-      <span class="meta" x-text="clock"></span>
-      <button class="bell-btn" @click="showNotifs = !showNotifs">
-        ⏏ <span class="badge" x-show="notifCount > 0" x-text="notifCount"></span>
-      </button>
-      <button @click="showInternals = true">⌘K</button>
-      <button onclick="window.location.href='/clients/{{ client.tenant_id }}/settings'">SETTINGS</button>
+    <div class="t-right">
+      <div class="t-clock" x-text="clock"></div>
+      <button class="t-btn" @click="cmdOpen=true;$nextTick(()=>$refs.cmdInput.focus())">⌘K</button>
+      <button class="t-btn accent" @click="execQuick('run_pipeline')" x-show="pipeline.agents_working===0">▶ Run</button>
+      <button class="t-btn" onclick="window.location.href='/clients/{{ client.tenant_id }}/settings'">Settings</button>
     </div>
   </div>
 
-  {# ─── NOTIFICATIONS DRAWER ─────────────────────────────────────── #}
-  <div class="notif-drawer" :class="{open: showNotifs}">
-    <template x-if="notifications.length === 0">
-      <div style="font-size:10px;color:var(--muted2);text-align:center;padding:20px">No notifications yet</div>
-    </template>
-    <template x-for="n in notifications.slice(-20).reverse()" :key="n.id">
-      <div class="notif-item">
-        <span class="nf-time" x-text="formatTs(n.time)"></span>
-        <span x-text="n.text"></span>
-      </div>
-    </template>
-  </div>
-
-  {# ─── LEFT: Activity ───────────────────────────────────────────── #}
-  <div class="panel panel-activity">
-    <div class="panel-head"><span>◉ Live Activity</span><span class="count" x-text="activity.length"></span></div>
-    <div class="activity-feed" x-ref="feed">
-      <template x-if="activity.length === 0">
-        <div class="activity-empty">No activity yet.<br/>Type a command or start the pipeline.</div>
-      </template>
-      <template x-for="(a, idx) in activity" :key="idx + ':' + a.created_at">
-        <div class="activity-item" :class="'lvl-' + (a.level || 'info')"
-             @click="expandActivity(idx)">
-          <div>
-            <span class="activity-agent" x-text="(a.agent || 'system').toUpperCase()"></span>
-            <span class="activity-ts" x-text="formatTs(a.created_at)"></span>
-          </div>
-          <p class="activity-msg" x-text="expanded[0] === idx ? a.message : msgPreview(a.message)"></p>
-        </div>
-      </template>
-    </div>
-  </div>
-
-	  {# ─── CENTER: Pipeline Phase Core ──────────────────────────────── #}
-	  <div class="panel-core">
-	    <div class="core-wrap">
-	      {# Phase rings — each represents a pipeline stage pair #}
-	      <div class="phase-ring r1" :class="ringClass(0)"><span class="ring-label">RESEARCH</span></div>
-	      <div class="phase-ring r2" :class="ringClass(1)"><span class="ring-label">STRATEGY</span></div>
-	      <div class="phase-ring r3" :class="ringClass(2)"><span class="ring-label">GENERATE</span></div>
-	      <div class="phase-ring r4" :class="ringClass(3)"><span class="ring-label">PUBLISH</span></div>
-
-	      {# Agent tokens placed on their layer ring #}
-	      <template x-for="token in agentTokens" :key="token.name">
-	        <div class="agent-token"
-	             :style="'left:'+token.left+'%; top:'+token.top+'%; color:'+token.color+'; border-color:'+token.color+'; background:'+token.bg+';'"
-	             x-text="token.letter"
-	             :title="token.name + ': ' + (token.task || 'working')"
-	             @click="showAgentDetail(token.name)"></div>
-	      </template>
-
-	      {# Center: phase indicator + progress + CTA #}
-	      <div class="core-center" @click="onCoreClick()">
-	        <div class="phase-icon" x-text="phaseData().icon"></div>
-	        <div class="phase-name" x-text="phaseData().name"></div>
-	        <div class="phase-pct" x-text="pipeline.progress_pct + '%'"></div>
-	        <div class="phase-cta" x-text="phaseData().cta"></div>
-	      </div>
-	    </div>
-
-	    {# Legend #}
-	    <div class="core-legend">
-	      <div class="core-legend-item"><span class="core-legend-dot ldone"></span> Done</div>
-	      <div class="core-legend-item"><span class="core-legend-dot lworking"></span> Working</div>
-	      <div class="core-legend-item"><span class="core-legend-dot lidle"></span> Idle</div>
-	      <div class="core-legend-item"><span class="core-legend-dot lerror"></span> Error</div>
-	    </div>
-	  </div>
-
-  {# ─── RIGHT: Missions + KPIs ────────────────────────────────────── #}
-  <div class="right-col">
-    <div class="panel panel-kpis">
-      <div class="panel-head"><span>◉ Signals</span></div>
-      <div class="kpi-grid">
-        <div class="kpi">
-          <p class="kpi-label">Pages</p>
-          <p class="kpi-value" x-text="kpis.pages_published"></p>
-          <p class="kpi-sub"><span x-text="kpis.pages_total"></span> total · <span x-text="kpis.pages_ready"></span> ready</p>
-          <svg class="sparkline" :viewBox="'0 0 '+sparkW+' '+sparkH" preserveAspectRatio="none">
-            <polyline fill="none" stroke="url(#spkP)" stroke-width="1.5" :points="sparkPoints(sparklines.pages)"/>
-            <defs><linearGradient id="spkP"><stop offset="0%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient></defs>
-          </svg>
-        </div>
-        <div class="kpi">
-          <p class="kpi-label">Keywords</p>
-          <p class="kpi-value" x-text="kpis.keywords_total"></p>
-          <p class="kpi-sub"><span x-text="kpis.keywords_high"></span> high priority</p>
-          <svg class="sparkline" :viewBox="'0 0 '+sparkW+' '+sparkH" preserveAspectRatio="none">
-            <polyline fill="none" stroke="url(#spkK)" stroke-width="1.5" :points="sparkPoints(sparklines.keywords)"/>
-            <defs><linearGradient id="spkK"><stop offset="0%" stop-color="#818cf8"/><stop offset="100%" stop-color="#f472b6"/></linearGradient></defs>
-          </svg>
-        </div>
-        <div class="kpi">
-          <p class="kpi-label">GEO Cites</p>
-          <p class="kpi-value" x-text="kpis.geo_citations"></p>
-          <p class="kpi-sub">of <span x-text="kpis.geo_queries_total"></span> queries</p>
-        </div>
-        <div class="kpi">
-          <p class="kpi-label">Competitors</p>
-          <p class="kpi-value" x-text="kpis.competitors"></p>
-          <p class="kpi-sub">mapped</p>
-        </div>
-      </div>
-    </div>
-
-    <div class="panel panel-missions">
-      <div class="panel-head"><span>◉ Missions</span><span class="count" x-text="missions.length"></span></div>
-      <div class="missions-list">
-        <template x-for="m in missions" :key="m.id">
-          <div class="mission" :class="'s-' + m.status">
-            <p class="mission-label" x-text="m.label"></p>
-            <p class="mission-detail" x-text="m.detail"></p>
-            <div class="mission-progress">
-              <div class="mission-progress-fill" :style="'width:' + Math.round(m.progress*100) + '%'"></div>
+  {# ─── LEFT — Agent List ───────────────────────────────────────── #}
+  <div class="panel p-left">
+    <div class="panel-head">Agents</div>
+    <div class="agent-list">
+      <template x-for="g in agentGroups" :key="g.label">
+        <div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--muted2);padding:8px 10px 4px;letter-spacing:.08em;text-transform:uppercase" x-text="g.label"></div>
+          <template x-for="a in g.agents" :key="a.name">
+            <div class="agent-row" :class="a.status" @click="showAgentDetail(a.name)">
+              <div class="agent-dot" :class="a.status"></div>
+              <div class="agent-info">
+                <div class="agent-name" x-text="a.name"></div>
+                <div class="agent-task" x-text="a.current_task || a.status"></div>
+              </div>
+              <div class="agent-layer" x-text="'L'+a.layer"></div>
             </div>
-            <button class="mission-btn" x-show="m.action"
-                    @click="execMission(m)"
-                    :disabled="commandBusy"
-                    x-text="commandBusy ? 'Working...' : m.action_label"></button>
+          </template>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  {# ─── CENTER — Dynamic Canvas ──────────────────────────────────── #}
+  <div class="p-center">
+    {# IDLE #}
+    <div class="canvas" x-show="pipeline.agents_working === 0 && pipeline.progress_pct < 100">
+      <div class="canvas-icon">🛰️</div>
+      <div class="canvas-title" x-text="pipeline.progress_pct === 0 ? 'Ready to launch' : 'Continue where you left off'"></div>
+      <div class="canvas-sub" x-text="pipeline.progress_pct === 0 ? 'Your SEO pipeline is idle. Start with keyword research or let the Director auto-orchestrate everything.' : pipeline.progress_pct + '% complete. ' + (kpis.pages_ready || 0) + ' pages ready to publish.'"></div>
+      <div class="canvas-actions">
+        <button class="canvas-btn primary" @click="execQuick('run_pipeline')">▶ Launch Pipeline</button>
+        <button class="canvas-btn" @click="execQuick('start_agent','Keyword Strategist')">🔍 Keyword Research</button>
+      </div>
+    </div>
+
+    {# WORKING #}
+    <div class="canvas" x-show="pipeline.agents_working > 0">
+      <div class="canvas-icon">◉</div>
+      <div class="canvas-title" x-text="pipeline.agents_working + ' agent' + (pipeline.agents_working>1?'s':'') + ' working'"></div>
+      <div class="canvas-sub" x-text="pipeline.eta"></div>
+      <div class="agent-cards">
+        <template x-for="a in workingAgents" :key="a.name">
+          <div class="agent-card" @click="showAgentDetail(a.name)">
+            <div class="ac-top"><div class="ac-dot working"></div><div class="ac-name" x-text="a.name"></div></div>
+            <div class="ac-task" x-text="a.current_task || 'Working...'"></div>
+          </div>
+        </template>
+      </div>
+      <div class="canvas-actions" style="margin-top:16px"><button class="canvas-btn" @click="execQuick('stop_pipeline')">■ Stop All</button></div>
+    </div>
+
+    {# COMPLETE #}
+    <div class="canvas" x-show="pipeline.progress_pct >= 100 && pipeline.agents_working === 0">
+      <div class="canvas-icon">◆</div>
+      <div class="canvas-title">Pipeline Complete</div>
+      <div class="canvas-sub" x-text="kpis.pages_published + ' pages published · ' + kpis.keywords_total + ' keywords · ' + kpis.geo_citations + ' GEO citations'"></div>
+      <div class="canvas-actions">
+        <button class="canvas-btn primary" @click="showInternals=true">View Results</button>
+        <button class="canvas-btn" @click="execQuick('start_agent','Content Freshness')">Refresh Content</button>
+      </div>
+    </div>
+  </div>
+
+  {# ─── RIGHT — KPIs + Missions ──────────────────────────────────── #}
+  <div class="p-right">
+    <div class="panel" x-show="suggestions.length > 0">
+      <div class="panel-head">Suggestions</div>
+      <div class="suggestions">
+        <template x-for="s in suggestions" :key="s.text">
+          <div class="sug-item" @click="execQuick(s.action, s.target)">
+            <div class="sug-icon" x-text="s.icon"></div><div class="sug-text" x-text="s.text"></div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-label">Progress</div><div class="kpi-value" style="color:var(--cyan)" x-text="pipeline.progress_pct+'%'"></div></div>
+      <div class="kpi"><div class="kpi-label">Competitors</div><div class="kpi-value" x-text="kpis.competitors"></div></div>
+    </div>
+
+    <div class="panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+      <div class="panel-head">Missions</div>
+      <div style="overflow-y:auto;flex:1">
+        <template x-for="m in missions" :key="m.id">
+          <div class="mission" :class="'s-'+m.status">
+            <p class="m-label" x-text="m.label"></p><p class="m-detail" x-text="m.detail"></p>
+            <div class="m-bar"><div class="m-bar-fill" :style="'width:'+Math.round(m.progress*100)+'%'"></div></div>
+            <button class="m-btn" x-show="m.action && !commandBusy" @click="execQuick(m.action, m.action_target)" x-text="m.action_label"></button>
           </div>
         </template>
       </div>
     </div>
   </div>
 
-  {# ─── CHAT ──────────────────────────────────────────────────────── #}
-  <div class="panel panel-chat">
-    <div class="chat-messages" x-ref="chatBox">
-      <template x-for="(m, idx) in chat" :key="idx">
-        <div class="chat-msg" :class="m.role + (m.streaming ? ' streaming' : '')">
-          <span x-html="m.html || m.text"></span>
-        </div>
+  {# ─── CHAT FAB ─────────────────────────────────────────────────── #}
+  <button class="chat-toggle" @click="chatOpen=!chatOpen;$nextTick(()=>{if(chatOpen)$refs.chatInput.focus()})" x-text="chatOpen ? '✕' : '◉'"></button>
+
+  {# ─── CHAT PANEL ───────────────────────────────────────────────── #}
+  <div class="chat-panel" :class="{open:chatOpen}">
+    <div class="chat-msgs" x-ref="chatBox">
+      <template x-for="(m,idx) in chat" :key="idx">
+        <div class="c-msg" :class="m.role + (m.streaming?' streaming':'')" x-text="m.text"></div>
       </template>
     </div>
     <div class="chat-input-row">
-      <span class="prompt">›</span>
-      <input type="text" x-model="chatInput" @keydown.enter="sendChat()"
-             :disabled="chatBusy"
-             placeholder="Ask or command — e.g. 'start keyword strategist' or 'what's blocking us?'">
-      <span class="chat-hint"><kbd>↵</kbd> send · <kbd>⌘K</kbd> internals</span>
+      <span style="color:var(--indigo);font-family:var(--mono)">›</span>
+      <input type="text" x-model="chatInput" @keydown.enter="sendChat()" :disabled="chatBusy" x-ref="chatInput" placeholder="Ask anything or type a command...">
     </div>
   </div>
 
-  {# ─── ALERTS ────────────────────────────────────────────────────── #}
-  <div class="alerts">
-    <template x-for="al in alerts" :key="al.id">
-      <div class="alert" :class="'kind-' + al.kind"><span class="dot"></span><span x-text="al.text"></span></div>
-    </template>
-  </div>
-
-  {# ─── AGENT DETAIL PANEL ────────────────────────────────────────── #}
-  <div class="agent-detail-overlay" :class="{open: detailAgent}">
-    <div class="agent-detail-card" x-show="detailAgent">
-      <h3 x-text="detailAgent?.name || ''"></h3>
-      <p class="ad-status"><span x-text="detailAgent?.status"></span> · runs: <span x-text="detailAgent?.run_count"></span></p>
-      <p style="font-size:10px;color:var(--muted)" x-text="detailAgent?.current_task"></p>
-      <div class="ad-log">
-        <template x-for="log in detailLogs" :key="log.created_at">
-          <p><span style="color:var(--indigo)" x-text="formatTs(log.created_at)"></span> <span x-text="log.message"></span></p>
+  {# ─── ⌘K COMMAND PALETTE ───────────────────────────────────────── #}
+  <div class="cmd-overlay" :class="{open:cmdOpen}" @click.self="cmdOpen=false">
+    <div class="cmd-box">
+      <input type="text" class="cmd-input" x-ref="cmdInput" x-model="cmdQuery" @keydown.escape="cmdOpen=false" @keydown.enter="execCmd()" @keydown.down.prevent="cmdDown()" @keydown.up.prevent="cmdUp()" placeholder="Search agents, run commands, open pages...">
+      <div class="cmd-results">
+        <template x-for="(item,idx) in cmdResults" :key="item.label">
+          <div class="cmd-item" :class="{selected:idx===cmdIdx}" @click="execCmdItem(item)" @mouseenter="cmdIdx=idx">
+            <div class="cmd-icon" x-text="item.icon||'→'"></div><div class="cmd-label" x-text="item.label"></div><div class="cmd-hint" x-text="item.hint||''"></div>
+          </div>
         </template>
       </div>
-      <div style="display:flex;gap:8px;margin-top:12px">
-        <button @click="execAction('stop_agent', detailAgent?.name)" style="background:var(--rose)">Stop Agent</button>
-        <button @click="execAction('start_agent', detailAgent?.name)">Retry Agent</button>
-        <button @click="detailAgent=null;detailLogs=[]" style="background:transparent;border:1px solid var(--border)">Close</button>
+    </div>
+  </div>
+
+  {# ─── AGENT DETAIL MODAL ───────────────────────────────────────── #}
+  <div class="modal-overlay" :class="{open:detailAgent}" @click.self="detailAgent=null">
+    <div class="modal" x-show="detailAgent">
+      <h3 x-text="detailAgent?.name"></h3>
+      <p class="m-status" x-text="(detailAgent?.status||'') + ' · Layer ' + (detailAgent?.layer||'') + ' · Run #' + (detailAgent?.run_count||0)"></p>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:12px" x-text="detailAgent?.current_task"></p>
+      <div class="m-log"><template x-for="l in detailLogs" :key="l.created_at"><p><span style="color:var(--indigo)" x-text="formatTs(l.created_at)"></span> <span x-text="l.message"></span></p></template></div>
+      <div class="m-actions">
+        <button @click="execQuick('stop_agent',detailAgent?.name)" class="danger">Stop</button>
+        <button @click="execQuick('start_agent',detailAgent?.name)">Retry</button>
+        <button @click="detailAgent=null">Close</button>
       </div>
     </div>
   </div>
 
-  {# ─── ⌘K OVERLAY ───────────────────────────────────────────────── #}
-  <div class="internals-overlay" :class="{open: showInternals}">
-    <button class="internals-close" @click="showInternals = false">ESC · CLOSE</button>
-    <template x-if="showInternals">
-      <iframe :src="'/clients/{{ client.tenant_id }}/mission-control/'"></iframe>
-    </template>
+  {# ─── INTERNALS OVERLAY ────────────────────────────────────────── #}
+  <div class="cmd-overlay" :class="{open:showInternals}" @click.self="showInternals=false">
+    <button style="position:fixed;top:16px;right:16px;z-index:201;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:8px 14px;border-radius:8px;font-family:var(--mono);font-size:11px;cursor:pointer" @click="showInternals=false">ESC · Close</button>
+    <iframe :src="'/clients/{{ client.tenant_id }}/mission-control/'" style="width:100%;height:100%;border:none;border-radius:16px"></iframe>
   </div>
 </div>
 
 <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 <script>
-function jarvis(tenantId) {
-  return {
-    tenantId,
-    activity: [], expanded: [],
-    agents: [], agentTokens: [],
-    missions: [],
-    kpis: { pages_published:0, pages_total:0, pages_ready:0, keywords_total:0, keywords_high:0, geo_citations:0, geo_queries_total:0, competitors:0 },
-    sparklines: { pages:[0,0,0,0,0,0,0], keywords:[0,0,0,0,0,0,0] },
-    pipeline: { progress_pct:0, eta:'Idle', agents_working:0, agents_done:0, agents_error:0, agents_total:0 },
+function jarvis(tenantId){return{
+  tenantId,activity:[],agents:[],agentGroups:[],missions:[],suggestions:[],
+  kpis:{pages_published:0,pages_total:0,pages_ready:0,keywords_total:0,keywords_high:0,geo_citations:0,geo_queries_total:0,competitors:0},
+  pipeline:{progress_pct:0,eta:'Idle',agents_working:0,agents_done:0,agents_error:0,agents_total:0},
+  workingAgents:[],
+  chat:[{role:'bot',text:'Online. Ask me anything about your SEO pipeline.'}],chatInput:'',chatBusy:false,chatOpen:false,
+  alerts:[],_alertId:0,commandBusy:false,
+  detailAgent:null,detailLogs:[],showInternals:false,clock:'',
+  cmdOpen:false,cmdQuery:'',cmdIdx:0,cmdResults:[],
 
-    chat: [{ role:'bot', text:'Online. Ask me anything or give commands like "start keyword strategist" or "run pipeline".', html:'Online. Ask me anything or give commands like <span class="cmd-highlight">start keyword strategist</span> or <span class="cmd-highlight">run pipeline</span>.' }],
-    chatInput:'', chatBusy:false,
-    alerts:[], _alertId:0,
-    notifications:[], notifCount:0, showNotifs:false,
-    detailAgent:null, detailLogs:[],
-    showInternals:false, clock:'', commandBusy:false,
-    sparkW:140, sparkH:18,
+  async boot(){
+    await this.refresh();
+    setInterval(()=>this.refresh(),3000);
+    setInterval(()=>this._tickClock(),1000);
+    this._tickClock();
+    window.addEventListener('keydown',e=>{
+      if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();this.cmdOpen=!this.cmdOpen;if(this.cmdOpen)this.$nextTick(()=>this.$refs.cmdInput?.focus())}
+      else if(e.key==='Escape'){this.cmdOpen=false;this.detailAgent=null;this.showInternals=false;this.chatOpen=false}
+    });
+  },
 
-    async boot() {
-      await this.refresh();
-      setInterval(() => this.refresh(), 2500);
-      setInterval(() => this._tickClock(), 1000);
-      this._tickClock();
-      window.addEventListener('keydown', (e) => {
-        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); this.showInternals = !this.showInternals; }
-        else if (e.key === 'Escape') { this.showInternals = false; this.detailAgent = null; this.showNotifs = false; }
-      });
-    },
+  async refresh(){
+    try{
+      const[stateR,sugR]=await Promise.all([
+        fetch(`/clients/${this.tenantId}/jarvis/state`,{credentials:'same-origin'}),
+        fetch(`/clients/${this.tenantId}/jarvis/suggestions`,{credentials:'same-origin'})
+      ]);
+      if(stateR.ok){const d=await stateR.json();this.agents=d.agents||[];this.missions=d.missions||[];this.kpis=d.kpis||this.kpis;this.pipeline=d.pipeline||this.pipeline;this.workingAgents=this.agents.filter(a=>a.status==='working');this._buildAgentGroups();this.activity=(d.activity||[]).slice(0,8)}
+      if(sugR.ok){const s=await sugR.json();this.suggestions=s.suggestions||[]}
+    }catch(e){}
+  },
 
-    async refresh() {
-      try {
-        const r = await fetch(`/clients/${this.tenantId}/jarvis/state`, { credentials:'same-origin' });
-        if (!r.ok) return;
-        const d = await r.json();
-        const prevTop = this.activity.length ? (this.activity[0].agent + this.activity[0].message) : '';
-        this.activity = d.activity || [];
-        this.agents = d.agents || [];
-        this.kpis = d.kpis || this.kpis;
-        this.sparklines = d.sparklines || this.sparklines;
-        this.missions = d.missions || [];
-        this.pipeline = d.pipeline || this.pipeline;
-        this._refreshAgentTokens();
-        if (this.activity.length && (this.activity[0].agent + this.activity[0].message) !== prevTop && prevTop) {
-          const a = this.activity[0];
-          this._addAlert(`${a.agent || 'system'}: ${a.message}`.slice(0,80), a.level||'info');
-          this.notifications.push({id:Date.now(), text:`${a.agent||'system'}: ${a.message}`.slice(0,80), time:new Date().toISOString()});
-          this.notifCount = Math.min(this.notifCount + 1, 99);
-        }
-      } catch(e) {}
-    },
+  _buildAgentGroups(){
+    const groups=[
+      {label:'Intelligence',agents:[]},{label:'Strategy',agents:[]},
+      {label:'Generation',agents:[]},{label:'Optimization',agents:[]},
+      {label:'Publishing',agents:[]},{label:'Analytics',agents:[]}
+    ];
+    for(const a of this.agents){const g=groups[Math.min((a.layer||1)-1,5)];if(g)g.agents.push(a)}
+    this.agentGroups=groups.filter(g=>g.agents.length>0);
+  },
 
-    _refreshAgentTokens() {
-      const colorMap = {
-        blue:'#60a5fa',cyan:'#22d3ee',purple:'#a78bfa',gray:'#9ca3af',teal:'#5eead4',
-        indigo:'#818cf8',green:'#4ade80',violet:'#a78bfa',fuchsia:'#e879f9',orange:'#fb923c',
-        yellow:'#facc15',pink:'#f472b6',lime:'#a3e635',slate:'#94a3b8',sky:'#38bdf8',
-        emerald:'#34d399',rose:'#fb7185',amber:'#fbbf24',
-      };
-      // Layer ring radii as percentage of core-wrap (380px / 2 = 190px radius)
-      const ringPct = [82, 68, 54, 40];  // r1-r4 insets → approximate ring positions
-      const working = this.agents.filter(a => a.status === 'working' || a.status === 'error').slice(0,8);
-      this.agentTokens = working.map((a, i) => {
-        const c = colorMap[a.color] || '#818cf8';
-        // Place agents on their layer ring with slight angular offset
-        const layer = a.layer || 1;
-        const ringIdx = layer <= 2 ? 0 : (layer === 3 ? 1 : (layer === 4 ? 2 : 3));
-        const pct = ringPct[Math.min(ringIdx, 3)];
-        const angle = (i * 1.2 + ringIdx * 0.8) * Math.PI * 2 / Math.max(working.length, 1);
-        return {
-          name: a.name, letter: (a.name || '?')[0].toUpperCase(),
-          task: a.current_task || '', color: c, bg: c + '22',
-          left: 50 + Math.cos(angle) * pct,
-          top: 50 + Math.sin(angle) * pct,
-        };
-      });
-    },
+  async execQuick(action,target){
+    if(this.commandBusy)return;
+    this.commandBusy=true;
+    try{
+      const body={action};if(target)body.agent=target;
+      const r=await fetch(`/clients/${this.tenantId}/jarvis/command`,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(body)});
+      const d=await r.json();
+      this._alert(d.ok?`✓ ${target||'Pipeline'} ${d.status||'started'}`:`✗ ${d.error||d.reason}`);
+    }catch(e){this._alert('Failed: '+e.message,'error')}
+    this.commandBusy=false;await this.refresh();
+  },
 
-    ringClass(ringIdx) {
-      // Determine ring status from agents in that layer group
-      const layers = [[1,1], [2,2], [3,3], [4,6]];  // ring 0=L1, 1=L2, 2=L3, 3=L4-6
-      const [lo, hi] = layers[ringIdx] || [0, 0];
-      const ringAgents = this.agents.filter(a => a.layer >= lo && a.layer <= hi);
-      if (ringAgents.length === 0) return '';
-      const hasError = ringAgents.some(a => a.status === 'error');
-      const hasWorking = ringAgents.some(a => a.status === 'working');
-      const allDone = ringAgents.every(a => a.status === 'done');
-      if (hasError) return 'error';
-      if (hasWorking) return 'working';
-      if (allDone) return 'done';
-      return '';
-    },
-    phaseData() {
-      const w = this.pipeline.agents_working || 0;
-      const pct = this.pipeline.progress_pct || 0;
-      if (pct >= 100) return { icon: '◆', name: 'COMPLETE', cta: 'View Results' };
-      if (w > 0) return { icon: '◉', name: 'EXECUTING', cta: w + ' agent' + (w>1?'s':'') + ' working' };
-      if (pct === 0) return { icon: '○', name: 'IDLE', cta: 'Click to Start' };
-      if (pct > 0) return { icon: '◐', name: 'IN PROGRESS', cta: 'Continue Pipeline' };
-      return { icon: '○', name: 'STANDBY', cta: 'Start Pipeline' };
-    },
-    onCoreClick() {
-      if (this.pipeline.progress_pct >= 100) {
-        this.showInternals = true;
-      } else if (this.pipeline.agents_working === 0) {
-        this.execAction('run_pipeline', '');
-      }
-    },
+  async showAgentDetail(name){
+    try{
+      const r=await fetch(`/clients/${this.tenantId}/jarvis/agent/${name}`,{credentials:'same-origin'});
+      const d=await r.json();
+      this.detailAgent=d.agent;this.detailLogs=d.recent_logs||[];
+    }catch(e){}
+  },
 
-    expandActivity(idx) { this.expanded = this.expanded[0] === idx ? [] : [idx]; },
-    msgPreview(text) { const s = (text||'').replace(/\s+/g,' ').trim(); return s.length <= 140 ? s : s.slice(0,140)+'…'; },
-    sparkPoints(arr) {
-      if (!arr||!arr.length) return '';
-      const w=this.sparkW, h=this.sparkH, max=Math.max(1,...arr), step=w/Math.max(1,arr.length-1);
-      return arr.map((v,i) => `${(i*step).toFixed(1)},${(h-(v/max)*(h-2)-1).toFixed(1)}`).join(' ');
-    },
-    formatTs(ts) {
-      if (!ts) return '';
-      const d=new Date(ts.includes('T')?ts:ts.replace(' ','T')+'Z');
-      if (isNaN(d.getTime())) return '';
-      return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
-    },
-    _tickClock(){ const d=new Date(); this.clock=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0'); },
-    _addAlert(text,level){
-      const kind=level==='success'?'success':level==='warning'?'warning':level==='error'?'error':'info';
-      const id=++this._alertId;
-      this.alerts.push({id,text,kind});
-      setTimeout(()=>{this.alerts=this.alerts.filter(a=>a.id!==id);},5200);
-    },
+  async sendChat(){
+    const msg=this.chatInput.trim();
+    if(!msg||this.chatBusy)return;
+    this.chat.push({role:'user',text:msg});this.chatInput='';this.chatBusy=true;
+    const bi=this.chat.push({role:'bot',text:'',streaming:true})-1;
+    this.$nextTick(()=>{if(this.$refs.chatBox)this.$refs.chatBox.scrollTop=this.$refs.chatBox.scrollHeight});
+    try{
+      const r=await fetch(`/clients/${this.tenantId}/jarvis/chat`,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({message:msg})});
+      const reader=r.body.getReader();const dec=new TextDecoder();let full='';
+      while(true){const{done,value}=await reader.read();if(done)break;const t=dec.decode(value,{stream:true});for(const l of t.split('\n')){if(l.startsWith('data: ')){try{const d=JSON.parse(l.slice(6));if(d.chunk){full+=d.chunk;this.chat[bi].text=full}else if(d.done)this.chat[bi].streaming=false}catch(e){}}}}
+    }catch(e){this.chat[bi].text='Offline — try again.';this.chat[bi].streaming=false}
+    this.chatBusy=false;
+    this.$nextTick(()=>{if(this.$refs.chatBox)this.$refs.chatBox.scrollTop=this.$refs.chatBox.scrollHeight});
+  },
 
-    async execMission(m) {
-      if (!m.action || this.commandBusy) return;
-      this.commandBusy = true;
-      try {
-        const body = { action: m.action };
-        if (m.action_target) body.agent = m.action_target;
-        const r = await fetch(`/clients/${this.tenantId}/jarvis/command`, {
-          method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin',
-          body: JSON.stringify(body),
-        });
-        const d = await r.json();
-        const text = d.ok ? `✓ ${m.action_target || 'Pipeline'} ${d.status || 'started'}` : `✗ ${d.error || d.reason || 'failed'}`;
-        this._addAlert(text, d.ok ? 'success' : 'warning');
-      } catch(e) {
-        this._addAlert('Command failed: ' + e.message, 'error');
-      }
-      this.commandBusy = false;
-      await this.refresh();
-    },
+  _buildCmdItems(){
+    const items=[];
+    items.push({icon:'▶',label:'Run Pipeline Director',hint:'run_pipeline',action:'run_pipeline',target:''});
+    for(const a of this.agents){
+      const icon=a.status==='working'?'◉':a.status==='done'?'✓':a.status==='error'?'⚠':'○';
+      items.push({icon,label:(a.status==='working'?'Stop ':'Start ')+a.name,hint:'L'+a.layer+' · '+a.status,action:a.status==='working'?'stop_agent':'start_agent',target:a.name});
+    }
+    items.push({icon:'⟳',label:'Reset Pipeline',hint:'reset_pipeline',action:'reset_pipeline',target:''});
+    items.push({icon:'⚙',label:'Client Settings',hint:'settings',action:'navigate',target:'/clients/'+this.tenantId+'/settings'});
+    items.push({icon:'⊡',label:'Mission Control',hint:'full dashboard',action:'internals',target:''});
+    return items;
+  },
+  execCmd(){const item=this.cmdResults[this.cmdIdx];if(item)this.execCmdItem(item)},
+  execCmdItem(item){this.cmdOpen=false;this.cmdQuery='';this.cmdIdx=0;if(item.action==='navigate')window.location.href=item.target;else if(item.action==='internals')this.showInternals=true;else this.execQuick(item.action,item.target)},
+  cmdDown(){this.cmdIdx=Math.min(this.cmdIdx+1,(this.cmdResults.length||1)-1)},
+  cmdUp(){this.cmdIdx=Math.max(this.cmdIdx-1,0)},
+  get cmdResults(){const q=(this.cmdQuery||'').toLowerCase();return this._buildCmdItems().filter(i=>!q||i.label.toLowerCase().includes(q)||(i.hint||'').toLowerCase().includes(q))},
 
-    async execAction(action, agentName) {
-      if (this.commandBusy) return;
-      this.commandBusy = true;
-      try {
-        const r = await fetch(`/clients/${this.tenantId}/jarvis/command`, {
-          method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin',
-          body: JSON.stringify({ action, agent: agentName }),
-        });
-        const d = await r.json();
-        this._addAlert(`✓ ${agentName}: ${d.status || 'ok'}`, 'success');
-      } catch(e) {
-        this._addAlert('Action failed: '+e.message, 'error');
-      }
-      this.commandBusy = false;
-      this.detailAgent = null;
-      await this.refresh();
-    },
-
-    async showAgentDetail(name) {
-      try {
-        const r = await fetch(`/clients/${this.tenantId}/jarvis/agent/${name}`, { credentials:'same-origin' });
-        const d = await r.json();
-        this.detailAgent = d.agent;
-        this.detailLogs = d.recent_logs || [];
-      } catch(e) {
-        this._addAlert('Could not load agent details', 'error');
-      }
-    },
-
-    async sendChat() {
-      const msg = this.chatInput.trim();
-      if (!msg || this.chatBusy) return;
-      this.chat.push({ role:'user', text:msg, html:this._escapeHtml(msg) });
-      this.chatInput = '';
-      this.chatBusy = true;
-      const botIdx = this.chat.push({ role:'bot', text:'', streaming:true }) - 1;
-      this._scrollChat();
-
-      try {
-        const r = await fetch(`/clients/${this.tenantId}/jarvis/chat`, {
-          method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin',
-          body: JSON.stringify({ message: msg }),
-        });
-        const reader = r.body.getReader();
-        const decoder = new TextDecoder();
-        let fullText = '';
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const text = decoder.decode(value, { stream:true });
-          for (const line of text.split('\n')) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.chunk) {
-                  fullText += data.chunk;
-                  this.chat[botIdx].text = fullText;
-                  this.chat[botIdx].html = this._formatReply(fullText);
-                } else if (data.done) {
-                  this.chat[botIdx].streaming = false;
-                } else if (data.error) {
-                  this.chat[botIdx].text = 'Error: ' + data.error;
-                  this.chat[botIdx].streaming = false;
-                }
-              } catch(e) {}
-            }
-          }
-        }
-      } catch(e) {
-        this.chat[botIdx].text = 'Operator offline — try again.';
-        this.chat[botIdx].streaming = false;
-      }
-      this.chatBusy = false;
-      this._scrollChat();
-    },
-
-    _escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); },
-    _formatReply(text) {
-      return this._escapeHtml(text)
-        .replace(/\/start\s+(\w[\w\s-]*\w)/gi, '<span class="cmd-highlight">/start $1</span>')
-        .replace(/\/stop\s+(\w[\w\s-]*\w)/gi, '<span class="cmd-highlight">/stop $1</span>')
-        .replace(/\/pipeline/gi, '<span class="cmd-highlight">/pipeline</span>')
-        .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.06);padding:1px 4px;border-radius:3px">$1</code>');
-    },
-
-    _scrollChat() {
-      this.$nextTick(() => { if (this.$refs.chatBox) this.$refs.chatBox.scrollTop = this.$refs.chatBox.scrollHeight; });
-    },
-  };
-}
+  _alert(text,level){const id=++this._alertId;this.alerts.push({id,text,kind:level||'info'});setTimeout(()=>{this.alerts=this.alerts.filter(a=>a.id!==id)},4000)},
+  _tickClock(){const d=new Date();this.clock=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0')},
+  formatTs(ts){if(!ts)return'';const d=new Date(ts.includes('T')?ts:ts.replace(' ','T')+'Z');if(isNaN(d.getTime()))return'';return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')},
+}}
 </script>
 </body>
 </html>
