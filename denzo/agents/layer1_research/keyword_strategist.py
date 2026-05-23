@@ -32,6 +32,7 @@ def _clean_keyword(kw: dict) -> dict:
             "comercial": "commercial", "commercial": "commercial",
             "local": "commercial", "urgencia": "commercial",
             "emergencia": "commercial", "compra": "transactional",
+            "local+marca": "commercial", "local+diferenciador": "commercial",
         }
         kw["intent"] = intent_map.get(intent, "commercial")
     else:
