@@ -406,7 +406,10 @@ class TenantAwareBaseAgent:
                     _last_api_call = time.time()
                 try:
                     response = client.messages.create(**kwargs)
-                    return response.content[0].text
+                    for block in response.content:
+                        if hasattr(block, 'text'):
+                            return block.text
+                    return ""
                 except anthropic.RateLimitError:
                     retry_wait = 30 * (attempt + 1)
                     self.log(f"Rate limit — waiting {retry_wait}s...", "warning")
@@ -473,7 +476,10 @@ class TenantAwareBaseAgent:
                         max_tokens=max_tokens,
                         messages=messages
                     )
-                    return resp.content[0].text
+                    for block in resp.content:
+                        if hasattr(block, 'text'):
+                            return block.text
+                    return ""
                 except anthropic.RateLimitError:
                     retry_wait = 30 * (attempt + 1)
                 except Exception as e:
