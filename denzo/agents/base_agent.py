@@ -567,20 +567,19 @@ class TenantAwareBaseAgent:
                 (self.tenant_id, target_keyword)
             )
             if not topic_rows:
-                # Check if topic_map is completely empty for this tenant (bootstrapping)
-                any_topic = db_execute(
-                    "SELECT COUNT(*) as n FROM topic_map WHERE tenant_id=?",
-                    (self.tenant_id,)
+                # Check if another page already targets this keyword (regardless of topic_map)
+                existing_kw = db_execute(
+                    "SELECT id, title FROM pages WHERE tenant_id=? AND target_keyword=? LIMIT 1",
+                    (self.tenant_id, target_keyword)
                 )
-                if any_topic and any_topic[0]["n"] > 0:
-                    # topic_map exists but this keyword isn't in it → block
+                if existing_kw:
                     self.log(
-                        f"BLOCKED '{title}': keyword '{target_keyword}' has no topic_map entry. "
-                        "Pages must originate from a canonical intent in topic_map.",
+                        f"BLOCKED '{title}': keyword '{target_keyword}' already targeted by "
+                        f"page_id={existing_kw[0]['id']} ('{existing_kw[0]['title'][:40]}'). Cannibalization prevented.",
                         "error"
                     )
                     return
-                # else: topic_map is empty → pipeline bootstrapping → allow
+                # No existing page for this keyword → allow (topic_map will be populated later)
 
             topic = topic_rows[0] if topic_rows else None
             if topic:  # Only enforce ownership checks if topic_map entry exists

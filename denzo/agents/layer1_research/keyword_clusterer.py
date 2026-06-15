@@ -19,9 +19,9 @@ class KeywordClusterer(TenantAwareBaseAgent):
         self.set_status("working", "Loading keywords from database")
         ctx = self.ctx
 
-        # Load keywords — limit to 800 to avoid Claude token truncation
+        # Load keywords — limit to 300 to guarantee JSON fits in output tokens
         rows = db_execute(
-            "SELECT keyword, intent, category, priority FROM keywords WHERE tenant_id=? ORDER BY CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END LIMIT 800",
+            "SELECT keyword, intent, category, priority FROM keywords WHERE tenant_id=? ORDER BY CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END LIMIT 300",
             (self.ctx.tenant_id,)
         )
 
