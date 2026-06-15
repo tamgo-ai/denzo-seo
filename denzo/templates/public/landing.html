@@ -3,340 +3,377 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>DENZO — AI Visibility. Measure what ChatGPT, Perplexity & Gemini say about you.</title>
-<meta name="description" content="The platform that measures and grows your visibility across every AI engine. Free AI Visibility Report in 30 seconds."/>
+<title>DENZO — AI Visibility Platform. Get cited by every AI that matters.</title>
+<meta name="description" content="We measure and grow your visibility across ChatGPT, Perplexity, Gemini, Claude and Google AI Overviews. Free AI Visibility Report in 30 seconds."/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;350;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <script type="importmap">
 {"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}
 </script>
 <style>
-/* ═══════════════════════════════════════════════════════════════════════
-   DENZO — Premium Minimal Design System
-   References: Notion, Tesla, Linear, Porsche
-   ═══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════
+   DENZO — Liquid Glass · Bento Grid · Avant-Garde
+   Fonts: Syne (headings) + Manrope (body)
+   Palette: True Black + Warm Gold + Indigo Glow
+   ══════════════════════════════════════════════════════════════════════ */
 :root {
-  --ink: #000000;
-  --paper: #08080c;
-  --surface: #0c0c14;
-  --border: rgba(255,255,255,0.06);
-  --border-hover: rgba(255,255,255,0.12);
-  --text: #f4f4f9;
-  --text-secondary: #9898b0;
-  --text-tertiary: #5c5c72;
-  --accent: #6366f1;
-  --accent-glow: rgba(99,102,241,0.3);
-  --amber: #f59e0b;
-  --emerald: #10b981;
-  --radius: 16px;
-  --radius-lg: 24px;
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ink:#000;
+  --surface:rgba(255,255,255,0.03);
+  --surface-raised:rgba(255,255,255,0.06);
+  --border:rgba(255,255,255,0.07);
+  --border-glow:rgba(168,133,55,0.25);
+  --text:#F5F1ED;
+  --text-secondary:#989088;
+  --text-tertiary:#544F4A;
+  --gold:#C8923B;
+  --gold-bright:#E2B04A;
+  --gold-glow:rgba(200,146,59,0.35);
+  --indigo:#6366f1;
+  --emerald:#10b981;
+  --radius-sm:12px;
+  --radius:18px;
+  --radius-lg:28px;
+  --font-display:'Syne',sans-serif;
+  --font-body:'Manrope',sans-serif;
+  --ease: cubic-bezier(0.22,1,0.36,1);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 body{
-  font-family:var(--font-sans);
+  font-family:var(--font-body);
   background:var(--ink);
   color:var(--text);
   overflow-x:hidden;
   line-height:1.6;
+  font-weight:400;
 }
 
-/* Atmosphere */
-.bg-atmo{
-  position:fixed;inset:0;pointer-events:none;z-index:0;
-}
-.bg-atmo::before{
+/* Atmosphere layers */
+.atmo{position:fixed;inset:0;pointer-events:none;z-index:0}
+.atmo::before{
   content:'';position:absolute;inset:0;
   background:
-    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(99,102,241,0.045) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 40% at 25% 60%, rgba(129,140,248,0.025) 0%, transparent 70%);
+    radial-gradient(ellipse 70% 55% at 45% -10%,rgba(200,146,59,0.06) 0%,transparent 65%),
+    radial-gradient(ellipse 55% 45% at 55% 110%,rgba(99,102,241,0.05) 0%,transparent 60%),
+    radial-gradient(ellipse 40% 35% at 25% 45%,rgba(200,146,59,0.04) 0%,transparent 50%);
+  animation:atmo-shift 30s ease-in-out infinite alternate;
 }
-.grid-subtle{
-  position:fixed;inset:0;pointer-events:none;z-index:0;
-  background-image:linear-gradient(rgba(255,255,255,0.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.018) 1px,transparent 1px);
-  background-size:80px 80px;
-  mask-image:radial-gradient(ellipse 70% 70% at 50% 30%,black,transparent);
+@keyframes atmo-shift{0%{opacity:.7}100%{opacity:1}}
+
+.grid{position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:linear-gradient(rgba(255,255,255,0.013) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.013) 1px,transparent 1px);
+  background-size:72px 72px;
+  mask-image:radial-gradient(ellipse 65% 65% at 50% 25%,black 0%,transparent 70%);
 }
+
+/* Liquid blobs */
+.blob{position:fixed;pointer-events:none;z-index:0;border-radius:50%;filter:blur(120px);opacity:.15}
+.blob-1{width:700px;height:700px;background:radial-gradient(circle,rgba(200,146,59,.5),transparent);top:-200px;left:-100px;animation:blob-float 25s ease-in-out infinite}
+.blob-2{width:500px;height:500px;background:radial-gradient(circle,rgba(99,102,241,.4),transparent);bottom:-150px;right:-150px;animation:blob-float 30s ease-in-out infinite reverse}
+.blob-3{width:400px;height:400px;background:radial-gradient(circle,rgba(226,176,74,.3),transparent);top:50%;left:50%;transform:translate(-50%,-50%);animation:blob-float 20s ease-in-out infinite}
+@keyframes blob-float{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(60px,-40px) scale(1.08)}50%{transform:translate(-30px,20px) scale(.94)}75%{transform:translate(-50px,-20px) scale(1.05)}}
 
 /* Nav */
-.nav{
-  position:fixed;top:0;left:0;right:0;z-index:100;
-  background:rgba(0,0,0,0.7);
-  backdrop-filter:blur(24px) saturate(180%);
-  -webkit-backdrop-filter:blur(24px) saturate(180%);
-  border-bottom:1px solid transparent;
-  transition:border-color .4s ease;
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;transition:all .4s var(--ease)}
+.nav-inner{max-width:1340px;margin:0 auto;padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:64px}
+.nav-brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+.nav-logo{
+  font-family:var(--font-display);font-weight:700;font-size:20px;
+  color:var(--text);letter-spacing:-0.02em;
 }
-.nav.scrolled{border-bottom-color:var(--border)}
-.nav-inner{
-  max-width:1280px;margin:0 auto;padding:0 32px;
-  display:flex;align-items:center;justify-content:space-between;height:60px;
-}
-.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:700;font-size:18px;color:var(--text);letter-spacing:-0.02em;}
-.nav-logo-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent-glow);animation:nav-pulse 2s ease-in-out infinite;}
-@keyframes nav-pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-.nav-links{display:flex;align-items:center;gap:28px}
-.nav-links a{color:var(--text-secondary);font-size:14px;font-weight:450;text-decoration:none;transition:color .2s;letter-spacing:0}
+.nav-logo span{color:var(--gold);font-weight:800}
+.nav-links{display:flex;align-items:center;gap:32px}
+.nav-links a{color:var(--text-secondary);font-size:14px;font-weight:450;text-decoration:none;transition:color .25s}
 .nav-links a:hover{color:var(--text)}
 @media(max-width:768px){.nav-links{display:none}}
+.nav-actions{display:flex;align-items:center;gap:12px}
 
+/* Scrolled nav */
+.nav.on{background:rgba(0,0,0,.75);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border-bottom:1px solid rgba(255,255,255,.05)}
+
+/* Buttons */
 .btn{
   display:inline-flex;align-items:center;gap:8px;
-  font-family:var(--font-sans);font-weight:600;font-size:14px;
-  padding:11px 22px;border-radius:10px;cursor:pointer;
-  transition:all .3s cubic-bezier(.4,0,.2,1);
-  text-decoration:none;border:none;letter-spacing:-0.01em;
+  font-family:var(--font-body);font-weight:600;font-size:14px;
+  padding:11px 24px;border-radius:var(--radius-sm);cursor:pointer;
+  transition:all .35s var(--ease);text-decoration:none;border:none;
+  letter-spacing:-0.01em;position:relative;overflow:hidden;
 }
 .btn-primary{
-  background:var(--accent);color:white;
-  box-shadow:0 0 0 0 var(--accent-glow);
+  background:linear-gradient(135deg,var(--gold) 0%,#A87820 100%);
+  color:#000;font-weight:700;
 }
 .btn-primary:hover{
   transform:translateY(-1px);
-  box-shadow:0 0 32px var(--accent-glow),0 4px 16px rgba(0,0,0,0.4);
+  box-shadow:0 0 40px var(--gold-glow),0 8px 24px rgba(0,0,0,.5);
 }
+.btn-primary::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,transparent,rgba(255,255,255,.25),transparent);
+  transform:translateX(-100%);transition:transform .6s;
+}
+.btn-primary:hover::after{transform:translateX(100%)}
 .btn-ghost{
   background:transparent;color:var(--text);
-  border:1px solid var(--border);
+  border:1px solid var(--border);font-weight:500;
 }
-.btn-ghost:hover{
-  border-color:var(--border-hover);
-  background:rgba(255,255,255,0.03);
-}
-.btn-lg{padding:15px 30px;font-size:16px;border-radius:12px}
+.btn-ghost:hover{border-color:rgba(255,255,255,.2);background:var(--surface)}
+.btn-lg{padding:15px 32px;font-size:16px;border-radius:14px}
+.btn-signin{color:var(--text-secondary);font-size:14px;font-weight:450;text-decoration:none;transition:color .25s}
+.btn-signin:hover{color:var(--text)}
 
 /* Sections */
-.sec{
-  position:relative;z-index:2;
-  padding:140px 32px;
-}
-.sec-inner{max-width:1100px;margin:0 auto}
+.sec{position:relative;z-index:2;padding:120px 32px}
+.sec-inner{max-width:1260px;margin:0 auto}
 .sec-label{
-  font-size:12px;font-weight:700;text-transform:uppercase;
-  letter-spacing:0.12em;color:var(--accent);margin-bottom:20px;
+  font-family:var(--font-body);font-size:11px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.14em;color:var(--gold);
+  margin-bottom:16px;
 }
 
 /* Hero */
-#hero-canvas{
-  position:absolute;top:0;left:0;width:100%;height:100%;
-  pointer-events:none;z-index:0;opacity:0.7;
-}
-.hero{
-  position:relative;min-height:100vh;display:flex;align-items:center;
-  padding:120px 32px 100px;
-}
-.hero-content{position:relative;z-index:2;max-width:780px;margin:0 auto;text-align:center}
-.hero-badge{
+.hero{position:relative;min-height:100vh;display:flex;align-items:center;padding:120px 32px 100px}
+#hero-canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.55}
+.hero-content{position:relative;z-index:2;max-width:900px;margin:0 auto;text-align:center}
+.hero-kicker{
   display:inline-flex;align-items:center;gap:8px;
-  padding:5px 14px;border-radius:100px;
-  border:1px solid rgba(99,102,241,0.2);
-  background:rgba(99,102,241,0.04);
-  font-size:13px;font-weight:500;color:var(--accent);
-  margin-bottom:40px;letter-spacing:-0.01em;
+  padding:4px 16px;border-radius:100px;
+  border:1px solid rgba(200,146,59,.2);
+  background:rgba(200,146,59,.06);
+  font-family:var(--font-body);font-size:13px;font-weight:500;
+  color:var(--gold);margin-bottom:36px;
 }
+.hero-kicker .dot{width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold-glow);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+
 .hero-title{
-  font-size:clamp(3rem,7vw,5.5rem);
-  font-weight:800;letter-spacing:-0.04em;line-height:1.04;
+  font-family:var(--font-display);font-weight:800;
+  font-size:clamp(3.2rem,7.5vw,6.5rem);
+  letter-spacing:-0.045em;line-height:1.02;
   margin-bottom:28px;color:var(--text);
 }
-.hero-subtitle{
-  font-size:clamp(1.05rem,1.8vw,1.25rem);
-  color:var(--text-secondary);max-width:540px;margin:0 auto 44px;
-  line-height:1.7;font-weight:400;letter-spacing:-0.01em;
+.hero-title em{font-style:normal;color:var(--gold);position:relative}
+.hero-title em::after{
+  content:'';position:absolute;bottom:4px;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent);
+  opacity:.4;border-radius:2px;
 }
-.hero-cta{
-  display:flex;align-items:center;gap:10px;padding:8px;
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:14px;max-width:500px;margin:0 auto 20px;
-  transition:border-color .3s;
+.hero-sub{
+  font-family:var(--font-body);font-size:clamp(1.05rem,1.8vw,1.25rem);
+  color:var(--text-secondary);max-width:560px;margin:0 auto 44px;
+  line-height:1.7;font-weight:400;
 }
-.hero-cta:focus-within{border-color:var(--accent)}
-.hero-cta input{
+.hero-sub strong{color:var(--text);font-weight:600}
+.hero-form{
+  display:flex;align-items:center;gap:8px;padding:8px;
+  background:rgba(255,255,255,.03);border:1px solid var(--border);
+  border-radius:16px;max-width:520px;margin:0 auto 16px;
+  transition:all .35s var(--ease);
+}
+.hero-form:focus-within{border-color:var(--gold);box-shadow:0 0 0 4px rgba(200,146,59,.08)}
+.hero-form input{
   flex:1;background:none;border:none;color:var(--text);
-  font-size:17px;font-family:var(--font-sans);outline:none;
-  padding:12px 16px;letter-spacing:-0.01em;
+  font-size:17px;font-family:var(--font-body);outline:none;
+  padding:13px 16px;letter-spacing:-0.01em;font-weight:450;
 }
-.hero-cta input::placeholder{color:var(--text-tertiary)}
+.hero-form input::placeholder{color:var(--text-tertiary)}
+.hero-note{font-size:13px;color:var(--text-tertiary);margin-top:14px}
 
-/* Feature cards */
-.card-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
-  gap:24px;
-}
-.card{
+/* Bento Grid */
+.bento{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:auto;gap:16px}
+.bento-card{
   background:var(--surface);border:1px solid var(--border);
   border-radius:var(--radius-lg);padding:36px;
-  transition:border-color .4s,transform .4s cubic-bezier(.4,0,.2,1);
+  transition:all .45s var(--ease);position:relative;overflow:hidden;
 }
-.card:hover{
-  border-color:var(--border-hover);
-  transform:translateY(-2px);
-}
-.card-icon{
-  width:44px;height:44px;border-radius:12px;
+.bento-card:hover{border-color:rgba(255,255,255,.12);background:var(--surface-raised);transform:translateY(-2px)}
+.bento-card.col-2{grid-column:span 2}
+.bento-card.row-2{grid-row:span 2}
+.bento-card .icon{
+  width:46px;height:46px;border-radius:14px;
   display:flex;align-items:center;justify-content:center;
-  margin-bottom:20px;font-size:20px;
+  margin-bottom:20px;font-size:22px;
 }
-.card-title{font-size:17px;font-weight:700;color:var(--text);margin-bottom:10px;letter-spacing:-0.02em;}
-.card-desc{font-size:14px;color:var(--text-secondary);line-height:1.65;font-weight:400;}
+.bento-card h4{font-family:var(--font-display);font-size:19px;font-weight:700;color:var(--text);margin-bottom:8px;letter-spacing:-0.025em}
+.bento-card p{font-size:14px;color:var(--text-secondary);line-height:1.65;max-width:340px}
+@media(max-width:768px){.bento{grid-template-columns:1fr}.bento-card.col-2{grid-column:span 1}}
 
-/* Stats */
-.stat-number{
-  font-size:clamp(2.5rem,5vw,4.5rem);
-  font-weight:800;letter-spacing:-0.04em;
-  color:var(--text);line-height:1;
-}
+/* Stat */
+.stat-val{font-family:var(--font-display);font-size:clamp(2.5rem,5vw,4.5rem);font-weight:800;letter-spacing:-0.04em;color:var(--text);line-height:1}
+.stat-val.gold{color:var(--gold)}
 
-/* Quote */
-.quote{
-  font-size:clamp(1.2rem,2vw,1.5rem);
-  font-weight:400;color:var(--text-secondary);
-  line-height:1.7;font-style:italic;letter-spacing:-0.01em;
-  max-width:680px;
-}
+/* Big quote */
+.quote{font-family:var(--font-body);font-size:clamp(1.2rem,2.2vw,1.6rem);font-weight:400;color:var(--text-secondary);line-height:1.65;max-width:680px;font-style:italic}
+.quote strong{color:var(--text);font-weight:600;font-style:normal}
 
-/* Price */
+/* Pricing */
 .price-card{
   background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--radius-lg);padding:40px;text-align:center;
-  transition:border-color .4s,transform .4s;
+  border-radius:var(--radius-lg);padding:48px 40px;text-align:center;
+  transition:all .45s var(--ease);
 }
-.price-card.featured{border-color:rgba(99,102,241,0.25);box-shadow:0 0 60px rgba(99,102,241,0.06)}
-.price-card:hover{border-color:var(--border-hover)}
-.price-amount{font-size:56px;font-weight:800;letter-spacing:-0.04em;color:var(--text);margin:12px 0}
+.price-card:hover{border-color:rgba(255,255,255,.12);transform:translateY(-2px)}
+.price-card.featured{border-color:var(--border-glow);box-shadow:0 0 80px rgba(200,146,59,.06)}
+.price-num{font-family:var(--font-display);font-size:56px;font-weight:800;letter-spacing:-0.04em;color:var(--text);margin:16px 0}
 
 /* FAQ */
-.faq-item{
-  border-bottom:1px solid var(--border);
-}
-.faq-q{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:20px 0;font-size:15px;font-weight:600;color:var(--text);
-  cursor:pointer;letter-spacing:-0.01em;
-}
-.faq-a{
-  padding:0 0 20px;font-size:14px;color:var(--text-secondary);
-  line-height:1.7;display:none;
-}
-.faq-item.open .faq-a{display:block}
-.faq-arrow{transition:transform .3s ease}
-.faq-item.open .faq-arrow{transform:rotate(45deg)}
+.faq{border-top:1px solid var(--border)}
+.faq-item{border-bottom:1px solid var(--border);cursor:pointer}
+.faq-q{padding:22px 0;font-weight:600;font-size:15px;color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:16px}
+.faq-a{overflow:hidden;max-height:0;transition:max-height .4s var(--ease),padding .4s var(--ease)}
+.faq-item.open .faq-a{max-height:300px;padding-bottom:20px}
+.faq-a p{font-size:14px;color:var(--text-secondary);line-height:1.7}
+.faq-plus{font-size:20px;font-weight:300;color:var(--text-tertiary);transition:transform .35s var(--ease)}
+.faq-item.open .faq-plus{transform:rotate(45deg)}
 
 /* Footer */
-.footer{font-size:13px;color:var(--text-tertiary);}
+.footer{font-size:13px;color:var(--text-tertiary);text-align:center}
 
-/* Animations */
-.reveal{opacity:0;transform:translateY(30px);transition:opacity .7s cubic-bezier(.4,0,.2,1),transform .7s cubic-bezier(.4,0,.2,1);}
-.reveal.on{opacity:1;transform:translateY(0)}
-.d1{transition-delay:.05s}.d2{transition-delay:.12s}.d3{transition-delay:.2s}.d4{transition-delay:.3s}.d5{transition-delay:.42s}
+/* Reveal animation */
+.rev{opacity:0;transform:translateY(36px);transition:opacity .8s var(--ease),transform .8s var(--ease)}
+.rev.on{opacity:1;transform:translateY(0)}
+.r1{transition-delay:.05s}.r2{transition-delay:.12s}.r3{transition-delay:.2s}.r4{transition-delay:.3s}.r5{transition-delay:.42s}.r6{transition-delay:.55s}
+
+/* Typewriter */
+.tw-cursor{animation:blink 1s step-end infinite}@keyframes blink{50%{opacity:0}}
 </style>
 </head>
 <body>
 
-<div class="bg-atmo"></div>
-<div class="grid-subtle"></div>
+<div class="atmo"></div>
+<div class="grid"></div>
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<div class="blob blob-3"></div>
 
-<!-- ═══════════════ NAV ═══════════════ -->
+<!-- ═══════════ NAV ═══════════ -->
 <nav class="nav" id="nav">
   <div class="nav-inner">
-    <a href="/" class="nav-logo"><span class="nav-logo-dot"></span>DENZO</a>
+    <a href="/" class="nav-brand"><span class="nav-logo">DEN<span style="color:var(--gold);font-weight:800">ZO</span></span></a>
     <div class="nav-links">
       <a href="#how">How It Works</a>
       <a href="#platform">Platform</a>
       <a href="/pricing">Pricing</a>
       <a href="#faq">FAQ</a>
     </div>
-    <div style="display:flex;align-items:center;gap:10px">
-      <a href="/login" style="color:var(--text-secondary);font-size:14px;font-weight:450;text-decoration:none">Sign in</a>
+    <div class="nav-actions">
+      <a href="/login" class="btn-signin">Sign in</a>
       <a href="#cta" class="btn btn-primary">Get Started</a>
     </div>
   </div>
 </nav>
 
-<!-- ═══════════════ HERO ═══════════════ -->
+<!-- ═══════════ HERO ═══════════ -->
 <section class="hero">
   <canvas id="hero-canvas"></canvas>
   <div class="hero-content">
-    <div class="hero-badge reveal">
-      <span style="width:6px;height:6px;border-radius:50%;background:var(--emerald);box-shadow:0 0 6px var(--emerald)"></span>
-      AI Visibility Platform
-    </div>
-    <h1 class="hero-title reveal d1">
-      When AI answers,<br/>does it say <span style="color:var(--accent)">your name</span>?
+    <div class="hero-kicker rev"><span class="dot"></span>AI Visibility Platform</div>
+    <h1 class="hero-title rev r1">
+      When AI answers,<br/>does it say <em id="biz-name">your name</em>?
     </h1>
-    <p class="hero-subtitle reveal d2">
-      ChatGPT, Perplexity, Gemini, Google AI Overviews — billions of answers every day.
-      We make sure your business is the one they mention.
+    <p class="hero-sub rev r2">
+      ChatGPT. Perplexity. Gemini. Claude. Google AI Overviews.<br/>
+      <strong>Billions of answers every day.</strong> We make sure <strong id="biz-name-2">your business</strong> is the one they mention — and we prove it with a single metric.
     </p>
     <form action="/wizard/start" method="POST">
-      <div class="hero-cta reveal d3">
-        <input type="text" name="url" required placeholder="yourbusiness.com" autocomplete="url"/>
+      <div class="hero-form rev r3">
+        <input type="text" name="url" required placeholder="yourbusiness.com" id="url-input" autocomplete="url"/>
         <button type="submit" class="btn btn-primary btn-lg">Get Your Free AI Visibility Report →</button>
       </div>
     </form>
-    <p class="reveal d4" style="font-size:13px;color:var(--text-tertiary);margin-top:12px;">No account needed · Results in 30 seconds · See exactly which AIs mention your competitors</p>
+    <p class="hero-note rev r4">No account · No credit card · Results in ~30s · See exactly which AIs cite your competitors</p>
   </div>
 </section>
 
-<!-- ═══════════════ AI VISIBILITY SCORE ═══════════════ -->
-<section class="sec" style="padding-top:0;padding-bottom:120px">
-  <div class="sec-inner" style="text-align:center">
-    <div class="sec-label reveal">The Metric That Defines the Category</div>
-    <h2 class="reveal d1" style="font-size:clamp(2rem,4vw,3.2rem);font-weight:800;letter-spacing:-0.03em;margin-bottom:20px;color:var(--text)">Your <span style="color:var(--accent)">AI Visibility Score</span>™</h2>
-    <p class="reveal d2" style="font-size:18px;color:var(--text-secondary);max-width:560px;margin:0 auto 72px;line-height:1.7">One number. Every AI engine. Your share of voice vs competitors — measured across ChatGPT, Perplexity, Gemini, and Google AI Overviews.</p>
+<!-- ═══════════ BENTO GRID ═══════════ -->
+<section id="platform" class="sec">
+  <div class="sec-inner">
+    <div class="sec-label rev" style="text-align:center">The Platform</div>
+    <h2 class="rev r1" style="font-family:var(--font-display);font-size:clamp(2rem,4vw,3.2rem);font-weight:800;letter-spacing:-0.035em;text-align:center;margin-bottom:12px;color:var(--text)">
+      Everything you need to own<br/>your <span style="color:var(--gold)">AI Visibility</span>
+    </h2>
+    <p class="rev r2" style="font-size:17px;color:var(--text-secondary);text-align:center;margin-bottom:64px;max-width:540px;margin-left:auto;margin-right:auto">34 AI agents. Six autonomous layers. One score that changes everything.</p>
 
-    <div class="card-grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));max-width:900px;margin:0 auto;">
-      <div class="card reveal d1" style="text-align:center;padding:48px 32px">
-        <div style="font-size:clamp(3rem,6vw,5rem);font-weight:900;letter-spacing:-0.05em;color:var(--accent);margin-bottom:8px">34<span style="font-size:.4em;font-weight:400;color:var(--text-secondary)">/100</span></div>
-        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Auto Body · Los Angeles</div>
-        <div style="font-size:13px;color:var(--text-tertiary)">Average AI Visibility Score</div>
+    <div class="bento">
+      <div class="bento-card col-2 rev r1">
+        <div class="icon" style="background:rgba(200,146,59,.1)">🔍</div>
+        <h4>Discovery Engine</h4>
+        <p>Before we create anything, we map everything: your site, your keywords, your AI citation baseline, your competitors' gaps. No cannibalization, no overwriting.</p>
       </div>
-      <div class="card reveal d2" style="text-align:center;padding:48px 32px">
-        <div style="font-size:clamp(3rem,6vw,5rem);font-weight:900;letter-spacing:-0.05em;color:var(--emerald);margin-bottom:8px">+51<span style="font-size:.4em;font-weight:400;color:var(--text-secondary)">%</span></div>
-        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Average Improvement</div>
-        <div style="font-size:13px;color:var(--text-tertiary)">After 90 days on DENZO</div>
+      <div class="bento-card rev r2">
+        <div class="icon" style="background:rgba(99,102,241,.1)">🧠</div>
+        <h4>AI Strategy</h4>
+        <p>Keyword clustering, EEAT authority mapping, semantic topic planning — informed by real GSC data and AI citation patterns.</p>
       </div>
-      <div class="card reveal d3" style="text-align:center;padding:48px 32px">
-        <div style="font-size:clamp(3rem,6vw,5rem);font-weight:900;letter-spacing:-0.05em;color:var(--amber);margin-bottom:8px">4.8M<span style="font-size:.4em;font-weight:400;color:var(--text-secondary)">+</span></div>
-        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Pages Optimized</div>
-        <div style="font-size:13px;color:var(--text-tertiary)">For AI citation across platforms</div>
+      <div class="bento-card rev r3">
+        <div class="icon" style="background:rgba(16,185,129,.1)">⚡</div>
+        <h4>Generation</h4>
+        <p>Hundreds of GEO-optimized pages. Content Optimizer improves. GEO Optimizer formats for LLM citation. One click.</p>
+      </div>
+      <div class="bento-card col-2 rev r4" style="background:linear-gradient(135deg,rgba(200,146,59,.04),rgba(200,146,59,.01));border-color:rgba(200,146,59,.15)">
+        <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div class="stat-val gold" style="margin-bottom:8px">34<span style="font-size:.35em;font-weight:400;color:var(--text-secondary)">/100</span></div>
+            <div style="font-weight:700;font-size:16px;color:var(--text);margin-bottom:4px">AI Visibility Score™</div>
+            <div style="font-size:13px;color:var(--text-secondary)">Auto Body · Los Angeles · Average</div>
+          </div>
+          <div style="flex:1;min-width:200px">
+            <div class="stat-val" style="color:var(--emerald);margin-bottom:8px">+51<span style="font-size:.35em;font-weight:400;color:var(--text-secondary)">%</span></div>
+            <div style="font-weight:700;font-size:16px;color:var(--text);margin-bottom:4px">90-Day Improvement</div>
+            <div style="font-size:13px;color:var(--text-secondary)">Average across all verticals</div>
+          </div>
+          <div style="flex:1;min-width:200px">
+            <div class="stat-val" style="margin-bottom:8px">4.8M<span style="font-size:.35em;font-weight:400;color:var(--text-secondary)">+</span></div>
+            <div style="font-weight:700;font-size:16px;color:var(--text);margin-bottom:4px">Pages Optimized</div>
+            <div style="font-size:13px;color:var(--text-secondary)">For AI citation across 6 engines</div>
+          </div>
+        </div>
+      </div>
+      <div class="bento-card rev r5">
+        <div class="icon" style="background:rgba(226,176,74,.1)">📹</div>
+        <h4>Video Engine</h4>
+        <p>Auto-generate YouTube videos from your content. VideoObject schema. Videos get cited more by AI.</p>
+      </div>
+      <div class="bento-card rev r6">
+        <div class="icon" style="background:rgba(239,68,68,.1)">📍</div>
+        <h4>GBP Autopilot</h4>
+        <p>Autonomous Google Business Profile: posts, Q&A, smart review responses. Local visibility → AI answers.</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ═══════════════ HOW IT WORKS ═══════════════ -->
-<section id="how" class="sec" style="background:var(--surface);padding:140px 32px">
+<!-- ═══════════ HOW IT WORKS ═══════════ -->
+<section id="how" class="sec" style="background:var(--surface)">
   <div class="sec-inner">
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:80px 40px;align-items:start;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:64px 48px;align-items:start">
       <div>
-        <div class="sec-label reveal">How It Works</div>
-        <h3 class="reveal d1" style="font-size:clamp(1.5rem,3vw,2.2rem);font-weight:800;letter-spacing:-0.03em;margin-bottom:16px;color:var(--text)">From invisible to<br/>cited by every AI</h3>
-        <p class="reveal d2" style="font-size:16px;color:var(--text-secondary);line-height:1.7;max-width:400px">No developers. No agency retainers. Your AI visibility team runs 24/7 — you check the dashboard when you want to see progress.</p>
+        <div class="sec-label rev">How It Works</div>
+        <h3 class="rev r1" style="font-family:var(--font-display);font-size:clamp(1.6rem,3vw,2.4rem);font-weight:800;letter-spacing:-0.035em;margin-bottom:20px;color:var(--text);line-height:1.15">From invisible to<br/>cited by every AI</h3>
+        <p class="rev r2" style="font-size:16px;color:var(--text-secondary);line-height:1.7;max-width:400px">No developers. No agency retainers. Your AI visibility team runs 24/7 — you check the dashboard when you want to see progress.</p>
+        <a href="#cta" class="btn btn-primary rev r3" style="margin-top:28px">Start Free Analysis →</a>
       </div>
-      <div style="display:flex;flex-direction:column;gap:32px">
-        <div class="reveal d1" style="display:flex;gap:16px">
-          <div style="width:32px;height:32px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;font-weight:700;color:var(--accent)">1</div>
+      <div style="display:flex;flex-direction:column;gap:40px">
+        <div class="rev r1" style="display:flex;gap:18px">
+          <div style="width:38px;height:38px;border-radius:50%;border:1px solid rgba(200,146,59,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:var(--font-display);font-size:15px;font-weight:700;color:var(--gold)">1</div>
           <div>
-            <div style="font-weight:700;font-size:16px;color:var(--text);margin-bottom:4px">Connect your site</div>
+            <div style="font-weight:700;font-size:17px;color:var(--text);margin-bottom:4px">Connect your site</div>
             <div style="font-size:14px;color:var(--text-secondary);line-height:1.6">WordPress or GitHub. One click. Permission scoped. You stay in control.</div>
           </div>
         </div>
-        <div class="reveal d2" style="display:flex;gap:16px">
-          <div style="width:32px;height:32px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;font-weight:700;color:var(--accent)">2</div>
+        <div class="rev r2" style="display:flex;gap:18px">
+          <div style="width:38px;height:38px;border-radius:50%;border:1px solid rgba(200,146,59,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:var(--font-display);font-size:15px;font-weight:700;color:var(--gold)">2</div>
           <div>
-            <div style="font-weight:700;font-size:16px;color:var(--text);margin-bottom:4px">AI agents go to work</div>
-            <div style="font-size:14px;color:var(--text-secondary);line-height:1.6">34 specialized agents research, write, optimize, and publish. Keywords, schema, EEAT, GEO, internal linking — all automatic.</div>
+            <div style="font-weight:700;font-size:17px;color:var(--text);margin-bottom:4px">AI agents go to work</div>
+            <div style="font-size:14px;color:var(--text-secondary);line-height:1.6">34 specialized agents research, write, optimize, and publish. Keywords. Schema. EEAT. GEO. Internal linking. Video. GBP. All automatic.</div>
           </div>
         </div>
-        <div class="reveal d3" style="display:flex;gap:16px">
-          <div style="width:32px;height:32px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;font-weight:700;color:var(--accent)">3</div>
+        <div class="rev r3" style="display:flex;gap:18px">
+          <div style="width:38px;height:38px;border-radius:50%;border:1px solid rgba(200,146,59,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:var(--font-display);font-size:15px;font-weight:700;color:var(--gold)">3</div>
           <div>
-            <div style="font-weight:700;font-size:16px;color:var(--text);margin-bottom:4px">Watch your AI Visibility Score climb</div>
-            <div style="font-size:14px;color:var(--text-secondary);line-height:1.6">Every week, your score updates across all AI engines. You see exactly which queries you're winning and where the gaps are.</div>
+            <div style="font-weight:700;font-size:17px;color:var(--text);margin-bottom:4px">Watch your AI Visibility Score climb</div>
+            <div style="font-size:14px;color:var(--text-secondary);line-height:1.6">Every week your score updates across all AI engines. See which queries you're winning and where the gaps are — quantified.</div>
           </div>
         </div>
       </div>
@@ -344,144 +381,97 @@ body{
   </div>
 </section>
 
-<!-- ═══════════════ PLATFORM ═══════════════ -->
-<section id="platform" class="sec">
-  <div class="sec-inner" style="text-align:center">
-    <div class="sec-label reveal">Platform</div>
-    <h2 class="reveal d1" style="font-size:clamp(2rem,4vw,3.2rem);font-weight:800;letter-spacing:-0.03em;margin-bottom:16px;color:var(--text)">Everything you need to<br/>dominate AI search</h2>
-    <p class="reveal d2" style="font-size:18px;color:var(--text-secondary);margin-bottom:72px">34 AI agents. Six layers. One autonomous pipeline.</p>
-  </div>
+<!-- ═══════════ TESTIMONIAL ═══════════ -->
+<section class="sec" style="text-align:center;padding:140px 32px">
   <div class="sec-inner">
-    <div class="card-grid">
-      <div class="card reveal d1">
-        <div class="card-icon" style="background:rgba(99,102,241,0.08)">🔍</div>
-        <div class="card-title">Discovery Engine</div>
-        <div class="card-desc">Before creating anything, we crawl your site, map every existing keyword you rank for, and establish your AI citation baseline. No cannibalization. No overwriting what's yours.</div>
-      </div>
-      <div class="card reveal d2">
-        <div class="card-icon" style="background:rgba(16,185,129,0.08)">🧠</div>
-        <div class="card-title">AI Strategy Layer</div>
-        <div class="card-desc">Keyword clustering, competitor gap analysis, EEAT authority mapping, and semantic topic planning — all informed by real GSC data and AI citation patterns.</div>
-      </div>
-      <div class="card reveal d3">
-        <div class="card-icon" style="background:rgba(245,158,11,0.08)">⚡</div>
-        <div class="card-title">Content Generation</div>
-        <div class="card-desc">Programmatic SEO writes hundreds of geo-optimized pages. Content Optimizer improves them. GEO Optimizer formats them to get cited by ChatGPT and Perplexity.</div>
-      </div>
-      <div class="card reveal d1">
-        <div class="card-icon" style="background:rgba(168,85,247,0.08)">📊</div>
-        <div class="card-title">AI Visibility Monitor</div>
-        <div class="card-desc">Track your mentions across ChatGPT, Perplexity, Gemini, Claude, and Google AI Overviews. See competitor comparisons. Know exactly what moves your score.</div>
-      </div>
-      <div class="card reveal d2">
-        <div class="card-icon" style="background:rgba(239,68,68,0.08)">📹</div>
-        <div class="card-title">Video Engine</div>
-        <div class="card-desc">Auto-generate YouTube videos from your content with full SEO metadata. VideoObject schema. AI avatar narration. Videos get cited more by AI engines.</div>
-      </div>
-      <div class="card reveal d3">
-        <div class="card-icon" style="background:rgba(34,197,94,0.08)">📍</div>
-        <div class="card-title">GBP Autopilot</div>
-        <div class="card-desc">Autonomous Google Business Profile management. Weekly posts, Q&A seeding, and smart review responses. Local visibility that feeds AI answers.</div>
-      </div>
+    <p class="quote rev" style="margin:0 auto 36px">"We stopped paying $4K/month for an agency that couldn't show results. DENZO showed us — with hard data — which AIs were citing us and which keywords our competitors were winning. In 60 days our AI Visibility Score went from 12 to 47. I've never seen anything like this."</p>
+    <div class="rev r1">
+      <div style="font-weight:700;font-size:16px;color:var(--text)">Carlos M.</div>
+      <div style="font-size:14px;color:var(--text-tertiary);margin-top:2px">Auto Collision Group · Los Angeles, CA</div>
     </div>
   </div>
 </section>
 
-<!-- ═══════════════ TESTIMONIAL ═══════════════ -->
-<section class="sec" style="background:var(--surface);text-align:center">
+<!-- ═══════════ PRICING ═══════════ -->
+<section id="pricing" class="sec" style="background:var(--surface);text-align:center">
   <div class="sec-inner">
-    <p class="quote reveal" style="margin:0 auto 32px">"We stopped paying $4K/month for an agency that couldn't show results. DENZO showed us exactly which AIs were citing us — and which keywords our competitors were winning. In 60 days our AI Visibility Score went from 12 to 47. I've never seen anything like this."</p>
-    <div class="reveal d1">
-      <div style="font-weight:700;font-size:15px;color:var(--text)">Carlos M.</div>
-      <div style="font-size:13px;color:var(--text-tertiary)">Auto Collision Group · Los Angeles</div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════ PRICING ═══════════════ -->
-<section id="pricing" class="sec" style="text-align:center">
-  <div class="sec-inner">
-    <div class="sec-label reveal">Pricing</div>
-    <h2 class="reveal d1" style="font-size:clamp(2rem,4vw,3.2rem);font-weight:800;letter-spacing:-0.03em;margin-bottom:16px;color:var(--text)">One price. Full platform.</h2>
-    <p class="reveal d2" style="font-size:18px;color:var(--text-secondary);margin-bottom:64px">Start for $1. Cancel anytime. No long contracts.</p>
-    <div style="display:flex;flex-wrap:wrap;gap:24px;justify-content:center;max-width:600px;margin:0 auto 32px">
-      <div class="price-card reveal d1" style="flex:1;min-width:200px">
-        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-tertiary);margin-bottom:4px">Free Analysis</div>
-        <div class="price-amount">$0</div>
+    <div class="sec-label rev">Pricing</div>
+    <h2 class="rev r1" style="font-family:var(--font-display);font-size:clamp(2rem,4vw,3rem);font-weight:800;letter-spacing:-0.035em;margin-bottom:12px;color:var(--text)">One price. Full platform.</h2>
+    <p class="rev r2" style="font-size:17px;color:var(--text-secondary);margin-bottom:56px">Start for $1. Cancel anytime. No long contracts.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:20px;justify-content:center;max-width:650px;margin:0 auto 28px">
+      <div class="price-card rev r1" style="flex:1;min-width:220px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:4px">Free Analysis</div>
+        <div class="price-num">$0</div>
         <div style="font-size:14px;color:var(--text-secondary)">AI Visibility Report<br/>No account needed</div>
       </div>
-      <div class="price-card featured reveal d2" style="flex:1;min-width:200px">
-        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--accent);margin-bottom:4px">Full Platform</div>
-        <div class="price-amount">$249<span style="font-size:16px;font-weight:400;color:var(--text-tertiary)">/mo</span></div>
-        <div style="font-size:14px;color:var(--text-secondary)">34 AI agents<br/>Unlimited pages<br/>All AI engines</div>
-        <div style="margin-top:16px;font-size:13px;font-weight:600;color:var(--amber)">$1 for 3 days · Cancel anytime</div>
+      <div class="price-card featured rev r2" style="flex:1;min-width:220px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:4px">Full Platform</div>
+        <div class="price-num">$249<span style="font-size:17px;font-weight:400;color:var(--text-tertiary)">/mo</span></div>
+        <div style="font-size:14px;color:var(--text-secondary)">34 AI agents · Unlimited pages<br/>All AI engines · Video · GBP</div>
+        <div style="margin-top:16px;font-size:13px;font-weight:600;color:var(--gold)">$1 for 3 days · Cancel anytime</div>
       </div>
     </div>
-    <a href="/pricing" class="btn btn-ghost reveal d3">See detailed plans →</a>
+    <a href="/pricing" class="btn btn-ghost rev r3">See detailed plans →</a>
   </div>
 </section>
 
-<!-- ═══════════════ FAQ ═══════════════ -->
-<section id="faq" class="sec" style="background:var(--surface)">
+<!-- ═══════════ FAQ ═══════════ -->
+<section id="faq" class="sec">
   <div class="sec-inner" style="max-width:700px">
-    <div class="sec-label reveal" style="text-align:center">FAQ</div>
-    <h2 class="reveal d1" style="text-align:center;font-size:clamp(1.8rem,3vw,2.6rem);font-weight:800;letter-spacing:-0.03em;margin-bottom:56px;color:var(--text)">Questions you might have</h2>
-    <div id="faq-list">
-      <div class="faq-item reveal">
-        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What does the free analysis check? <span class="faq-arrow">+</span></div>
-        <div class="faq-a">We scan your website and check your presence across ChatGPT, Perplexity, Gemini, and Google AI Overviews for your core keywords. You'll see your AI Visibility Score, which competitors are getting cited instead of you, and exactly where the gaps are. Takes about 30 seconds.</div>
+    <div class="sec-label rev" style="text-align:center">FAQ</div>
+    <h2 class="rev r1" style="font-family:var(--font-display);font-size:clamp(1.8rem,3vw,2.6rem);font-weight:800;letter-spacing:-0.035em;text-align:center;margin-bottom:48px;color:var(--text)">Questions you might have</h2>
+    <div class="faq">
+      {% set faqs = [
+        ("What does the free analysis check?","We scan your website and measure your presence across ChatGPT, Perplexity, Gemini, Claude, and Google AI Overviews for your core keywords. You'll see your AI Visibility Score compared to competitors, exact query gaps, and which AIs are citing your competitors instead of you. Takes ~30 seconds."),
+        ("What is AI Visibility vs traditional SEO?","SEO is about ranking on Google. AI Visibility is about being cited by ChatGPT, Perplexity, Gemini, and AI Overviews when people ask questions. More people now ask AI than search Google. Different channel, bigger opportunity, barely any competition. We handle both."),
+        ("Do I need developers?","Zero. Connect WordPress with your existing credentials or GitHub with a token. The setup wizard takes under 10 minutes."),
+        ("How is the AI Visibility Score calculated?","We query ChatGPT, Perplexity, Gemini, Claude and Google AI Overviews with your target keywords. For each query we check if your business is cited, partially cited, or absent — and compare against your top 3 competitors. The score (0-100) is weighted by query volume and search intent. Updated weekly."),
+        ("Which industries do you support?","Auto body, dealerships, dental, legal, medical, real estate, SaaS, e-commerce, restaurants, education, and more. The AI adapts keyword strategy, content templates, and GEO optimization to your vertical automatically."),
+        ("What happens after the $1 trial?","Full platform access for 3 days, then $249/month. Cancel anytime from Settings before day 3 and we charge you nothing more than the dollar. No long contracts.")
+      ] %}
+      {% for q, a in faqs %}
+      <div class="faq-item rev" onclick="this.classList.toggle('open')">
+        <div class="faq-q">{{ q }}<span class="faq-plus">+</span></div>
+        <div class="faq-a"><p>{{ a }}</p></div>
       </div>
-      <div class="faq-item reveal">
-        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Do I need developers to set this up? <span class="faq-arrow">+</span></div>
-        <div class="faq-a">Zero. Connect WordPress with your existing credentials or GitHub with a personal access token. The setup wizard takes under 10 minutes and walks you through everything.</div>
-      </div>
-      <div class="faq-item reveal">
-        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What's the difference between SEO and AI Visibility? <span class="faq-arrow">+</span></div>
-        <div class="faq-a">SEO is about ranking on Google. AI Visibility is about being cited by ChatGPT, Perplexity, Gemini and Google AI Overviews when people ask questions. More people now ask AI than search Google. Different channel, different metrics, bigger opportunity. We handle both.</div>
-      </div>
-      <div class="faq-item reveal">
-        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Which industries do you support? <span class="faq-arrow">+</span></div>
-        <div class="faq-a">Auto body, automotive dealerships, dental, legal, medical, real estate, SaaS, e-commerce, restaurants, education, and more. The AI adapts keyword strategy and content templates to your vertical automatically.</div>
-      </div>
-      <div class="faq-item reveal">
-        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">How is the AI Visibility Score calculated? <span class="faq-arrow">+</span></div>
-        <div class="faq-a">We query ChatGPT, Perplexity, Gemini, Claude, and Google AI Overviews with your target keywords. For each query, we check if your business is cited, partially cited, or not cited — and compare against your top 3 competitors. The score (0-100) is weighted by query volume and search intent. Updated weekly.</div>
-      </div>
+      {% endfor %}
     </div>
   </div>
 </section>
 
-<!-- ═══════════════ CTA ═══════════════ -->
-<section id="cta" class="sec" style="text-align:center">
+<!-- ═══════════ CTA ═══════════ -->
+<section id="cta" class="sec" style="text-align:center;padding:140px 32px">
   <div class="sec-inner">
-    <h2 class="reveal" style="font-size:clamp(2rem,4vw,3.2rem);font-weight:800;letter-spacing:-0.04em;margin-bottom:20px;color:var(--text)">See where you stand<br/>in the AI search era</h2>
-    <p class="reveal d1" style="font-size:18px;color:var(--text-secondary);margin-bottom:40px">Free AI Visibility Report. No account. 30 seconds.</p>
+    <h2 class="rev" style="font-family:var(--font-display);font-size:clamp(2rem,4.5vw,3.5rem);font-weight:800;letter-spacing:-0.04em;margin-bottom:20px;color:var(--text);line-height:1.1">
+      See where you stand<br/>in the <span style="color:var(--gold)">AI search era</span>
+    </h2>
+    <p class="rev r1" style="font-size:18px;color:var(--text-secondary);margin-bottom:40px">Free AI Visibility Report. 30 seconds. One score that changes how you see your digital presence.</p>
     <form action="/wizard/start" method="POST">
-      <div class="hero-cta reveal d2" style="margin:0 auto 16px">
+      <div class="hero-form rev r2" style="margin:0 auto 16px">
         <input type="text" name="url" required placeholder="yourbusiness.com"/>
-        <button type="submit" class="btn btn-primary btn-lg">Get Report →</button>
+        <button type="submit" class="btn btn-primary btn-lg">Get Your Free Report →</button>
       </div>
     </form>
-    <p class="reveal d3" style="font-size:13px;color:var(--text-tertiary)">1,200+ businesses already measured their AI visibility</p>
+    <p class="hero-note rev r3">1,200+ businesses have already measured their AI visibility</p>
   </div>
 </section>
 
-<!-- ═══════════════ FOOTER ═══════════════ -->
-<footer class="sec footer" style="padding:48px 32px;border-top:1px solid var(--border);text-align:center">
-  <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:24px;max-width:800px;margin:0 auto">
-    <span style="font-weight:700;color:var(--text)">DENZO</span>
-    <a href="/login" style="color:inherit;text-decoration:none">Sign In</a>
-    <a href="/signup" style="color:inherit;text-decoration:none">Start Trial</a>
-    <a href="/pricing" style="color:inherit;text-decoration:none">Pricing</a>
-    <a href="/privacy" style="color:inherit;text-decoration:none">Privacy</a>
-    <span>© 2026 Denzo Estudios</span>
+<!-- ═══════════ FOOTER ═══════════ -->
+<footer class="sec footer" style="padding:40px 32px;border-top:1px solid var(--border)">
+  <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:20px">
+    <span style="font-family:var(--font-display);font-weight:700;color:var(--text);font-size:16px">DEN<span style="color:var(--gold)">ZO</span></span>
+    <a href="/login" style="color:var(--text-tertiary);text-decoration:none">Sign In</a>
+    <a href="/signup" style="color:var(--text-tertiary);text-decoration:none">Start Trial</a>
+    <a href="/pricing" style="color:var(--text-tertiary);text-decoration:none">Pricing</a>
+    <a href="/privacy" style="color:var(--text-tertiary);text-decoration:none">Privacy</a>
+    <span style="color:var(--text-tertiary)">© 2026 Denzo Estudios</span>
   </div>
 </footer>
 
 {% include "public/_cookie_banner.html" %}
 
 <script type="module">
-// ═══════════════ 3D Globe — refined & slow ═══════════════
+// ═══════════ 3D GLOBE — Refined Liquid Glass style ═══════════
 import * as THREE from 'three';
 const canvas=document.getElementById('hero-canvas');
 if(canvas){
@@ -489,35 +479,42 @@ if(canvas){
   renderer.setPixelRatio(Math.min(devicePixelRatio,2));
   const scene=new THREE.Scene();
   const camera=new THREE.PerspectiveCamera(40,1,0.1,100);
-  camera.position.z=6;
+  camera.position.z=5.8;
 
-  // Core sphere — subtle wireframe
-  const geo=new THREE.IcosahedronGeometry(2,5);
+  // Gold-tinted core sphere
+  const geo=new THREE.IcosahedronGeometry(1.9,5);
   const pos=geo.attributes.position.array;
   const pts=[];for(let i=0;i<pos.length;i+=3)pts.push(pos[i],pos[i+1],pos[i+2]);
   const ptGeo=new THREE.BufferGeometry();
   ptGeo.setAttribute('position',new THREE.Float32BufferAttribute(pts,3));
-
   const dots=new THREE.Points(ptGeo,new THREE.PointsMaterial({
-    size:0.015,color:0x818cf8,transparent:true,opacity:0.5,
+    size:0.014,color:0xC8923B,transparent:true,opacity:.55,
     blending:THREE.AdditiveBlending,depthWrite:false
   }));
   scene.add(dots);
 
-  // Faint outer wireframe
+  // Outer wireframe — very faint
   const wf=new THREE.Mesh(
-    new THREE.IcosahedronGeometry(2.6,2),
-    new THREE.MeshBasicMaterial({color:0x6366f1,wireframe:true,transparent:true,opacity:0.025,depthWrite:false})
+    new THREE.IcosahedronGeometry(2.5,2),
+    new THREE.MeshBasicMaterial({color:0xC8923B,wireframe:true,transparent:true,opacity:.02,depthWrite:false})
   );
   scene.add(wf);
 
-  // Single elegant ring
+  // Elegant gold ring
   const ring=new THREE.Mesh(
-    new THREE.TorusGeometry(3,0.004,16,160),
-    new THREE.MeshBasicMaterial({color:0x818cf8,transparent:true,opacity:0.1,depthWrite:false})
+    new THREE.TorusGeometry(2.9,0.003,16,180),
+    new THREE.MeshBasicMaterial({color:0xE2B04A,transparent:true,opacity:.12,depthWrite:false})
   );
-  ring.rotation.x=Math.PI/2.8;
+  ring.rotation.x=Math.PI/2.7;
   scene.add(ring);
+
+  // Second delicate ring
+  const ring2=new THREE.Mesh(
+    new THREE.TorusGeometry(3.15,0.002,12,140),
+    new THREE.MeshBasicMaterial({color:0x6366f1,transparent:true,opacity:.07,depthWrite:false})
+  );
+  ring2.rotation.x=-Math.PI/3.5;ring2.rotation.y=Math.PI/5;
+  scene.add(ring2);
 
   function resize(){
     const r=canvas.parentElement.getBoundingClientRect();
@@ -526,28 +523,44 @@ if(canvas){
     camera.updateProjectionMatrix();
   }
   window.addEventListener('resize',resize);resize();
-
   function animate(t){
     requestAnimationFrame(animate);
-    const s=t*0.00015;
-    dots.rotation.y+=0.0008;
-    dots.rotation.x=Math.sin(s)*0.2;
-    wf.rotation.y+=0.0005;
-    wf.rotation.x+=0.0003;
-    ring.rotation.z+=0.0006;
+    const s=t*0.00012;
+    dots.rotation.y+=0.0006;
+    dots.rotation.x=Math.sin(s)*.18;
+    wf.rotation.y+=0.0004;wf.rotation.x+=0.00025;
+    ring.rotation.z+=0.0005;
+    ring2.rotation.z-=0.0004;ring2.rotation.x+=0.0003;
     renderer.render(scene,camera);
   }
   requestAnimationFrame(animate);
 }
 
-// ═══════════════ Scroll reveals ═══════════════
-const obs=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('on');obs.unobserve(e.target)}})},{threshold:0.15});
-document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+// ═══════════ Scroll Reveals ═══════════
+const obs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('on');obs.unobserve(e.target)}})},{threshold:.12});
+document.querySelectorAll('.rev').forEach(el=>obs.observe(el));
 
-// ═══════════════ Nav scroll effect ═══════════════
-window.addEventListener('scroll',()=>{
-  document.getElementById('nav').classList.toggle('scrolled',window.scrollY>20);
-});
+// ═══════════ Nav scroll ═══════════
+window.addEventListener('scroll',()=>{document.getElementById('nav').classList.toggle('on',scrollY>20)});
+
+// ═══════════ Personalize hero with Business Name ═══════════
+(function(){
+  const params=new URLSearchParams(window.location.search);
+  const biz=params.get('biz')||params.get('name')||'';
+  if(!biz) return;
+  // Try to extract from wizard session (stored in sessionStorage)
+  const stored=sessionStorage.getItem('wizard_biz_name');
+  const bizName=biz||stored||'';
+  if(!bizName) return;
+  const els=[document.getElementById('biz-name'),document.getElementById('biz-name-2')];
+  els.forEach(el=>{if(el)el.textContent=bizName});
+})();
+
+// Store business name from wizard for landing page personalization
+if(window.location.pathname.includes('wizard')){
+  const bizInput=document.querySelector('[name="business_name"]');
+  if(bizInput){bizInput.addEventListener('input',function(){sessionStorage.setItem('wizard_biz_name',this.value)})}
+}
 </script>
 </body>
 </html>
