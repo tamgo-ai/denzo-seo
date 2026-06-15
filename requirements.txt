@@ -7,3 +7,4 @@ python-dotenv==1.0.1
 beautifulsoup4==4.12.3
 lxml==5.2.2
 apify-client>=1.7.0
+google-auth>=2.30.0

@@ -155,13 +155,15 @@ class KeywordStrategist(TenantAwareBaseAgent):
 5. Question: "how much does [service] cost", "what to do after accident"
 6. Emergency/urgent: "24 hour tow", "same day estimate", "near me"
 7. Long-tail location combos: service + each city in [{cities_str}]"""
-        elif industry in ("automotive_dealership",):
+        elif industry in ("automotive_dealership", "car_dealership"):
+            # Use the primary brand/make as svc0 for dealerships, fallback to first service
+            _svc0_dl = (ctx.certifications[0] if ctx.certifications else svc0)
             intent_categories = """
-3. Buyer-intent: "buy {svc0}", "{svc0} for sale", "{svc0} near me", "best price"
-4. Comparison: "{svc0} vs [competitor brand]", "{svc0} review", "which {svc0} to buy"
+3. Buyer-intent: "buy {svc0}", "{svc0} for sale", "{svc0} near me", "best price {svc0}"
+4. Comparison: "{svc0} vs [competitor brand]", "{svc0} review", "best {svc0} deals"
 5. Finance: "{svc0} lease deals", "{svc0} financing", "{svc0} monthly payment calculator"
-6. CPO/Pre-owned: "certified pre-owned {svc0}", "used {svc0} [city]", "CPO warranty"
-7. Long-tail location combos: service + each city in [{cities_str}]""".format(svc0=svc0, cities_str=cities_str)
+6. CPO/Pre-owned: "certified pre-owned {svc0}", "used {svc0} [city]", "CPO {svc0} warranty"
+7. Long-tail location combos: service + each city in [{cities_str}]""".format(svc0=_svc0_dl, cities_str=cities_str)
         elif industry in ("saas_tech", "agency"):
             intent_categories = """
 3. Problem-aware: "how to automate [service]", "best [service] software", "[service] pricing"

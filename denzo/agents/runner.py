@@ -39,6 +39,15 @@ class AgentRunner:
         if agent_name not in AGENT_REGISTRY:
             return {"status": "error", "message": f"Unknown agent: {agent_name}"}
 
+        # Director singleton: refuse to start a second Director for the same tenant
+        if agent_name == "Pipeline Director":
+            dir_rows = db_execute(
+                "SELECT status FROM agents WHERE tenant_id=? AND name='Pipeline Director'",
+                (tenant_id,)
+            )
+            if dir_rows and dir_rows[0]["status"] == "working":
+                return {"status": "already_running", "message": "Director is already running for this tenant"}
+
         with cls._lock:
             tenant_threads = cls._threads.setdefault(tenant_id, {})
             if agent_name in tenant_threads and tenant_threads[agent_name].is_alive():

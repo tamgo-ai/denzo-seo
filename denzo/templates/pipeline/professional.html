@@ -1,0 +1,838 @@
+{% extends "base.html" %}
+
+{% block title %}{{ client.name }} — Dashboard{% endblock %}
+
+{% block breadcrumb %}
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+  <a href="/" style="color:var(--muted);text-decoration:none;">Overview</a>
+  <span style="color:var(--muted2)">/</span>
+  <span style="color:var(--text);font-weight:600;">{{ client.name }}</span>
+</div>
+{% endblock %}
+
+{% block topbar_actions %}
+<a href="/clients/{{ tenant_id }}/pipeline"
+   style="font-size:12px;color:var(--text);font-weight:600;text-decoration:none;padding:6px 10px;border-radius:6px;border-bottom:2px solid #6366f1;">Dashboard</a>
+<a href="/clients/{{ tenant_id }}/agents"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Agents</a>
+<a href="/clients/{{ tenant_id }}/keywords"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Keywords</a>
+<a href="/clients/{{ tenant_id }}/pages"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Pages</a>
+<a href="/clients/{{ tenant_id }}/competitors"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">Competitors</a>
+<a href="/clients/{{ tenant_id }}/geo"
+   style="font-size:12px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">GEO</a>
+<a href="/clients/{{ tenant_id }}/jarvis/"
+   style="font-size:12px;color:var(--muted2);text-decoration:none;padding:6px 10px;border-radius:6px;transition:color 0.15s;"
+   onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted2)'">AI</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ── Animations ── */
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── KPI Cards ── */
+.kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  transition: border-color 0.2s;
+}
+.kpi-card:hover { border-color: var(--border2); }
+.kpi-card .kpi-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 10px;
+}
+.kpi-card .kpi-val {
+  font-size: 28px; font-weight: 700; letter-spacing: -0.03em;
+  color: var(--text); line-height: 1;
+}
+.kpi-card .kpi-label {
+  font-size: 10px; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.06em; margin-top: 4px;
+}
+
+/* ── Layer accordion ── */
+.layer-section { margin-bottom: 6px; }
+.layer-header {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 16px;
+  cursor: pointer; user-select: none; transition: border-color 0.15s;
+}
+.layer-header:hover { border-color: var(--border2); }
+.layer-header.has-activity { border-left: 2px solid #6366f1; padding-left: 14px; }
+.layer-chevron { transition: transform 0.2s; }
+.layer-chevron.open { transform: rotate(180deg); }
+
+/* ── Agent cards ── */
+.agent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+  padding: 8px 0 4px;
+}
+.agent-card {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px;
+  transition: all 0.15s; cursor: pointer;
+}
+.agent-card:hover { border-color: var(--border2); transform: translateY(-1px); }
+.agent-card.selected { border-color: #6366f1; background: rgba(99,102,241,0.06); }
+.agent-card .ac-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.agent-card .ac-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.agent-card .ac-dot.idle { background: #555; }
+.agent-card .ac-dot.working { background: #818cf8; box-shadow: 0 0 8px #818cf8; animation: pulse 1.2s ease-in-out infinite; }
+.agent-card .ac-dot.done { background: #4ade80; }
+.agent-card .ac-dot.error { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+.agent-card .ac-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agent-card .ac-task { font-size: 11px; color: var(--muted); line-height: 1.4; margin-bottom: 10px; min-height: 2.6em; }
+.agent-card .ac-meta { font-size: 10px; color: var(--muted2); margin-bottom: 8px; display: flex; gap: 12px; }
+.agent-card .ac-actions { display: flex; gap: 6px; }
+
+.btn-start, .btn-stop {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  font-size: 11px; font-weight: 600; padding: 0 12px; height: 28px;
+  border-radius: 5px; cursor: pointer; transition: all 0.15s; font-family: inherit;
+}
+.btn-start {
+  background: #000; color: #fff; border: 1px solid var(--border2); flex: 1;
+}
+.btn-start:hover:not(:disabled) { background: #1a1a2e; border-color: #6366f1; }
+.btn-start:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn-stop {
+  background: transparent; color: var(--red); border: 1px solid rgba(239,68,68,0.2);
+}
+.btn-stop:hover:not(:disabled) { background: rgba(239,68,68,0.08); }
+.btn-stop:disabled { opacity: 0.2; cursor: not-allowed; }
+
+/* ── Output panel (slide-up) ── */
+.output-panel {
+  background: #0a0a12; border: 1px solid rgba(99,102,241,0.2); border-radius: 12px;
+  margin-bottom: 16px; overflow: hidden; animation: slideUp 0.2s ease-out;
+}
+.output-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid rgba(99,102,241,0.1);
+  background: rgba(99,102,241,0.04);
+}
+.output-body {
+  padding: 16px; max-height: 300px; overflow-y: auto;
+  font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px;
+  line-height: 1.6; color: rgba(255,255,255,0.7);
+  white-space: pre-wrap; word-break: break-word;
+}
+.output-body::-webkit-scrollbar { width: 3px; }
+.output-body::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+
+/* ── Activity log ── */
+.log-area {
+  background: rgba(255,255,255,0.015);
+  border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);
+  max-height: 350px; overflow-y: auto;
+}
+.log-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 7px 12px; border-bottom: 1px solid rgba(255,255,255,0.03);
+  font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; line-height: 1.5;
+}
+.log-row:last-child { border-bottom: none; }
+.log-row.success { border-left: 2px solid #4ade80; }
+.log-row.error   { border-left: 2px solid #ef4444; }
+.log-row.warning { border-left: 2px solid #f59e0b; }
+.log-row.info    { border-left: 2px solid #3b82f6; }
+.log-row:hover   { background: rgba(255,255,255,0.02); }
+.log-time { color: rgba(255,255,255,0.25); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.log-agent { color: #818cf8; font-weight: 600; white-space: nowrap; }
+
+/* ── Director panel ── */
+.director-bar {
+  background: #0a0a0f; border: 1px solid rgba(99,102,241,0.15); border-radius: 12px;
+  padding: 14px 18px; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 16px;
+}
+.director-thought {
+  flex: 1; font-size: 12px; color: rgba(255,255,255,0.55); line-height: 1.5;
+  min-width: 0;
+}
+
+/* ── Filter tabs ── */
+.filter-tabs { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
+.filter-tab {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.06em; padding: 5px 10px; border-radius: 6px;
+  cursor: pointer; border: 1px solid transparent;
+  color: var(--muted2); background: transparent; transition: all 0.15s;
+  font-family: inherit;
+}
+.filter-tab:hover { color: var(--muted); background: rgba(255,255,255,0.03); }
+.filter-tab.active { color: var(--text); background: rgba(255,255,255,0.05); border-color: var(--border2); }
+
+/* Quick-actions bar */
+.quick-actions {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="professionalDashboard('{{ tenant_id }}')" x-init="boot()">
+
+  <!-- ═══════════════ HEADER ═══════════════ -->
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:16px;">
+    <div>
+      <h1 style="font-size:24px;font-weight:700;letter-spacing:-0.02em;color:var(--text);margin:0 0 4px;">
+        {{ client.name }}
+      </h1>
+      <p style="font-size:12px;color:var(--muted);margin:0;">
+        Professional SEO Dashboard · {{ client.business_type | replace('_', ' ') | title }}
+      </p>
+    </div>
+    <div class="quick-actions">
+      <!-- Live indicator -->
+      <div style="display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;font-size:10px;font-weight:600;letter-spacing:.04em;"
+           :style="wsConnected ? 'border:1px solid rgba(74,222,128,0.2);background:rgba(74,222,128,0.06);color:#4ade80;' : 'border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);color:rgba(255,255,255,0.25);'">
+        <span style="width:5px;height:5px;border-radius:50%;" :style="wsConnected ? 'background:#4ade80;box-shadow:0 0 6px #4ade80;' : 'background:rgba(255,255,255,0.2);'"></span>
+        <span x-text="wsConnected ? 'LIVE' : 'OFFLINE'"></span>
+      </div>
+
+      <!-- Reset -->
+      <button onclick="denzoResetPipeline('{{ tenant_id }}')"
+              style="font-size:10px;font-weight:600;padding:5px 12px;border-radius:6px;cursor:pointer;background:rgba(251,146,60,0.06);border:1px solid rgba(251,146,60,0.15);color:#fb923c;font-family:inherit;letter-spacing:.03em;">
+        Reset
+      </button>
+
+      <!-- Stop All -->
+      <button onclick="denzoStopAll('{{ tenant_id }}')"
+              style="font-size:10px;font-weight:600;padding:5px 12px;border-radius:6px;cursor:pointer;font-family:inherit;letter-spacing:.03em;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:#f87171;">
+        Stop All
+      </button>
+
+      <!-- Run Full Pipeline -->
+      <button onclick="denzoRunPipeline('{{ tenant_id }}')"
+              style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:6px 18px;border-radius:8px;cursor:pointer;font-family:inherit;letter-spacing:-.01em;border:none;transition:all 0.2s;background:linear-gradient(135deg,#6366f1,#818cf8);color:#fff;box-shadow:0 0 20px rgba(99,102,241,0.25);">
+        <svg style="width:12px;height:12px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+        Run Pipeline
+      </button>
+
+      <!-- Jarvis AI quick access -->
+      <a href="/clients/{{ tenant_id }}/jarvis/"
+         style="font-size:10px;font-weight:600;padding:5px 12px;border-radius:6px;text-decoration:none;font-family:inherit;letter-spacing:.03em;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.12);color:#818cf8;">
+        AI
+      </a>
+    </div>
+  </div>
+
+  <!-- ═══════════════ KPI STRIP ═══════════════ -->
+  <div class="kpi-strip">
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:rgba(99,102,241,0.1);">
+        <svg style="width:16px;height:16px;color:#818cf8;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
+        </svg>
+      </div>
+      <div class="kpi-val" x-text="stats.keywords">{{ kw_count }}</div>
+      <div class="kpi-label">Keywords</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:rgba(168,85,247,0.1);">
+        <svg style="width:16px;height:16px;color:#a855f7;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+      </div>
+      <div class="kpi-val" x-text="stats.pages">{{ page_counts.total or 0 }}</div>
+      <div class="kpi-label">Pages</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:rgba(74,222,128,0.1);">
+        <svg style="width:16px;height:16px;color:#4ade80;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 13l4 4L19 7"/>
+        </svg>
+      </div>
+      <div class="kpi-val" style="color:#4ade80;" x-text="stats.published">{{ page_counts.published or 0 }}</div>
+      <div class="kpi-label">Published</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:rgba(249,115,22,0.1);">
+        <svg style="width:16px;height:16px;color:#f97316;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+      </div>
+      <div class="kpi-val" x-text="stats.competitors">{{ comp_stats.values() | sum if comp_stats else 0 }}</div>
+      <div class="kpi-label">Competitors</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:rgba(34,211,238,0.1);">
+        <svg style="width:16px;height:16px;color:#22d3ee;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+      </div>
+      <div class="kpi-val" x-text="stats.geo_citations || '0'">{{ geo_citations }}</div>
+      <div class="kpi-label">GEO Citations</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:rgba(236,72,153,0.1);">
+        <svg style="width:16px;height:16px;color:#ec4899;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+      </div>
+      <div class="kpi-val">
+        <span x-text="Object.values(agents).filter(a => a.status==='working').length">0</span>
+      </div>
+      <div class="kpi-label">Active Agents</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ AGENT OUTPUT PANEL (slide-up) ═══════════════ -->
+  <div class="output-panel" x-show="selectedAgent" x-transition>
+    <div class="output-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="width:8px;height:8px;border-radius:50%;" :style="'background:' + (getAgent(selectedAgent).status==='working'?'#818cf8':getAgent(selectedAgent).status==='done'?'#4ade80':getAgent(selectedAgent).status==='error'?'#ef4444':'#555')"></span>
+        <strong style="font-size:13px;" x-text="selectedAgent"></strong>
+        <span style="font-size:10px;color:var(--muted2);" x-text="'Layer ' + (getAgent(selectedAgent).layer || '?') + ' · ' + (getAgent(selectedAgent).status || 'idle')"></span>
+        <span style="font-size:10px;color:var(--muted2);" x-text="getAgent(selectedAgent).run_count ? 'Run #' + getAgent(selectedAgent).run_count : ''"></span>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn-start"
+                onclick="if(window._denzoSelectedAgent) denzoStartAgent('{{ tenant_id }}', window._denzoSelectedAgent)">
+          ▶ Start
+        </button>
+        <button class="btn-stop"
+                onclick="if(window._denzoSelectedAgent) denzoStopAgent('{{ tenant_id }}', window._denzoSelectedAgent)">
+          ■ Stop
+        </button>
+        <button @click="selectedAgent=null" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px;">×</button>
+      </div>
+    </div>
+
+    <!-- Current task -->
+    <div style="padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04);">
+      <span style="font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:.06em;">Current Task</span>
+      <p style="font-size:12px;color:var(--muted);margin:4px 0 0;" x-text="getAgent(selectedAgent).current_task || 'Idle'"></p>
+    </div>
+
+    <!-- Output / last message -->
+    <div style="padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04);">
+      <span style="font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:.06em;">Last Output</span>
+      <p style="font-size:12px;color:rgba(255,255,255,0.6);margin:4px 0 0;line-height:1.5;" x-text="getAgent(selectedAgent).last_message || 'No output yet. Click Start to run this agent.'"></p>
+    </div>
+
+    <!-- Agent-specific logs -->
+    <div style="padding:10px 16px;">
+      <span style="font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:.06em;">Recent Logs</span>
+      <div style="max-height:200px;overflow-y:auto;margin-top:6px;">
+        <template x-for="l in agentLogs(selectedAgent)" :key="l.created_at">
+          <div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.02);font-size:11px;font-family:monospace;">
+            <span style="color:rgba(255,255,255,0.25);white-space:nowrap;" x-text="fmtTime(l.created_at)"></span>
+            <span style="color:rgba(255,255,255,0.5);" x-text="l.message"></span>
+          </div>
+        </template>
+        <p x-show="agentLogs(selectedAgent).length === 0" style="font-size:11px;color:var(--muted2);">No logs yet for this agent.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DIRECTOR STATUS BAR ═══════════════ -->
+  <div class="director-bar">
+    <div style="width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"
+         :style="Object.values(agents).some(a => a.status==='working') ? 'background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);' : 'background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);'">
+      <svg style="width:16px;height:16px;color:#818cf8;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+      </svg>
+    </div>
+    <div class="director-thought">
+      <span style="font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(99,102,241,0.5);">Director</span>
+      <span style="margin-left:8px;" x-text="directorThought"></span>
+    </div>
+    <span style="font-size:9px;font-weight:600;color:var(--muted2);white-space:nowrap;font-family:monospace;"
+          x-text="Object.values(agents).filter(a=>a.status==='working').length + ' running'"></span>
+  </div>
+
+  <!-- ═══════════════ AGENT LAYERS ═══════════════ -->
+  <div style="margin-bottom:16px;">
+
+    <!-- Layer filter tabs -->
+    <div class="filter-tabs">
+      <button class="filter-tab" :class="{active:layerFilter==='all'}" @click="layerFilter='all'">All Layers</button>
+      {% for layer_num, layer_data in layers.items() %}
+      <button class="filter-tab" :class="{active:layerFilter==='{{ layer_num }}'}" @click="layerFilter='{{ layer_num }}'">
+        L{{ layer_num }}: {{ layer_data.label }}
+      </button>
+      {% endfor %}
+    </div>
+
+    {% for layer_num, layer_data in layers.items() %}
+    <div class="layer-section" data-layer="{{ layer_num }}" x-data="{ open: true }"
+         :style="(layerFilter === 'all' || layerFilter === '{{ layer_num }}') ? '' : 'display: none;'">
+
+      <!-- Layer header -->
+      <div class="layer-header"
+           :class="layerHasActivity({{ layer_num }}) ? 'has-activity' : ''"
+           @click="open = !open"
+           style="cursor:pointer;">
+        <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+          <span style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;
+            {% if layer_num == 0 %}background:rgba(99,102,241,0.2);color:#a5b4fc;
+            {% elif layer_num == 1 %}background:rgba(59,130,246,0.12);color:#60a5fa;
+            {% elif layer_num == 2 %}background:rgba(168,85,247,0.12);color:#c084fc;
+            {% elif layer_num == 3 %}background:rgba(249,115,22,0.12);color:#fb923c;
+            {% elif layer_num == 4 %}background:rgba(20,184,166,0.12);color:#2dd4bf;
+            {% elif layer_num == 5 %}background:rgba(100,116,139,0.12);color:#94a3b8;
+            {% else %}background:rgba(16,185,129,0.12);color:#34d399;{% endif %}">
+            L{{ layer_num }}
+          </span>
+          <div>
+            <span style="font-size:13px;font-weight:600;color:var(--text);">{{ layer_data.label }}</span>
+            <span style="font-size:11px;color:var(--muted2);margin-left:8px;" x-text="layerSummary({{ layer_num }})"></span>
+          </div>
+        </div>
+        <svg class="layer-chevron" :class="open ? 'open' : ''"
+             style="width:15px;height:15px;color:var(--muted2);flex-shrink:0;"
+             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </div>
+
+      <!-- Agent grid -->
+      <div x-show="open" x-transition :style="open ? '' : 'display: none;'">
+        <div class="agent-grid">
+          {% for agent in layer_data.agents %}
+          <div class="agent-card"
+               :class="{selected: selectedAgent === '{{ agent.name }}'}"
+               @click="selectedAgent = '{{ agent.name }}'"
+               onclick="window._denzoSelectedAgent='{{ agent.name }}';"
+               data-agent="{{ agent.name }}"
+               style="cursor:pointer;">
+            <div class="ac-header">
+              <span class="ac-dot" :class="getAgent('{{ agent.name }}').status"></span>
+              <span class="ac-name">{{ agent.name }}</span>
+            </div>
+            <div class="ac-task">
+              <span x-text="getAgent('{{ agent.name }}').current_task
+                ? getAgent('{{ agent.name }}').current_task.substring(0, 90) + (getAgent('{{ agent.name }}').current_task.length > 90 ? '…' : '')
+                : (getAgent('{{ agent.name }}').status === 'done' ? '✓ Completed' : getAgent('{{ agent.name }}').status === 'error' ? '✗ Error' : 'Ready')"></span>
+            </div>
+            <div class="ac-meta">
+              <span x-text="getAgent('{{ agent.name }}').run_count ? getAgent('{{ agent.name }}').run_count + ' runs' : 'Never run'"></span>
+              <span x-show="getAgent('{{ agent.name }}').last_run_at" x-text="'Last: ' + fmtDate(getAgent('{{ agent.name }}').last_run_at)"></span>
+            </div>
+            <div class="ac-actions">
+              <button class="btn-start"
+                      onclick="denzoStartAgent('{{ tenant_id }}', '{{ agent.name }}')">
+                ▶ Start
+              </button>
+              <button class="btn-stop"
+                      onclick="denzoStopAgent('{{ tenant_id }}', '{{ agent.name }}')">
+                ■
+              </button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- ═══════════════ LIVE ACTIVITY LOG ═══════════════ -->
+  <div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="width:7px;height:7px;border-radius:50%;" :class="wsConnected ? 'pulse-dot-green' : ''" :style="wsConnected ? '' : 'background:#555;'"></span>
+        <span style="font-size:13px;font-weight:600;color:var(--text);">Live Activity</span>
+        <span style="font-size:10px;color:var(--muted2);" x-text="allLogs.length + ' entries'"></span>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <select @change="logFilter=$event.target.value" style="background:#000;border:1px solid var(--border);color:var(--muted);font-size:10px;padding:3px 8px;border-radius:4px;font-family:inherit;">
+          <option value="all">All Agents</option>
+          {% for layer_num, layer_data in layers.items() %}
+          <optgroup label="Layer {{ layer_num }}: {{ layer_data.label }}">
+            {% for agent in layer_data.agents %}
+            <option value="{{ agent.name }}">{{ agent.name }}</option>
+            {% endfor %}
+          </optgroup>
+          {% endfor %}
+        </select>
+        <button @click="clearLogs()" style="font-size:10px;color:var(--muted2);background:transparent;border:none;cursor:pointer;">Clear</button>
+      </div>
+    </div>
+
+    <div class="log-area" x-ref="logPanel">
+      {% for entry in activity | reverse %}
+      <div class="log-row {{ entry.level or 'info' }}"
+           x-show="logFilter==='all' || logFilter==='{{ entry.agent or '' }}'">
+        <span style="flex-shrink:0;width:12px;text-align:center;
+          {% if entry.level == 'success' %}color:#22c55e;
+          {% elif entry.level == 'error' %}color:#ef4444;
+          {% elif entry.level == 'warning' %}color:#f59e0b;
+          {% else %}color:#3b82f6;{% endif %}">
+          {% if entry.level == 'success' %}✓{% elif entry.level == 'error' %}✗{% elif entry.level == 'warning' %}⚠{% else %}·{% endif %}
+        </span>
+        <span class="log-time">{{ entry.created_at[5:16] if entry.created_at else '' }}</span>
+        {% if entry.agent %}
+        <span class="log-agent">{{ entry.agent[:20] }}</span>
+        {% endif %}
+        <span style="color:rgba(255,255,255,0.55);word-break:break-all;">{{ entry.message or '' }}</span>
+      </div>
+      {% endfor %}
+
+      <template x-for="entry in filteredLogs" :key="entry.id">
+        <div class="log-row" :class="entry.level || 'info'">
+          <span style="flex-shrink:0;width:12px;text-align:center;" :style="'color:' + levelColor(entry.level)" x-text="levelIcon(entry.level)"></span>
+          <span class="log-time" x-text="fmtTime(entry.created_at)"></span>
+          <span class="log-agent" x-show="entry.agent" x-text="(entry.agent||'').substring(0,20)"></span>
+          <span style="color:rgba(255,255,255,0.55);word-break:break-all;" x-text="entry.message || ''"></span>
+        </div>
+      </template>
+
+      <div x-show="filteredLogs.length === 0 && {{ activity | length }} === 0"
+           style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;">
+        <p style="color:rgba(255,255,255,0.25);font-size:13px;margin:0;">No activity yet</p>
+        <p style="color:rgba(255,255,255,0.15);font-size:11px;margin:4px 0 0;">Start an agent to see live results here</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Global agent control functions (NO Alpine dependency) ──────────────────
+function denzoStartAgent(tenantId, agentName) {
+  _denzoShowToast('⏳ Starting ' + agentName + '...', 'info');
+  fetch('/api/' + tenantId + '/agents/start/' + encodeURIComponent(agentName), {
+    method: 'POST',
+    credentials: 'same-origin'
+  })
+    .then(function(r) {
+      if (!r.ok) {
+        return r.json().then(function(d) { throw new Error(d.error || 'HTTP ' + r.status); })
+                    .catch(function() { throw new Error('Server error (HTTP ' + r.status + ')'); });
+      }
+      return r.json();
+    })
+    .then(function(d) {
+      if (d.error) {
+        _denzoShowToast('✗ ' + d.error, 'error');
+      } else if (d.status === 'already_running') {
+        _denzoShowToast('⚠ ' + agentName + ' is already running', 'warning');
+      } else if (d.status === 'blocked') {
+        _denzoShowToast('⚠ ' + d.reason, 'warning');
+      } else {
+        _denzoShowToast('✓ ' + agentName + ' started!', 'success');
+      }
+    })
+    .catch(function(e) {
+      _denzoShowToast('✗ ' + (e.message || 'Network error'), 'error');
+    });
+}
+
+function denzoStopAgent(tenantId, agentName) {
+  _denzoShowToast('■ Stopping ' + agentName + '...', 'info');
+  fetch('/api/' + tenantId + '/agents/stop/' + encodeURIComponent(agentName), {
+    method: 'POST',
+    credentials: 'same-origin'
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      _denzoShowToast('■ ' + agentName + ' stop requested', 'info');
+    })
+    .catch(function(e) {
+      _denzoShowToast('✗ Network error', 'error');
+    });
+}
+
+function denzoRunPipeline(tenantId) {
+  _denzoShowToast('⏳ Starting Pipeline Director...', 'info');
+  fetch('/api/' + tenantId + '/pipeline/run', {
+    method: 'POST',
+    credentials: 'same-origin'
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.error) {
+        _denzoShowToast('✗ ' + d.error, 'error');
+      } else {
+        _denzoShowToast('✓ Pipeline Director activated!', 'success');
+      }
+    })
+    .catch(function(e) {
+      _denzoShowToast('✗ Network error', 'error');
+    });
+}
+
+function denzoStopAll(tenantId) {
+  _denzoShowToast('■ Stopping all agents...', 'info');
+  fetch('/api/' + tenantId + '/pipeline/stop', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      _denzoShowToast('■ All agents stopping', 'info');
+    })
+    .catch(function(e) {
+      _denzoShowToast('✗ Network error', 'error');
+    });
+}
+
+function denzoResetPipeline(tenantId) {
+  if (!confirm('Reset ALL agents to idle? This stops everything but keeps your data (keywords, pages, etc.) intact.')) return;
+  _denzoShowToast('⟳ Resetting pipeline...', 'warning');
+  fetch('/api/' + tenantId + '/pipeline/reset', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      _denzoShowToast('✓ ' + d.message || 'Pipeline reset', 'success');
+    })
+    .catch(function(e) {
+      _denzoShowToast('✗ Network error', 'error');
+    });
+}
+
+// Toast notification system (NO dependency on Alpine)
+var _denzoToastId = 0;
+function _denzoShowToast(msg, level) {
+  var id = ++_denzoToastId;
+  var container = document.getElementById('denzo-toasts');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'denzo-toasts';
+    container.style.cssText = 'position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:6px;';
+    document.body.appendChild(container);
+  }
+  var colors = {
+    success: 'rgba(74,222,128,0.12)',
+    error: 'rgba(239,68,68,0.15)',
+    warning: 'rgba(251,191,36,0.12)',
+    info: 'rgba(59,130,246,0.1)'
+  };
+  var borders = {
+    success: 'rgba(74,222,128,0.3)',
+    error: 'rgba(239,68,68,0.35)',
+    warning: 'rgba(251,191,36,0.25)',
+    info: 'rgba(59,130,246,0.25)'
+  };
+  var textColors = {
+    success: '#4ade80',
+    error: '#f87171',
+    warning: '#fbbf24',
+    info: '#60a5fa'
+  };
+  var toast = document.createElement('div');
+  toast.style.cssText = 'padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;max-width:380px;font-family:Inter,system-ui,sans-serif;' +
+    'background:' + (colors[level] || colors.info) + ';' +
+    'border:1px solid ' + (borders[level] || borders.info) + ';' +
+    'color:' + (textColors[level] || textColors.info) + ';';
+  toast.textContent = msg;
+  container.appendChild(toast);
+  setTimeout(function() {
+    if (toast.parentNode) toast.parentNode.removeChild(toast);
+  }, 5000);
+}
+</script>
+
+<script>
+function professionalDashboard(tenantId) {
+  return {
+    tenantId,
+    agents: {},
+    logs: [],
+    stats: { keywords: {{ kw_count }}, pages: {{ page_counts.total or 0 }}, published: {{ page_counts.published or 0 }}, competitors: {{ comp_stats.values() | sum if comp_stats else 0 }}, geo_citations: {{ geo_citations }} },
+    ws: null,
+    wsConnected: false,
+    selectedAgent: null,
+    layerFilter: 'all',
+    logFilter: 'all',
+    hasWorking: false,
+    alerts: [],
+    _alertId: 0,
+
+    async boot() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      this.ws = new WebSocket(proto + '//' + location.host + '/ws/' + this.tenantId + '/logs');
+      this.ws.onopen = () => { this.wsConnected = true; };
+      this.ws.onclose = () => { this.wsConnected = false; };
+      this.ws.onerror = () => { this.wsConnected = false; };
+      this.ws.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        if (data.logs && data.logs.length > 0) {
+          this.logs = [...this.logs.slice(-500), ...data.logs];
+          this.$nextTick(() => {
+            const el = this.$refs.logPanel;
+            if (el) el.scrollTop = el.scrollHeight;
+          });
+        }
+        if (data.agents) {
+          data.agents.forEach(a => { this.agents[a.name] = a; });
+          this.hasWorking = Object.values(this.agents).some(a => a.status === 'working');
+        }
+        if (data.stats) {
+          this.stats = { ...this.stats, ...data.stats };
+        }
+      };
+    },
+
+    getAgent(name) {
+      return this.agents[name] || { name, status: 'idle', current_task: '', layer: '', last_message: '', run_count: 0, last_run_at: null };
+    },
+
+    startAgent(name) {
+      const agent = this.getAgent(name);
+      if (agent.status === 'working') {
+        this.addAlert('⚠ ' + name + ' is already running', 'warning');
+        return;
+      }
+      fetch('/api/' + this.tenantId + '/agents/start/' + encodeURIComponent(name), { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+          if (d.error) {
+            this.addAlert('✗ ' + name + ': ' + d.error, 'error');
+          } else {
+            this.addAlert('✓ Started ' + name, 'success');
+          }
+        })
+        .catch(e => this.addAlert('✗ Network error: ' + e.message, 'error'));
+    },
+
+    stopAgent(name) {
+      const agent = this.getAgent(name);
+      if (agent.status !== 'working') {
+        this.addAlert('ℹ ' + name + ' is not running', 'info');
+        return;
+      }
+      fetch('/api/' + this.tenantId + '/agents/stop/' + encodeURIComponent(name), { method: 'POST' })
+        .then(r => r.json())
+        .then(d => this.addAlert('■ Stopped ' + name, 'info'));
+    },
+
+    addAlert(msg, level) {
+      this.alerts.push({ id: ++this._alertId, msg, level });
+      setTimeout(() => { this.alerts = this.alerts.filter(a => a.id !== this._alertId); }, 5000);
+    },
+
+    runAllAgents() {
+      fetch('/api/' + this.tenantId + '/pipeline/run', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => { if (d.error) console.warn(d.error); });
+    },
+
+    stopAllAgents() {
+      Object.keys(this.agents).forEach(name => {
+        if (this.agents[name].status === 'working') this.stopAgent(name);
+      });
+    },
+
+    resetPipeline() {
+      if (!confirm('Reset ALL agents to idle? This stops everything and clears agent states. Your data (keywords, pages, etc.) stays intact.')) return;
+      fetch('/api/' + this.tenantId + '/pipeline/reset', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => { if (d.status === 'reset') alert('All agents reset to idle.'); });
+    },
+
+    agentLogs(agentName) {
+      return this.logs.filter(l => l.agent === agentName).slice(-20);
+    },
+
+    get allLogs() {
+      return this.logs;
+    },
+
+    get filteredLogs() {
+      if (this.logFilter === 'all') return this.logs;
+      return this.logs.filter(l => l.agent === this.logFilter);
+    },
+
+    clearLogs() {
+      this.logs = [];
+    },
+
+    // Layer helpers
+    layerStatus(n) {
+      const arr = Object.values(this.agents).filter(a => parseInt(a.layer) === n);
+      if (!arr.length) return 'idle';
+      if (arr.some(a => a.status === 'error')) return 'error';
+      if (arr.some(a => a.status === 'working')) return 'working';
+      if (arr.every(a => a.status === 'done')) return 'done';
+      return 'idle';
+    },
+    layerHasActivity(n) {
+      return Object.values(this.agents).some(a => parseInt(a.layer) === n && (a.status === 'working' || a.status === 'done'));
+    },
+    layerSummary(n) {
+      const arr = Object.values(this.agents).filter(a => parseInt(a.layer) === n);
+      const working = arr.filter(a => a.status === 'working').length;
+      const done = arr.filter(a => a.status === 'done').length;
+      const error = arr.filter(a => a.status === 'error').length;
+      const parts = [arr.length + ' agents'];
+      if (working) parts.push(working + ' running');
+      if (done) parts.push(done + ' done');
+      if (error) parts.push(error + ' errors');
+      return parts.join(' · ');
+    },
+
+    // Director
+    get directorThought() {
+      const working = Object.values(this.agents).filter(a => a.status === 'working');
+      const done = Object.values(this.agents).filter(a => a.status === 'done');
+      const errors = Object.values(this.agents).filter(a => a.status === 'error');
+      if (!working.length && !done.length && !errors.length) {
+        return 'All systems ready. Launch individual agents or run the full pipeline.';
+      }
+      if (!working.length && errors.length) {
+        return errors[0].name + ' reported an issue. Check the activity log.';
+      }
+      if (!working.length && done.length) {
+        return 'Pipeline complete — ' + done.length + ' agent(s) finished. Review results above.';
+      }
+      const agent = working[0];
+      const task = (agent.current_task || '').substring(0, 80);
+      return (working.length > 1 ? working.length + ' agents running: ' : '') + agent.name + (task ? ': ' + task : '');
+    },
+
+    // Formatting
+    fmtTime(ts) {
+      if (!ts) return '';
+      const d = new Date(ts.includes('T') ? ts : ts.replace(' ', 'T') + 'Z');
+      if (isNaN(d.getTime())) return '';
+      return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':' + String(d.getSeconds()).padStart(2, '0');
+    },
+    fmtDate(ts) {
+      if (!ts) return '';
+      const d = new Date(ts.includes('T') ? ts : ts.replace(' ', 'T') + 'Z');
+      if (isNaN(d.getTime())) return '';
+      return (d.getMonth()+1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    },
+    levelColor(level) {
+      const map = { success: '#22c55e', error: '#ef4444', warning: '#f59e0b', info: '#3b82f6' };
+      return map[level] || '#3b82f6';
+    },
+    levelIcon(level) {
+      const map = { success: '✓', error: '✗', warning: '⚠', info: '·' };
+      return map[level] || '·';
+    },
+  };
+}
+</script>
+{% endblock %}

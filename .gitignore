@@ -9,3 +9,4 @@ screenshots/
 *.log
 .DS_Store
 data/
+.env.backup*

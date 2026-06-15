@@ -32,27 +32,7 @@ class ProgrammaticSEO(TenantAwareBaseAgent):
         faq_block = faq_schema[0]["value"] if faq_schema else ""
 
         # Build Brand Voice DNA block
-        brand_voice_block = ""
-        if brand_voice:
-            brand_voice_block = f"""
-BRAND VOICE DNA — follow this exactly:
-- Brand name: {brand_voice.get('brand_name', ctx.client_name)}
-- Writing style: {brand_voice.get('writing_style', 'professional')}
-- Years of experience to reference: {brand_voice.get('years_experience', '')}
-- Clients served: {brand_voice.get('clients_served', '')}
-- Founder voice: {brand_voice.get('founder_name', '')}
-- Key proprietary insights to weave in: {brand_voice.get('key_insight_1', '')} / {brand_voice.get('key_insight_2', '')} / {brand_voice.get('key_insight_3', '')}
-- Contrarian position: {brand_voice.get('contrarian_position', '')}
-- Signature phrases to use: {brand_voice.get('phrases_to_use', '')}
-- Phrases to NEVER use: {brand_voice.get('phrases_to_avoid', '')}
-
-AUTHORITY SIGNAL RULES — include at least 2 of these in every piece:
-1. First-person data: "In our experience with [X clients/years]..."
-2. Named framework: Create a named methodology (e.g. "The [Brand] [Method/Framework/Approach]")
-3. Contrarian position: "Most [industry players] will tell you X, but that's wrong because..."
-4. Specific numbers: Use exact figures, percentages, timeframes — never vague estimates
-5. Expert quote: "As {brand_voice.get('founder_name', 'our founder')}, puts it: '...'"
-"""
+        brand_voice_block = ctx.to_brand_voice_block(brand_voice)
 
         # Build Data Intelligence block
         data_intel_block = ""
@@ -196,17 +176,25 @@ OUTPUT STRUCTURE — follow this exact HTML structure in order:
      </div>
    </div>
 
-WRITING RULES:
+WRITING RULES — GOOGLE SEARCH QUALITY STANDARDS:
 - NO breadcrumbs, NO navigation, NO header/footer elements
 - Use <h2> as the main heading (WordPress theme provides <h1> from page title — do NOT use <h1> tags)
+- Minimum 800 words total — pages under this threshold fail Google's "thin content" filter
+- UNIQUE ENTITIES: Mention 2-3 nearby landmarks, neighborhoods, or well-known local entities
+- UNIQUE STATISTICS: Include at least 2 specific numbers per page (e.g. "15 years serving X", "2,000+ vehicles repaired", "within 2.4 miles of Y"). NEVER reuse stats across pages
+- READABILITY: Write at 8th-10th grade level. Short sentences (15-25 words). No jargon without explanation
+- EXPERTISE SIGNAL: Include one "According to [expert/technician/founder]..." attribution
+- AUTHORITY SIGNAL: Reference 1-2 certifications, awards, or industry memberships relevant to the topic
+- TRUST SIGNAL: Include a guarantee, warranty statement, or third-party verification relevant to this page
+- GEO SIGNAL: Include the full business NAP (Name, Address, Phone) at least once naturally
 - Every claim must be specific: numbers, timeframes, named services — never "many" or "various"
-- Minimum 800 words total
 - Add descriptive alt text to ALL <img> tags (include keyword + location)
 - If real images were provided above, embed 1-2 <img> tags with exact src URLs
 - Start your output with EXACTLY this comment on line 1: <!-- META_DESC: [your 120-155 char SEO meta description here] -->
 - Then output the HTML fragment (no <html>, <body>, <head> tags)
 """
-        raw = self.call_claude(prompt, max_tokens=4000, model="claude-sonnet-4-6")
+        raw = self.call_claude(prompt, max_tokens=4000, model="claude-sonnet-4-6",
+                              system=self.build_cacheable_system(), cache_system=True)
         if not raw:
             return raw, ""
 
@@ -232,19 +220,11 @@ WRITING RULES:
 
         # Strip full HTML document wrappers — Claude occasionally generates these
         # even when told to output only fragments. If these reach WordPress they break the layout.
-        import re as _re
-        cleaned = _re.sub(r'<!DOCTYPE[^>]*>', '', cleaned, flags=_re.IGNORECASE)
-        cleaned = _re.sub(r'<html[^>]*>', '', cleaned, flags=_re.IGNORECASE)
-        cleaned = _re.sub(r'</html>', '', cleaned, flags=_re.IGNORECASE)
-        cleaned = _re.sub(r'<head>.*?</head>', '', cleaned, flags=_re.IGNORECASE | _re.DOTALL)
-        cleaned = _re.sub(r'<body[^>]*>', '', cleaned, flags=_re.IGNORECASE)
-        cleaned = _re.sub(r'</body>', '', cleaned, flags=_re.IGNORECASE)
-        cleaned = cleaned.strip()
+        from denzo.agents.base_agent import strip_html_wrappers, strip_h1_tags
+        cleaned = strip_html_wrappers(cleaned)
 
         # Enforce no H1 tags — WordPress/site theme provides the H1 from the page title.
-        # Claude ignores this instruction ~40% of the time, so post-process unconditionally.
-        cleaned = _re.sub(r'<h1(\s|>)', lambda m: '<h2' + m.group(1), cleaned)
-        cleaned = _re.sub(r'</h1>', '</h2>', cleaned)
+        cleaned = strip_h1_tags(cleaned)
 
         # Fallback meta description: extract first <p> text if Claude didn't include META_DESC
         if not meta_desc:
@@ -395,8 +375,9 @@ WRITING RULES:
                 continue
 
             db_write(
-                "UPDATE pages SET content=?, meta_description=?, quality_score=65, schema_markup=?, "
-                "status='ready', updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
+                "UPDATE pages SET content=?, meta_description=?, quality_score=65, scored_by='sonnet-4-6-initial', "
+                "schema_markup=?, status='ready', notes=COALESCE(notes||' ','')||'[PENDING_REVIEW]', "
+                "updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
                 (content, meta_desc, schema_local_business, page_dict["id"], self.ctx.tenant_id)
             )
             done += 1

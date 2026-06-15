@@ -142,7 +142,8 @@ Return ONLY valid JSON. Do not add any text outside the JSON object.
 """
         self.set_status("working", "Generating E-E-A-T strategy with AI")
         # Sonnet for this complex structured-JSON task — Haiku truncates at this token count
-        raw = self.call_claude(prompt, max_tokens=8000, model="claude-sonnet-4-6")
+        raw = self.call_claude(prompt, max_tokens=8000, model="claude-sonnet-4-6",
+                              system=self.build_cacheable_system(), cache_system=True)
 
         if not raw:
             self.log("AI returned empty response", "error")

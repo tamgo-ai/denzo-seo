@@ -12,7 +12,7 @@ AGENT_REGISTRY = {
     "Keyword Strategist":        ("layer1_research.keyword_strategist",          "KeywordStrategist",        1, "blue"),
     "Keyword Clusterer":         ("layer1_research.keyword_clusterer",           "KeywordClusterer",         1, "cyan"),
     "Competitor Intel":          ("layer1_research.competitor_intel",            "CompetitorIntel",          1, "purple"),
-    "Technical Auditor":         ("layer1_research.technical_auditor",           "TechnicalAuditor",         1, "gray"),
+    "Technical Auditor":         ("layer1_research.deep_auditor",                 "DeepTechnicalAuditor",     1, "gray"),
     "Site Style Analyzer":       ("layer1_research.site_style_analyzer",         "SiteStyleAnalyzer",        1, "teal"),
     "Data Intelligence":         ("layer1_research.data_intelligence",           "DataIntelligence",         1, "indigo"),
     "GBP Optimizer":             ("layer1_research.gbp_optimizer",               "GBPOptimizer",             1, "green"),
@@ -38,6 +38,10 @@ AGENT_REGISTRY = {
     "SERP Intelligence":         ("layer5_monitoring.serp_intelligence",         "SERPIntelligence",         6, "rose"),
     "Reviews Intelligence":      ("layer5_monitoring.reviews_intelligence",      "ReviewsIntelligence",      6, "orange"),
     "ROI Attribution":           ("layer5_monitoring.roi_attribution",           "ROIAttribution",           6, "amber"),
+    "Content Duplicate Checker": ("layer5_monitoring.content_duplicate_checker", "ContentDuplicateChecker",  6, "rose"),
+    "Perplexity Tracker":        ("layer5_monitoring.perplexity_tracker",        "PerplexityTracker",       6, "violet"),
+    "GEO Gap Closer":            ("layer5_monitoring.geo_gap_closer",            "GEOGapCloser",            6, "emerald"),
+    "Indexation Accelerator":   ("layer4_publishing.indexation_accelerator",    "IndexationAccelerator",   5, "emerald"),
 }
 
 LAYER_LABELS = {

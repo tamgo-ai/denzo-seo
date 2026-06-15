@@ -22,27 +22,7 @@ class GEOOptimizer(TenantAwareBaseAgent):
         keyword = page.get("target_keyword", title)
 
         # Build Brand Voice DNA block
-        brand_voice_block = ""
-        if brand_voice:
-            brand_voice_block = f"""
-BRAND VOICE DNA — follow this exactly:
-- Brand name: {brand_voice.get('brand_name', ctx.client_name)}
-- Writing style: {brand_voice.get('writing_style', 'professional')}
-- Years of experience to reference: {brand_voice.get('years_experience', '')}
-- Clients served: {brand_voice.get('clients_served', '')}
-- Founder voice: {brand_voice.get('founder_name', '')}
-- Key proprietary insights to weave in: {brand_voice.get('key_insight_1', '')} / {brand_voice.get('key_insight_2', '')} / {brand_voice.get('key_insight_3', '')}
-- Contrarian position: {brand_voice.get('contrarian_position', '')}
-- Signature phrases to use: {brand_voice.get('phrases_to_use', '')}
-- Phrases to NEVER use: {brand_voice.get('phrases_to_avoid', '')}
-
-AUTHORITY SIGNAL RULES — include at least 2 of these in every piece:
-1. First-person data: "In our experience with [X clients/years]..."
-2. Named framework: Create a named methodology (e.g. "The [Brand] [Method/Framework/Approach]")
-3. Contrarian position: "Most [industry players] will tell you X, but that's wrong because..."
-4. Specific numbers: Use exact figures, percentages, timeframes — never vague estimates
-5. Expert quote: "As {brand_voice.get('founder_name', 'our founder')}, puts it: '...'"
-"""
+        brand_voice_block = ctx.to_brand_voice_block(brand_voice)
 
         prompt = f"""{ctx.to_prompt_block()}
 {brand_voice_block}
@@ -70,23 +50,34 @@ Apply these GEO techniques:
 4. Add an "Expert perspective" block: <blockquote>"According to [business name]'s team: [specific authoritative statement relevant to this page's topic]"</blockquote>
 5. Include the full business NAP (Name, Address, Phone) once in a structured paragraph
 
-GEO OPTIMIZATION RULES FOR AI ANSWER ENGINES (ChatGPT, Perplexity, Google AI Overviews):
+GEO OPTIMIZATION RULES - PROVEN TECHNIQUES FOR AI CITATION (ChatGPT, Claude, Gemini, Perplexity, Copilot):
 
-6. DIRECT ANSWER SENTENCES (Direct Answer): For every key topic on this page, add a single sentence that directly answers the question in full. Format: "[Question] Answer: [direct answer]." These sentences are what AI models extract as citations.
+6. DIRECT ANSWER SENTENCES: For every key topic, add "Q: [question] A: [direct answer in 1-2 sentences]." AI models extract these verbatim. "Q: How much does collision repair cost in LA? A: At [business], collision repair typically costs $1,500-$4,500 with most jobs completed in 3-5 business days."
 
-7. DEFINITION BLOCKS (Definition Block): Add a clear 2-sentence definition of the main service/topic near the top. AI models prefer pages with explicit definitions.
+7. DEFINITION BLOCK: First paragraph MUST define the topic in 2 sentences. AI models use definitions to ground their answers.
 
-8. STATISTICS & SPECIFICS (Statistics): Include at least 2 specific data points (timeframes, percentages, measurements). "Most bumper repairs take 2-4 hours" is 10x more citable than "repairs are fast".
+8. STATISTICS & SPECIFICS: At least 3 unique data points per page. Numbers, percentages, exact timeframes. NEVER reuse stats across pages. "Average repair: 4.2 days" beats "fast repairs."
 
-9. STRUCTURED COMPARISON: Add a short section comparing this business to alternatives. AI models use these to recommend businesses.
+9. STRUCTURED COMPARISON TABLE: Add a comparison using <table> or structured <div> comparing this business to "alternatives" or "what to look for." AI models use comparison data for recommendations.
 
-10. SPEAKABLE CONTENT (Speakable): The first paragraph after H1 must be readable aloud in 15 seconds or less. Voice assistants prioritize this for "near me" queries.
+10. CITATION SNIPPETS: Wrap 2-3 key factual statements in <span class="citation-snippet"> tags. These sentences are the most likely to be extracted by AI. Each must be a complete, standalone fact.
 
-11. ENTITY ASSOCIATIONS (Entity Association): Mention 2-3 nearby landmarks, neighborhoods, or well-known local entities. This helps AI models associate the business with the geographic area.
+11. ENTITY ASSOCIATIONS: Mention 2-3 nearby landmarks, neighborhoods, or well-known local entities. "Located 0.8 miles from [Landmark]" helps geo-association in AI vector databases.
 
-Return the FULL improved HTML content. Return ONLY HTML, no explanation.
+12. AUTHOR ATTRIBUTION: Every page needs an "expert voice." Include: "According to [Name], [Title] at [Business] with [X] years of experience: '[direct quote]'"
+
+13. LAST-UPDATED TIMESTAMP: Add a visible "Last updated: [date]" within the content. AI models weigh freshness signals heavily.
+
+14. SEMANTIC HTML STRUCTURE: Use <article>, <section>, <address> tags. AI crawlers parse semantic HTML better than generic <div> soup.
+
+15. INTERNAL CITATION NETWORK: Link to 2-3 other pages on this exact topic cluster using descriptive anchor text. AI models see internal links as topical authority signals.
+
+16. COUNTERFACTUAL POSITIONING: Include ONE contrarian statement. "Most [industry] shops will tell you [X], but [Business] takes a different approach: [Y]." AI models cite unique perspectives over generic ones.
+
+Return the FULL improved HTML content with ALL these 16 techniques applied. Return ONLY HTML, no explanation.
 """
-        return self.call_claude(prompt, max_tokens=3000, model="claude-sonnet-4-6")
+        return self.call_claude(prompt, max_tokens=3000, model="claude-sonnet-4-6",
+                               system=self.build_cacheable_system(), cache_system=True)
 
     BATCH = 20
 

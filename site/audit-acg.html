@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEO Audit Report — Auto Collision Group (autoacg.com)</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  --bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a24;--border:rgba(255,255,255,0.06);
+  --text:#e8e8f0;--muted:#8888a0;--muted2:#555570;
+  --red:#ef4444;--amber:#f59e0b;--green:#22c55e;--blue:#3b82f6;--indigo:#6366f1;
+}
+body{margin:0;font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased}
+.container{max-width:1100px;margin:0 auto;padding:40px 24px}
+h1{font-size:36px;font-weight:800;letter-spacing:-0.03em;margin:0 0 4px;line-height:1.1}
+h2{font-size:22px;font-weight:700;letter-spacing:-0.02em;margin:40px 0 16px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+h3{font-size:16px;font-weight:600;margin:20px 0 10px}
+.meta-line{font-size:14px;color:var(--muted);margin:0 0 24px}
+
+.score-ring{display:inline-flex;align-items:center;justify-content:center;width:100px;height:100px;border-radius:50%;font-size:36px;font-weight:800;margin:16px 0;border:4px solid}
+.score-ring.critical{border-color:var(--red);color:var(--red)}
+.score-ring.warning{border-color:var(--amber);color:var(--amber)}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:768px){.grid2,.grid3,.grid4{grid-template-columns:1fr}}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px}
+.card.green{border-left:3px solid var(--green)}
+.card.red{border-left:3px solid var(--red)}
+.card.amber{border-left:3px solid var(--amber)}
+.card.blue{border-left:3px solid var(--blue)}
+.card-head{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted2);margin:0 0 8px}
+.card-val{font-size:28px;font-weight:800;letter-spacing:-0.03em;margin:0}
+.card-sub{font-size:11px;color:var(--muted);margin:4px 0 0}
+
+.issue{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:8px}
+.issue.p0{border-left:3px solid var(--red)}
+.issue.p1{border-left:3px solid var(--amber)}
+.issue.p2{border-left:3px solid var(--green)}
+.issue-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.issue-badge{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;padding:2px 8px;border-radius:4px}
+.issue-badge.p0{background:rgba(239,68,68,0.12);color:var(--red)}
+.issue-badge.p1{background:rgba(245,158,11,0.12);color:var(--amber)}
+.issue-badge.p2{background:rgba(34,197,94,0.12);color:var(--green)}
+.issue-title{font-size:14px;font-weight:600}
+.issue-desc{font-size:12px;color:var(--muted);line-height:1.6;margin:4px 0 0}
+.issue-fix{font-size:12px;color:var(--green);margin:8px 0 0;padding:8px 10px;background:rgba(34,197,94,0.04);border-radius:6px}
+.issue-impact{font-size:10px;font-weight:600;margin:6px 0 0}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2);padding:10px 12px;border-bottom:1px solid var(--border)}
+td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--muted)}
+.pass{color:var(--green);font-weight:600}
+.fail{color:var(--red);font-weight:600}
+.warn{color:var(--amber);font-weight:600}
+
+code{background:rgba(255,255,255,0.04);padding:2px 6px;border-radius:3px;font-size:12px;font-family:'JetBrains Mono','Fira Code',monospace}
+pre{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;overflow-x:auto;font-size:12px;font-family:'JetBrains Mono','Fira Code',monospace;line-height:1.5}
+
+.progress-bar{height:6px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden;margin:8px 0}
+.progress-fill{height:100%;border-radius:3px;transition:width 0.6s}
+.progress-fill.red{background:var(--red)}
+.progress-fill.amber{background:var(--amber)}
+.progress-fill.green{background:var(--green)}
+
+.section-toc{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0}
+.toc-item{font-size:12px;font-weight:500;color:var(--indigo);text-decoration:none;padding:6px 12px;border-radius:6px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.12);transition:all 0.15s}
+
+.donut{display:flex;align-items:center;gap:16px}
+.donut-ring{flex-shrink:0}
+
+.footer-note{text-align:center;color:var(--muted2);font-size:12px;margin-top:60px;padding:20px;border-top:1px solid var(--border)}
+
+.summary-hero{display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;margin:24px 0}
+.summary-score{text-align:center}
+.summary-details{flex:1;min-width:280px}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>🔍 SEO Technical Audit</h1>
+<p style="font-size:20px;font-weight:600;margin:0 0 4px;">Auto Collision Group</p>
+<p class="meta-line">
+  <span>autoacg.com</span> &nbsp;·&nbsp;
+  <span>Vercel + Next.js</span> &nbsp;·&nbsp;
+  <span>13 locations — California</span> &nbsp;·&nbsp;
+  <span>June 5, 2026</span>
+</p>
+
+<!-- ═══════════════ EXECUTIVE SUMMARY ═══════════════ -->
+<div class="summary-hero">
+  <div class="summary-score">
+    <div class="score-ring critical">48<span style="font-size:14px">/100</span></div>
+    <p style="font-size:11px;color:var(--muted);margin:4px 0 0;">CRITICAL — Needs Immediate Action</p>
+  </div>
+  <div class="summary-details">
+    <div class="grid2">
+      <div class="card red">
+        <p class="card-head">Critical Issues</p>
+        <p class="card-val" style="color:var(--red)">5</p>
+        <p class="card-sub">Blocking rankings &amp; rich results</p>
+      </div>
+      <div class="card amber">
+        <p class="card-head">High Priority</p>
+        <p class="card-val" style="color:var(--amber)">7</p>
+        <p class="card-sub">Significant ranking impact</p>
+      </div>
+      <div class="card blue">
+        <p class="card-head">Quick Wins</p>
+        <p class="card-val" style="color:var(--blue)">6</p>
+        <p class="card-sub">Easy fixes, good ROI</p>
+      </div>
+      <div class="card green">
+        <p class="card-head">Passing</p>
+        <p class="card-val" style="color:var(--green)">8</p>
+        <p class="card-sub">What's working well</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ TABLE OF CONTENTS ═══════════════ -->
+<div class="section-toc">
+  <a href="#s1" class="toc-item">1. On-Page SEO</a>
+  <a href="#s2" class="toc-item">2. Technical SEO</a>
+  <a href="#s3" class="toc-item">3. Schema &amp; Structured Data</a>
+  <a href="#s4" class="toc-item">4. Images &amp; Media</a>
+  <a href="#s5" class="toc-item">5. Performance</a>
+  <a href="#s6" class="toc-item">6. GEO / AI Visibility</a>
+  <a href="#s7" class="toc-item">7. Social &amp; Sharing</a>
+  <a href="#s8" class="toc-item">8. Local SEO</a>
+  <a href="#s9" class="toc-item">9. Content Quality</a>
+  <a href="#s10" class="toc-item">10. Security &amp; Technical</a>
+  <a href="#s11" class="toc-item">11. Action Plan</a>
+</div>
+
+<!-- ═══════════════ 1. ON-PAGE SEO ═══════════════ -->
+<h2 id="s1">1. On-Page SEO <span style="font-size:14px;color:var(--amber);font-weight:500;">— Score: 35/100</span></h2>
+
+<div class="issue p0">
+  <div class="issue-head">
+    <span class="issue-badge p0">CRITICAL</span>
+    <span class="issue-title">Title Tag: 26 characters — severely under-optimized</span>
+  </div>
+  <div class="issue-desc">
+    Current title: <code>"Certified Auto Body Repair"</code><br>
+    This is a <strong>generic, location-less title</strong>. It doesn't include the business name, primary city, or target keywords. Google typically displays 50-60 characters in SERPs — you're wasting 50% of your most valuable SEO real estate. With 13 locations across California, the homepage title MUST signal geographic relevance.
+  </div>
+  <div class="issue-impact" style="color:var(--red)">Impact: Direct ranking loss for all location-based keywords</div>
+  <div class="issue-fix">
+    <strong>→ Fix:</strong> Optimize to 55-60 characters. Recommended:<br>
+    <code>Auto Body Repair in California | 13 Locations | Auto Collision Group</code><br>
+    or: <code>Certified Auto Body & Collision Repair — Whittier, CA & 12 Locations | ACG</code>
+  </div>
+</div>
+
+<div class="issue p0">
+  <div class="issue-head">
+    <span class="issue-badge p0">CRITICAL</span>
+    <span class="issue-title">H1 Tag: poorly formatted, no location keyword</span>
+  </div>
+  <div class="issue-desc">
+    Current H1: <code>"We use OEM Parts in all of our repairs."</code><br>
+    The H1 is a marketing slogan, not an SEO-optimized heading. The words appear merged in the rendered output ("OEM Partsin all of ourrepairs"), suggesting a Next.js rendering bug. The H1 should contain the primary keyword and location.
+  </div>
+  <div class="issue-impact" style="color:var(--red)">Impact: Missed primary ranking signal — H1 is one of Google's top 3 on-page factors</div>
+  <div class="issue-fix">
+    <strong>→ Fix:</strong> <code>Certified Auto Body Repair with OEM Parts — 13 Locations Across California</code>
+  </div>
+</div>
+
+<div class="issue p0">
+  <div class="issue-head">
+    <span class="issue-badge p0">CRITICAL</span>
+    <span class="issue-title">No Canonical URL Tag</span>
+  </div>
+  <div class="issue-desc">
+    The page is served at <code>/en</code> (redirect from <code>/</code>) but has <strong>no canonical tag</strong>. This creates duplicate content risk — Google may index <code>/</code>, <code>/en</code>, and <code>/en/</code> as separate pages, splitting ranking signals across multiple URLs.
+  </div>
+  <div class="issue-impact" style="color:var(--red)">Impact: Diluted PageRank and potential duplicate content penalties</div>
+  <div class="issue-fix">
+    <strong>→ Fix:</strong> Add <code>&lt;link rel="canonical" href="https://www.autoacg.com/"&gt;</code> in &lt;head&gt;
+  </div>
+</div>
+
+<div class="issue p1">
+  <div class="issue-head">
+    <span class="issue-badge p1">HIGH</span>
+    <span class="issue-title">Duplicate H2 Headings</span>
+  </div>
+  <div class="issue-desc">
+    4 H2 tags appear <strong>twice</strong> on the page: "Hours: Monday–Friday…", "Premium Services", "CERTIFIED AUTO COLLISION GROUP", "COMPLIMENTARY TOW SERVICE". Duplicate headings confuse Google's content structure analysis and waste crawl budget on redundant signals.
+  </div>
+  <div class="issue-fix">
+    <strong>→ Fix:</strong> Ensure each H2 is unique. Merge duplicate sections into a single instance. Use H3s for sub-points under unique H2s.
+  </div>
+</div>
+
+<div class="issue p1">
+  <div class="issue-head">
+    <span class="issue-badge p1">HIGH</span>
+    <span class="issue-title">Meta Description: acceptable but not optimal</span>
+  </div>
+  <div class="issue-desc">
+    Current: <code>"Auto Collision Group offers certified auto body and refinishing repairs in California. Services include online estimates, towing, and rental assistance."</code> (152 chars). Good length, mentions services, but missing a <strong>CTA</strong> and <strong>primary city</strong>.
+  </div>
+  <div class="issue-fix">
+    <strong>→ Fix:</strong> <code>"Auto Collision Group provides certified auto body repair with OEM parts at 13 California locations including Whittier, Bakersfield & LA. Free estimates & 24/7 towing. Call 833-333-4224."</code>
+  </div>
+</div>
+
+<!-- ═══════════════ 2. TECHNICAL SEO ═══════════════ -->
+<h2 id="s2">2. Technical SEO <span style="font-size:14px;color:var(--amber);font-weight:500;">— Score: 40/100</span></h2>
+
+<div class="issue p0">
+  <div class="issue-head">
+    <span class="issue-badge p0">CRITICAL</span>
+    <span class="issue-title">237KB of Inline JavaScript — 62% of page weight</span>
+  </div>
+  <div class="issue-desc">
+    The page contains <strong>237,479 bytes of inline JavaScript</strong> (62% of total HTML). This is Next.js framework code (13 JS bundles + inline chunks). While some is unavoidable with Next.js, this volume causes:
+    <ul style="margin:6px 0;padding-left:20px;font-size:12px;color:var(--muted);">
+      <li>Slow Time to Interactive (TTI) — Google ranks based on Core Web Vitals</li>
+      <li>Poor mobile experience — 375KB download before rendering</li>
+      <li>Text-to-HTML ratio of only 3% — Google sees this as "thin content" despite 1,663 words</li>
+    </ul>
+  </div>
+  <div class="issue-impact" style="color:var(--red)">Impact: Core Web Vitals penalty, especially on mobile. Affects ALL keyword rankings.</div>
+  <div class="issue-fix">
+    <strong>→ Fix:</strong> Enable Next.js <code>swcMinify: true</code>. Use <code>next/dynamic</code> for below-fold components. Move non-critical JS to <code>async</code> or <code>defer</code>. Consider reducing JS bundle count.
+  </div>
+</div>
+
+<div class="issue p1">
+  <div class="issue-head">
+    <span class="issue-badge p1">HIGH</span>
+    <span class="issue-title">Cache-Control: no-store — zero browser caching</span>
+  </div>
+  <div class="issue-desc">
+    Server returns <code>Cache-Control: private, no-cache, no-store, max-age=0, must-revalidate</code>. This means <strong>every visit downloads the full 375KB from scratch</strong>. For returning visitors and Googlebot, this adds unnecessary latency.
+  </div>
+  <div class="issue-fix">
+    <strong>→ Fix:</strong> Set <code>Cache-Control: public, max-age=3600, stale-while-revalidate=86400</code> for static pages. Use ISR (Incremental Static Regeneration) in Next.js for location pages.
+  </div>
+</div>
+
+<div class="issue p1">
+  <div class="issue-head">
+    <span class="issue-badge p1">HIGH</span>
+    <span class="issue-title">URL /en suffix without hreflang tags</span>
+  </div>
+  <div class="issue-desc">
+    Homepage redirects to <code>/en</code>, implying an English version exists. But <strong>0 hreflang tags</strong> are present. Google interprets <code>/en</code> as a separate URL from <code>/</code> — if you don't have other languages, this is unnecessary URL complexity.
+  </div>
+  <div class="issue-fix">
+    <strong>→ Fix:</strong> Remove the <code>/en</code> redirect and serve directly from <code>/</code>. If multi-language IS planned, add proper hreflang tags: <code>&lt;link rel="alternate" hreflang="en" href="https://www.autoacg.com/en"&gt;</code> <code>&lt;link rel="alternate" hreflang="es" href="https://www.autoacg.com/es"&gt;</code> <code>&lt;link rel="alternate" hreflang="x-default" href="https://www.autoacg.com/"&gt;</code>
+  </div>
+</div>
+
+<div class="issue p2">
+  <div class="issue-head">
+    <span class="issue-badge p2">PASS</span>
+    <span class="issue-title">HTTPS + HSTS properly configured ✓</span>
+  </div>
+  <div class="issue-desc">
+    HTTPS enforced. HSTS max-age=63,072,000 (2 years). This is correctly configured and meets security best practices.
+  </div>
+</div>
+
+<!-- ═══════════════ 3. SCHEMA ═══════════════ -->
+<h2 id="s3">3. Schema &amp; Structured Data <span style="font-size:14px;color:var(--red);font-weight:500;">— Score: 0/100</span></h2>
+
+<div class="issue p0">
+  <div class="issue-head">
+    <span class="issue-badge p0">CRITICAL</span>
+    <span class="issue-title">ZERO JSON-LD Schema Markup — completely absent</span>
+  </div>
+  <div class="issue-desc">
+    <strong>0 schema blocks found</strong> on the entire page. This is the single biggest SEO issue. Without schema markup, Google cannot:
+    <ul style="margin:6px 0;padding-left:20px;font-size:12px;color:var(--muted);">
+      <li>Display rich results (star ratings, hours, FAQs, breadcrumbs)</li>
+      <li>Qualify for Google Local Pack and Google Maps integration</li>
+      <li>Show site links, business details, or service information in SERPs</li>
+      <li>Get cited by AI engines (ChatGPT, Perplexity, Google AI Overviews)</li>
+    </ul>
+    With <strong>13 physical locations</strong>, this is a massive missed opportunity. Each location needs its own LocalBusiness schema block.
+  </div>
+  <div class="issue-impact" style="color:var(--red)">Impact: Invisible to rich results, local pack, and AI search. Estimated traffic loss: 30-50%.</div>
+  <div class="issue-fix">
+    <strong>→ Fix (Priority #1):</strong> Implement these schema types immediately:<br><br>
+    <strong>1. LocalBusiness + AutoRepair</strong> — for each of 13 locations:<br>
+    <pre>{
+  "@context": "https://schema.org",
+  "@type": ["LocalBusiness", "AutoRepair"],
+  "name": "Auto Collision Group — Whittier",
+  "address": { "@type": "PostalAddress", "streetAddress": "...", "addressLocality": "Whittier", "addressRegion": "CA" },
+  "telephone": "833-333-4224",
+  "openingHoursSpecification": { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday"], "opens": "08:00", "closes": "17:00" },
+  "areaServed": { "@type": "City", "name": "Whittier" }
+}</pre><br>
+    <strong>2. FAQPage</strong> — for GEO/AI citation visibility:<br>
+    <pre>{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "Do you use OEM parts for collision repair?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Auto Collision Group uses OEM (Original Equipment Manufacturer) parts exclusively — this includes Tesla, BMW, Maserati, and all luxury brands." }},
+    { "@type": "Question", "name": "Do you offer free towing after an accident?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. We provide complimentary 24/7 towing service. Call 833-333-4224 anytime." }},
+    { "@type": "Question", "name": "How many locations does Auto Collision Group have?", "acceptedAnswer": { "@type": "Answer", "text": "13 locations across California: Whittier, Bakersfield (2), Covina, Fresno, Gardena (2), Ontario, Santa Ana, Victorville, Los Angeles, Rancho Cucamonga, and El Cajon." }}
+  ]
+}</pre><br>
+    <strong>3. BreadcrumbList</strong> — for navigation structure in SERPs<br>
+    <strong>4. Organization</strong> — for brand knowledge panel<br>
+    <strong>5. Service</strong> — for each service offered (auto body repair, refinishing, aluminum repair, etc.)
+  </div>
+</div>
+
+<!-- ═══════════════ 4. IMAGES ═══════════════ -->
+<h2 id="s4">4. Images &amp; Media <span style="font-size:14px;color:var(--green);font-weight:500;">— Score: 68/100</span></h2>
+
+<table>
+  <tr><th>Metric</th><th>Value</th><th>Status</th></tr>
+  <tr><td>Total Images</td><td>96</td><td>—</td></tr>
+  <tr><td>Alt Text Present</td><td>96 / 96 (100%)</td><td class="pass">✓ Excellent</td></tr>
+  <tr><td>Generic Alt Text</td><td>0</td><td class="pass">✓ All descriptive</td></tr>
+  <tr><td>WebP Format</td><td>36 / 96 (37%)</td><td class="warn">⚠ Only 37% — should be 100%</td></tr>
+  <tr><td>Lazy Loaded</td><td>36 / 96 (37%)</td><td class="warn">⚠ Only 37% — should be ~80%</td></tr>
+  <tr><td>Width/Height Set</td><td>2 / 96 (2%)</td><td class="fail">✗ CLS risk — 94 images have no dimensions</td></tr>
+  <tr><td>Next.js Image Optimization</td><td>Using /_next/image</td><td class="pass">✓ Good — but not all images use it</td></tr>
+</table>
+
+<div class="issue p1" style="margin-top:16px;">
+  <div class="issue-head">
+    <span class="issue-badge p1">HIGH</span>
+    <span class="issue-title">94 images missing width/height — severe CLS risk</span>
+  </div>
+  <div class="issue-desc">
+    Only 2 of 96 images have explicit <code>width</code> and <code>height</code> attributes. This causes <strong>Cumulative Layout Shift (CLS)</strong> — the page jumps around as images load. Google penalizes CLS heavily in Core Web Vitals (threshold: 0.1). Each un-sized image contributes to layout instability.
+  </div>
+  <div class="issue-fix">
+    <strong>→ Fix:</strong> Use Next.js <code>&lt;Image&gt;</code> component (not plain &lt;img&gt;) for ALL images. The Next.js Image component automatically sets dimensions and prevents CLS.<br>
+    Also: convert remaining 63% of images to WebP/AVIF format for additional 30-50% size reduction.
+  </div>
+</div>
+
+<!-- ═══════════════ 5. PERFORMANCE ═══════════════ -->
+<h2 id="s5">5. Performance <span style="font-size:14px;color:var(--amber);font-weight:500;">— Score: 42/100</span></h2>
+
+<div class="grid2">
+  <div class="card red">
+    <p class="card-head">Total Page Size</p>
+    <p class="card-val" style="color:var(--red)">375 KB</p>
+    <p class="card-sub">Ideal: &lt;200KB for mobile-first</p>
+  </div>
+  <div class="card red">
+    <p class="card-head">Inline JavaScript</p>
+    <p class="card-val" style="color:var(--red)">237 KB</p>
+    <p class="card-sub">62% of page — framework overhead</p>
+  </div>
+  <div class="card amber">
+    <p class="card-head">Text-to-HTML Ratio</p>
+    <p class="card-val" style="color:var(--amber)">3.0%</p>
+    <p class="card-sub">Normal: 10-25% (Google flags &lt;5%)</p>
+  </div>
+  <div class="card amber">
+    <p class="card-head">Cache Strategy</p>
+    <p class="card-val" style="color:var(--amber)">None</p>
+    <p class="card-sub">no-store — every visit re-downloads</p>
+  </div>
+  <div class="card green">
+    <p class="card-head">Compression</p>
+    <p class="card-val" style="color:var(--green)">Brotli</p>
+    <p class="card-sub">✓ Vercel provides automatic Brotli</p>
+  </div>
+  <div class="card blue">
+    <p class="card-head">Hosting</p>
+    <p class="card-val" style="color:var(--blue)">Vercel</p>
+    <p class="card-sub">✓ Good CDN + Edge Network</p>
+  </div>
+</div>
+
+<div class="issue p1" style="margin-top:16px;">
+  <div class="issue-head">
+    <span class="issue-badge p1">HIGH</span>
+    <span class="issue-title">13 external JavaScript files + 1 CSS file</span>
+  </div>
+  <div class="issue-desc">
+    14 total external resources (13 JS + 1 CSS). Each file requires a separate HTTP request. While HTTP/2 multiplexes, reducing the number of bundles would improve load time significantly on slower connections (mobile, 4G).
+  </div>
+  <div class="issue-fix">
+    <strong>→ Fix:</strong> Bundle CSS into 1 file. Code-split JS by route. Use <code>next/dynamic</code> with <code>ssr: false</code> for non-critical components.
+  </div>
+</div>
+
+<!-- ═══════════════ 6. GEO / AI VISIBILITY ═══════════════ -->
+<h2 id="s6">6. GEO / AI Visibility <span style="font-size:14px;color:var(--red);font-weight:500;">— Score: 10/100</span></h2>
+
+<p style="color:var(--muted);font-size:13px;">
+  GEO (Generative Engine Optimization) determines whether AI platforms — Google AI Overviews, ChatGPT, Perplexity, Claude, Gemini — cite your business. With 41 out of 260 GEO queries already citing ACG, fixing these issues will directly increase AI-driven traffic.
+</p>
+
+<div class="issue p0">
+  <div class="issue-head">
+    <span class="issue-badge p0">CRITICAL</span>
+    <span class="issue-title">Zero FAQ Content — invisible to AI citations</span>
+  </div>
+  <div class="issue-desc">
+    AI engines cite content that <strong>directly answers questions</strong>. The page has zero FAQ content — no Q&A format, no definition blocks, no structured answers. AI models look for: clear question → clear answer patterns. Without them, ACG is invisible in AI-generated recommendations.
+  </div>
+  <div class="issue-fix">
+    <strong>→ Fix:</strong> Add 8-10 FAQs with FAQPage schema. Key questions to answer:<br>
+    • "Does Auto Collision Group use OEM parts?"<br>
+    • "What insurance companies does ACG work with?"<br>
+    • "How long does auto body repair take?"<br>
+    • "Do you offer a warranty on collision repair?"<br>
+    • "What areas do you serve in California?"<br>
+    • "Do you provide rental cars during repair?"<br>
+    • "How do I get a free estimate?"<br>
+    • "Are you certified for Tesla/BMW/Maserati repair?"
+  </div>
+</div>
+
+<div class="issue p0">
+  <div class="issue-head">
+    <span class="issue-badge p0">CRITICAL</span>
+    <span class="issue-title">No structured lists or tables</span>
+  </div>
+  <div class="issue-desc">
+    <strong>0 HTML lists (&lt;ul&gt;/&lt;ol&gt;)</strong> found on the page. AI models prefer structured, scannable content. Lists of services, locations, certifications, and insurance partners would be cited directly. Currently, 13 locations are mentioned but not structured in a list — AI can't easily parse them.
+  </div>
+  <div class="issue-fix">
+    <strong>→ Fix:</strong> Add structured lists for: services (6 items), locations (13 items), certifications (34 items), insurance partners. Wrap in semantic HTML with descriptive headings.
+  </div>
+</div>
+
+<div class="issue p1">
+  <div class="issue-head">
+    <span class="issue-badge p1">HIGH</span>
+    <span class="issue-title">No definition block — missing authoritative first paragraph</span>
+  </div>
+  <div class="issue-desc">
+    AI citations require the first paragraph to directly answer "what is this business?" The current homepage opens with a slogan, not a definition. AI models skip content that doesn't immediately establish "who, what, where."
+  </div>
+  <div class="issue-fix">
+    <strong>→ Fix:</strong> Add a clear definition as the first content block:<br>
+    <em>"Auto Collision Group is a certified auto body and collision repair company with 13 locations across California. Founded in Whittier, CA, ACG specializes in OEM-certified repairs for luxury vehicles including Tesla, BMW, and Maserati, offering free 24/7 towing, online estimates, and lifetime warranty on all repairs."</em>
+  </div>
+</div>
+
+<!-- ═══════════════ 7. SOCIAL ═══════════════ -->
+<h2 id="s7">7. Social &amp; Sharing <span style="font-size:14px;color:var(--red);font-weight:500;">— Score: 0/100</span></h2>
+
+<div class="issue p0">
+  <div class="issue-head">
+    <span class="issue-badge p0">CRITICAL</span>
+    <span class="issue-title">ZERO Open Graph tags — social sharing is broken</span>
+  </div>
+  <div class="issue-desc">
+    When someone shares autoacg.com on Facebook, LinkedIn, WhatsApp, iMessage, or Slack, the link appears as <strong>plain text with no image, no title, no description</strong>. This directly reduces click-through from social channels and makes the business look unprofessional.
+  </div>
+  <div class="issue-fix">
+    <strong>→ Fix:</strong> Add these meta tags in &lt;head&gt;:<br>
+    <pre>&lt;meta property="og:title" content="Auto Collision Group | Certified Auto Body Repair — 13 CA Locations"&gt;
+&lt;meta property="og:description" content="Certified auto body repair with OEM parts. 13 locations across California. Free estimates &amp; 24/7 towing. Tesla, BMW &amp; Maserati certified."&gt;
+&lt;meta property="og:image" content="https://www.autoacg.com/images/og-image.jpg"&gt;
+&lt;meta property="og:url" content="https://www.autoacg.com"&gt;
+&lt;meta property="og:type" content="website"&gt;
+&lt;meta name="twitter:card" content="summary_large_image"&gt;
+&lt;meta name="twitter:title" content="Auto Collision Group | Certified Auto Body Repair"&gt;
+&lt;meta name="twitter:image" content="https://www.autoacg.com/images/twitter-card.jpg"&gt;</pre>
+  </div>
+</div>
+
+<p style="font-size:12px;color:var(--muted);">
+  <strong>Recommendation:</strong> Create a 1200×630px OG image with the ACG logo, tagline "13 California Locations", and phone number. Use brand colors (#e40014 red, #2197d4 blue based on Site Style Analyzer findings).
+</p>
+
+<!-- ═══════════════ 8. LOCAL SEO ═══════════════ -->
+<h2 id="s8">8. Local SEO <span style="font-size:14px;color:var(--amber);font-weight:500;">— Score: 55/100</span></h2>
+
+<div class="grid2">
+  <div class="card green">
+    <p class="card-head">Location Mentions</p>
+    <p class="card-val" style="color:var(--green)">11/13</p>
+    <p class="card-sub">Cities mentioned on homepage</p>
+  </div>
+  <div class="card green">
+    <p class="card-head">Phone Number</p>
+    <p class="card-val" style="color:var(--green)">✓ Visible</p>
+    <p class="card-sub">833-333-4224 in page content</p>
+  </div>
+  <div class="card amber">
+    <p class="card-head">NAP Consistency</p>
+    <p class="card-val" style="color:var(--amber)">Unknown</p>
+    <p class="card-sub">Need to verify across 13 GBPs</p>
+  </div>
+  <div class="card red">
+    <p class="card-head">LocalBusiness Schema</p>
+    <p class="card-val" style="color:var(--red)">Missing</p>
+    <p class="card-sub">0 of 13 locations have schema</p>
+  </div>
+</div>
+
+<div class="issue p1" style="margin-top:16px;">
+  <div class="issue-head">
+    <span class="issue-badge p1">HIGH</span>
+    <span class="issue-title">13 location pages not linked from homepage</span>
+  </div>
+  <div class="issue-desc">
+    All 13 cities are mentioned, but there are <strong>no dedicated links</strong> to individual location pages. Google needs clear internal linking to understand your location architecture. Each location should have: a dedicated page, linked from homepage, with unique LocalBusiness schema, and Google Business Profile integration.
+  </div>
+  <div class="issue-fix">
+    <strong>→ Fix:</strong> Add a "Our Locations" section with links to each city page. Use the Denzo SEO Programmatic SEO agent to generate 13 optimized location pages with unique content per city.
+  </div>
+</div>
+
+<!-- ═══════════════ 9. CONTENT QUALITY ═══════════════ -->
+<h2 id="s9">9. Content Quality <span style="font-size:14px;color:var(--amber);font-weight:500;">— Score: 50/100</span></h2>
+
+<table>
+  <tr><th>Metric</th><th>Value</th><th>Assessment</th></tr>
+  <tr><td>Word Count</td><td>1,663</td><td class="warn">⚠ Adequate for homepage — 2,000+ recommended</td></tr>
+  <tr><td>Paragraphs</td><td>48</td><td class="pass">✓ Good paragraph density</td></tr>
+  <tr><td>HTML Lists</td><td>0 (zero)</td><td class="fail">✗ Critical — zero structured lists</td></tr>
+  <tr><td>List Items</td><td>0</td><td class="fail">✗ No scannable content</td></tr>
+  <tr><td>Avg Sentence Length</td><td>11.4 words</td><td class="pass">✓ Readable — good range (10-20 ideal)</td></tr>
+  <tr><td>Internal Links</td><td>38</td><td class="pass">✓ Good crawl structure</td></tr>
+  <tr><td>External Links</td><td>6</td><td class="pass">✓ Reasonable</td></tr>
+  <tr><td>FAQs Present</td><td>0</td><td class="fail">✗ None</td></tr>
+  <tr><td>CTAs</td><td>2 ("call us", "free estimate")</td><td class="warn">⚠ Add more contextual CTAs</td></tr>
+</table>
+
+<div class="issue p1" style="margin-top:16px;">
+  <div class="issue-head">
+    <span class="issue-badge p1">HIGH</span>
+    <span class="issue-title">No structured service descriptions</span>
+  </div>
+  <div class="issue-desc">
+    The page mentions services (auto body repair, aluminum repair, refinish, towing, estimates, rental, financing) but doesn't have structured, keyword-rich descriptions of each. Each service should have: a heading, a 2-3 sentence description, and a CTA link to a dedicated service page.
+  </div>
+  <div class="issue-fix">
+    <strong>→ Fix:</strong> For each of the 7 services, add: H2 heading → 2-3 sentence description with keywords → CTA button. This creates "service silos" that Google loves.
+  </div>
+</div>
+
+<!-- ═══════════════ 10. SECURITY ═══════════════ -->
+<h2 id="s10">10. Security &amp; Technical <span style="font-size:14px;color:var(--green);font-weight:500;">— Score: 85/100</span></h2>
+
+<table>
+  <tr><th>Header</th><th>Value</th><th>Status</th></tr>
+  <tr><td>HTTPS</td><td>✓ Enforced</td><td class="pass">✓</td></tr>
+  <tr><td>HSTS</td><td>max-age=63072000 (2 years)</td><td class="pass">✓ Excellent</td></tr>
+  <tr><td>X-Content-Type-Options</td><td>Not set</td><td class="warn">⚠ Add: nosniff</td></tr>
+  <tr><td>X-Frame-Options</td><td>Not set</td><td class="warn">⚠ Add: DENY or SAMEORIGIN</td></tr>
+  <tr><td>Content-Security-Policy</td><td>Not set</td><td class="warn">⚠ Recommended for Next.js</td></tr>
+  <tr><td>Server</td><td>Vercel</td><td class="pass">✓ Enterprise-grade</td></tr>
+</table>
+
+<!-- ═══════════════ 11. ACTION PLAN ═══════════════ -->
+<h2 id="s11">11. Action Plan — Prioritized Roadmap</h2>
+
+<h3>🔴 WEEK 1 — Critical (Revenue Impact: Immediate)</h3>
+<div class="issue p0">
+  <div class="issue-head"><span class="issue-badge p0">P0</span><span class="issue-title">Implement JSON-LD Schema (LocalBusiness × 13 + FAQPage + Organization)</span></div>
+  <div class="issue-desc">Estimated effort: 4-6 hours. Tool: Denzo SEO Schema Engineer agent.</div>
+  <div class="issue-impact" style="color:var(--green)">Expected impact: Rich results within 2-4 weeks, +20-35% CTR</div>
+</div>
+<div class="issue p0">
+  <div class="issue-head"><span class="issue-badge p0">P0</span><span class="issue-title">Add Canonical URL Tag + Fix /en redirect</span></div>
+  <div class="issue-desc">Estimated effort: 30 minutes. Fix in Next.js config or _document.tsx.</div>
+  <div class="issue-impact" style="color:var(--green)">Expected impact: Consolidated ranking signals within 1-2 weeks</div>
+</div>
+<div class="issue p0">
+  <div class="issue-head"><span class="issue-badge p0">P0</span><span class="issue-title">Add Full Open Graph + Twitter Card Tags</span></div>
+  <div class="issue-desc">Estimated effort: 1 hour. Create OG image (1200×630px). Add meta tags.</div>
+  <div class="issue-impact" style="color:var(--green)">Expected impact: Better social CTR immediately</div>
+</div>
+
+<h3>🟡 WEEK 2 — High Priority (Revenue Impact: Short-term)</h3>
+<div class="issue p1">
+  <div class="issue-head"><span class="issue-badge p1">P1</span><span class="issue-title">Fix Title Tag + H1 + Meta Description</span></div>
+  <div class="issue-desc">Optimize with location keywords. Title: 55-60 chars. H1: include "California" + "OEM Parts". Meta: add CTA + phone.</div>
+</div>
+<div class="issue p1">
+  <div class="issue-head"><span class="issue-badge p1">P1</span><span class="issue-title">Add 8-10 FAQs with FAQPage Schema for GEO/AI visibility</span></div>
+  <div class="issue-desc">Critical for AI citations. Use Denzo SEO GEO Optimizer agent.</div>
+</div>
+<div class="issue p1">
+  <div class="issue-head"><span class="issue-badge p1">P1</span><span class="issue-title">Add structured HTML lists (services, locations, certifications)</span></div>
+  <div class="issue-desc">Replace plain text with &lt;ul&gt;/&lt;ol&gt; lists. 0 lists → at least 5-6.</div>
+</div>
+<div class="issue p1">
+  <div class="issue-head"><span class="issue-badge p1">P1</span><span class="issue-title">Eliminate duplicate H2s + fix H1 rendering bug</span></div>
+  <div class="issue-desc">Each H2 must be unique. Fix words-merging-together rendering issue.</div>
+</div>
+
+<h3>🟢 WEEK 3-4 — Optimization (Revenue Impact: Medium-term)</h3>
+<div class="issue p2">
+  <div class="issue-head"><span class="issue-badge p2">P2</span><span class="issue-title">Fix 94 images missing width/height dimensions (CLS)</span></div>
+  <div class="issue-desc">Use Next.js &lt;Image&gt; component everywhere. Convert remaining images to WebP.</div>
+</div>
+<div class="issue p2">
+  <div class="issue-head"><span class="issue-badge p2">P2</span><span class="issue-title">Reduce inline JavaScript (237KB → target &lt;100KB)</span></div>
+  <div class="issue-desc">Code splitting, dynamic imports, tree shaking. Enable SWC minification.</div>
+</div>
+<div class="issue p2">
+  <div class="issue-head"><span class="issue-badge p2">P2</span><span class="issue-title">Set Cache-Control headers for static pages</span></div>
+  <div class="issue-desc">Use ISR (Incremental Static Regeneration). Add stale-while-revalidate.</div>
+</div>
+<div class="issue p2">
+  <div class="issue-head"><span class="issue-badge p2">P2</span><span class="issue-title">Add security headers (X-Content-Type, X-Frame, CSP)</span></div>
+  <div class="issue-desc">Configure in vercel.json or next.config.js. Low effort, good security hygiene.</div>
+</div>
+<div class="issue p2">
+  <div class="issue-head"><span class="issue-badge p2">P2</span><span class="issue-title">Expand content to 2,500+ words with service descriptions</span></div>
+  <div class="issue-desc">Each service gets: H2 → 2-3 sentence description → CTA. Add definition block.</div>
+</div>
+<div class="issue p2">
+  <div class="issue-head"><span class="issue-badge p2">P2</span><span class="issue-title">Link 13 individual location pages from homepage</span></div>
+  <div class="issue-desc">Generate with Denzo SEO Programmatic SEO agent. Each gets unique LocalBusiness schema.</div>
+</div>
+
+<div class="footer-note">
+  <p><strong>Audit performed by Denzo SEO Platform</strong> — June 5, 2026</p>
+  <p>Data collected via direct crawl, Apify SEO Audit Tool (Score: 87/100 B-grade by Apify's automated scanner), and manual analysis.</p>
+  <p>Next audit recommended after implementing Critical + High Priority fixes (2-3 weeks).</p>
+  <p style="margin-top:16px;font-size:10px;color:var(--muted2);">
+    autoacg.com &nbsp;|&nbsp; 13 locations &nbsp;|&nbsp; 833-333-4224 &nbsp;|&nbsp; Vercel + Next.js &nbsp;|&nbsp; Industry: auto_body_shop
+  </p>
+</div>
+
+</div>
+</body>
+</html>

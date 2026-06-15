@@ -72,6 +72,7 @@
        analyzeError: '',
        currentAnalyzeStep: 0,
        isMultilocation: false,
+       submitting: false,
        analysisData: {},
        publisherType: 'wordpress',
        fields: {
@@ -117,6 +118,31 @@
        servicesJson() { return JSON.stringify(this.servicesList.map(s => s.name)); },
        dontSellJson() { return JSON.stringify(this.dontSellList); },
        competitorsJson() { return JSON.stringify(this.competitors.filter(c => c.name.trim())); },
+       get servicePlaceholder() {
+         const map = {
+           'automotive_dealership': 'e.g. New Car Sales, Trade-In Appraisal, BMW Financing…',
+           'auto_body_shop': 'e.g. Collision Repair, Paint Matching, Frame Straightening…',
+           'dental_clinic': 'e.g. Teeth Whitening, Dental Implants, Root Canal…',
+           'law_firm': 'e.g. Personal Injury, Family Law, DUI Defense…',
+           'restaurant': 'e.g. Private Events, Catering, Weekend Brunch…',
+           'saas_tech': 'e.g. API Integration, Custom Dashboard, AI Automation…',
+           'real_estate': 'e.g. Buyer Representation, Home Valuation, Property Management…',
+           'medical_clinic': 'e.g. Primary Care, Pediatrics, Physical Therapy…',
+           'home_services': 'e.g. Plumbing, Electrical, HVAC Installation…',
+           'education_academy': 'e.g. Certification Programs, Online Courses, Workshops…',
+         };
+         return map[this.fields.business_type] || 'e.g. Free Consultation, Custom Solutions, 24/7 Support…';
+       },
+       get dontSellPlaceholder() {
+         const map = {
+           'automotive_dealership': 'e.g. Body Repair, Paint Services, Tire Sales…',
+           'auto_body_shop': 'e.g. Vehicle Sales, Oil Changes, Mechanic Services…',
+           'dental_clinic': 'e.g. Cosmetic Surgery, Orthopedics, Pharmacy…',
+           'law_firm': 'e.g. Tax Preparation, Accounting, Real Estate Sales…',
+           'restaurant': 'e.g. Grocery Delivery, Meal Prep Kits, Food Truck…',
+         };
+         return map[this.fields.business_type] || 'e.g. Services you do NOT offer…';
+       },
 
        async doAnalyze() {
          const url = this.fields.website_url.trim();
@@ -164,7 +190,10 @@
              self.fields.insurance_partners = data.insurance_partners.join(', ');
            if (data.services?.length)
              self.servicesList = data.services.map((s, i) => ({name: s, priority: i+1}));
-           const comps = data.suggested_competitors_tier1 || data.suggested_competitors || [];
+           // Backend returns: competitors (primary), suggested_competitors (fallback)
+           const comps = data.competitors?.length ? data.competitors
+                       : (data.suggested_competitors?.length ? data.suggested_competitors
+                       : []);
            if (comps.length)
              self.competitors = comps.slice(0, 6).map(c => ({name: c.name || '', url: c.url || ''}));
            if (data.is_multilocation) self.isMultilocation = true;
@@ -219,6 +248,25 @@
     </div>
   </div>
 
+  <!-- ── Submit overlay ── -->
+  <div x-show="submitting" x-cloak
+       style="position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.8);backdrop-filter:blur(8px);">
+    <div style="background:#0f0f0f;border:1px solid var(--border);border-radius:16px;width:100%;max-width:380px;margin:0 16px;padding:36px 28px;text-align:center;">
+      <div style="width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,rgba(249,115,22,0.15),rgba(168,85,247,0.15));border:1px solid rgba(249,115,22,0.25);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+        <svg style="width:28px;height:28px;animation:spin 0.8s linear infinite;" fill="none" viewBox="0 0 24 24">
+          <path style="opacity:0.2" d="M12 2a10 10 0 110 20 10 10 0 010-20z" stroke="url(#g)" stroke-width="2.5"/>
+          <path d="M12 2a10 10 0 0110 10" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/>
+          <defs><linearGradient id="g"><stop stop-color="#f97316"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs>
+        </svg>
+      </div>
+      <h3 style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:6px;">Launching Your Pipeline</h3>
+      <p style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:20px;">Creating client, seeding 26 AI agents, preparing your SEO dashboard…</p>
+      <div style="width:100%;background:var(--surface2);border-radius:9999px;height:4px;overflow:hidden;">
+        <div style="width:100%;height:4px;background:linear-gradient(90deg,#f97316,#a855f7);animation:shimmer 1.5s ease-in-out infinite;"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Progress ── -->
   <div style="margin-bottom:28px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -253,7 +301,8 @@
   </div>
 
   <!-- ── FORM ── -->
-  <form method="POST" action="/clients/create" id="onboarding-form" novalidate>
+  <form method="POST" action="/clients/create" id="onboarding-form" novalidate
+        @submit="if (fields.name.trim()) { submitting = true; }">
     <input type="hidden" name="website_url"        :value="fields.website_url">
     <input type="hidden" name="business_type"      :value="fields.business_type">
     <input type="hidden" name="is_multilocation"   :value="isMultilocation ? '1' : '0'">
@@ -346,22 +395,37 @@
             <div>
               <label class="form-label">Business Type</label>
               <select x-model="fields.business_type" class="form-input" style="cursor:pointer;">
-                <option value="auto_body_shop">Auto Body Shop</option>
-                <option value="dental_clinic">Dental Clinic</option>
-                <option value="law_firm">Law Firm</option>
-                <option value="insurance_agency">Insurance Agency</option>
-                <option value="restaurant">Restaurant</option>
-                <option value="real_estate">Real Estate</option>
-                <option value="home_services">Home Services</option>
-                <option value="medical_clinic">Medical Clinic</option>
-                <option value="saas_tech">SaaS / Tech</option>
-                <option value="agency">Marketing Agency</option>
-                <option value="ecommerce">E-commerce</option>
-                <option value="education_academy">Education / Academy</option>
-                <option value="online_courses">Online Courses</option>
-                <option value="coaching">Coaching</option>
-                <option value="veterinary">Veterinary</option>
-                <option value="other">Other</option>
+                <optgroup label="Automotive">
+                  <option value="auto_body_shop">Auto Body / Collision Repair</option>
+                  <option value="automotive_dealership">Auto Dealership</option>
+                </optgroup>
+                <optgroup label="Healthcare">
+                  <option value="dental_clinic">Dental Clinic</option>
+                  <option value="medical_clinic">Medical Clinic</option>
+                  <option value="veterinary">Veterinary</option>
+                </optgroup>
+                <optgroup label="Legal & Financial">
+                  <option value="law_firm">Law Firm</option>
+                  <option value="insurance_agency">Insurance Agency</option>
+                  <option value="financial_services">Financial Services</option>
+                </optgroup>
+                <optgroup label="Services & Hospitality">
+                  <option value="restaurant">Restaurant</option>
+                  <option value="hotel">Hotel / Hospitality</option>
+                  <option value="spa">Spa / Beauty</option>
+                  <option value="gym">Gym / Fitness</option>
+                  <option value="home_services">Home Services</option>
+                  <option value="real_estate">Real Estate</option>
+                </optgroup>
+                <optgroup label="Digital & Education">
+                  <option value="saas_tech">SaaS / Tech</option>
+                  <option value="agency">Marketing Agency</option>
+                  <option value="ecommerce">E-commerce</option>
+                  <option value="education_academy">Education / Academy</option>
+                  <option value="online_courses">Online Courses</option>
+                  <option value="coaching">Coaching</option>
+                </optgroup>
+                <option value="other">Other / General</option>
               </select>
             </div>
           </div>
@@ -499,7 +563,7 @@
             </div>
 
             <div style="margin-top:10px;display:flex;gap:8px;" x-data="{newService:''}">
-              <input type="text" x-model="newService" placeholder="Add a service…"
+              <input type="text" x-model="newService" :placeholder="servicePlaceholder"
                      class="form-input" style="flex:1;"
                      @keydown.enter.prevent="if(newService.trim()){addService(newService.trim());newService=''}">
               <button type="button" @click="if(newService.trim()){addService(newService.trim());newService=''}"
@@ -535,7 +599,7 @@
               </template>
             </div>
             <div style="margin-top:10px;display:flex;gap:8px;" x-data="{newDontSell:''}">
-              <input type="text" x-model="newDontSell" placeholder="e.g. Vehicle Sales, Routine Maintenance…"
+              <input type="text" x-model="newDontSell" :placeholder="dontSellPlaceholder"
                      class="form-input" style="flex:1;"
                      @keydown.enter.prevent="if(newDontSell.trim()){addDontSell(newDontSell.trim());newDontSell=''}">
               <button type="button" @click="if(newDontSell.trim()){addDontSell(newDontSell.trim());newDontSell=''}"
@@ -717,5 +781,10 @@
 </div>
 <style>
   @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes shimmer {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+  }
 </style>
 {% endblock %}

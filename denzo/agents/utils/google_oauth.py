@@ -28,6 +28,11 @@ PROVIDER_SCOPES = {
     ],
     "gsc": [
         "https://www.googleapis.com/auth/webmasters.readonly",
+        "https://www.googleapis.com/auth/indexing",       # shared scope for Indexing API
+        "openid", "email", "profile",
+    ],
+    "indexing": [
+        "https://www.googleapis.com/auth/indexing",
         "openid", "email", "profile",
     ],
 }

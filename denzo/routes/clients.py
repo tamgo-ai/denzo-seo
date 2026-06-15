@@ -154,7 +154,7 @@ Return ONLY a valid JSON object — no markdown, no explanation — with exactly
 
 {{
   "business_name": "Full business name",
-  "business_type": "one of: auto_body_shop | dental_clinic | medical_clinic | law_firm | insurance_agency | restaurant | real_estate | home_services | veterinary | education_academy | online_courses | coaching | saas_tech | agency | ecommerce | other",
+  "business_type": "one of: auto_body_shop | automotive_dealership | dental_clinic | medical_clinic | law_firm | insurance_agency | restaurant | real_estate | home_services | veterinary | education_academy | online_courses | coaching | saas_tech | agency | ecommerce | gym | hotel | spa | financial_services | other",
   "tagline": "The brand's main value proposition or slogan",
   "phone": "Phone number if found, else empty string",
   "address": "Street address if found",

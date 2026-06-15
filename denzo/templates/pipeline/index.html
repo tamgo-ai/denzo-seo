@@ -141,6 +141,32 @@
           {% endif %}
         </p>
       </div>
+
+      <!-- Launch Pipeline button -->
+      {% set dir_status = namespace(st='idle') %}
+      {% for layer_num, layer_data in layers.items() %}
+        {% for agent in layer_data.agents %}
+          {% if agent.name == 'Pipeline Director' %}
+            {% set dir_status.st = agent.status %}
+          {% endif %}
+        {% endfor %}
+      {% endfor %}
+      {% if dir_status.st not in ('working', 'done') %}
+      <button onclick="launchPipeline(this)"
+              style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#f97316,#a855f7);color:#fff;font-size:14px;font-weight:700;padding:14px 28px;border-radius:12px;border:none;cursor:pointer;white-space:nowrap;transition:all 0.2s;box-shadow:0 4px 24px rgba(249,115,22,0.3);flex-shrink:0;"
+              onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 6px 32px rgba(249,115,22,0.4)'"
+              onmouseout="this.style.transform='';this.style.boxShadow='0 4px 24px rgba(249,115,22,0.3)'">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24" id="launch-icon">
+          <path d="M8 5v14l11-7z"/>
+        </svg>
+        <span id="launch-label">Launch Pipeline</span>
+      </button>
+      {% elif dir_status.st == 'working' %}
+      <div style="display:inline-flex;align-items:center;gap:10px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:12px;padding:14px 24px;flex-shrink:0;">
+        <div style="width:8px;height:8px;border-radius:50%;background:#4ade80;animation:pulse-anim 1.5s ease-in-out infinite;"></div>
+        <span style="font-size:13px;font-weight:600;color:#4ade80;">Pipeline Running</span>
+      </div>
+      {% endif %}
     </div>
 
     <!-- Pipeline Control Room CTA banner -->
@@ -512,5 +538,33 @@
     {% endif %}
   </div>
   {% endif %}
+
+<script>
+async function launchPipeline(btn) {
+  btn.disabled = true;
+  const label = document.getElementById('launch-label');
+  const origHTML = btn.innerHTML;
+  label.textContent = 'Launching…';
+
+  try {
+    const resp = await fetch('/api/{{ tenant_id }}/pipeline/run', { method: 'POST' });
+    const data = await resp.json();
+    if (resp.ok) {
+      label.textContent = 'Pipeline Started!';
+      btn.style.background = 'linear-gradient(135deg,#22c55e,#10b981)';
+      btn.style.boxShadow = '0 4px 24px rgba(34,197,94,0.3)';
+      setTimeout(() => { location.reload(); }, 1200);
+    } else {
+      label.textContent = data.error || 'Failed';
+      btn.style.background = 'linear-gradient(135deg,#ef4444,#dc2626)';
+      btn.style.boxShadow = '0 4px 24px rgba(239,68,68,0.3)';
+      setTimeout(() => { btn.innerHTML = origHTML; btn.disabled = false; }, 2000);
+    }
+  } catch(e) {
+    label.textContent = 'Network error';
+    setTimeout(() => { btn.innerHTML = origHTML; btn.disabled = false; }, 2000);
+  }
+}
+</script>
 
 {% endblock %}

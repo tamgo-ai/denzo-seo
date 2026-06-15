@@ -33,10 +33,23 @@ def audit(tenant_id):
         flash("Client not found.", "error")
         return redirect(url_for("clients.list_clients"))
 
+    # Try deep audit first, fall back to legacy technical_audit
     setting = db.execute(
-        "SELECT value, updated_at FROM settings WHERE tenant_id=? AND key='technical_audit'",
+        "SELECT value, updated_at FROM settings WHERE tenant_id=? AND key='audit_deep'",
         (tenant_id,)
     ).fetchone()
+    if not setting:
+        setting = db.execute(
+            "SELECT value, updated_at FROM settings WHERE tenant_id=? AND key='technical_audit'",
+            (tenant_id,)
+        ).fetchone()
+
+    # Also load Lighthouse data if available
+    lighthouse_setting = db.execute(
+        "SELECT value FROM settings WHERE tenant_id=? AND key='lighthouse_report'",
+        (tenant_id,)
+    ).fetchone()
+
     clients = _get_all_clients_slim()
     db.close()
 
@@ -49,12 +62,20 @@ def audit(tenant_id):
         except Exception:
             audit_data = None
 
+    lighthouse_data = None
+    if lighthouse_setting:
+        try:
+            lighthouse_data = json.loads(lighthouse_setting["value"])
+        except Exception:
+            pass
+
     return render_template(
         "audit/index.html",
         client=client,
         tenant_id=tenant_id,
         audit=audit_data,
         updated_at=updated_at,
+        lighthouse=lighthouse_data,
         clients=clients,
         active_tenant=tenant_id,
     )

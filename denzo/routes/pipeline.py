@@ -154,8 +154,22 @@ def index(tenant_id):
     clients = _get_sidebar_clients()
     db.close()
 
+    # ── GEO citations ────────────────────────────────────────────────────
+    geo_citations = 0
+    geo_queries_total = 0
+    try:
+        geo_row = db.execute(
+            "SELECT COUNT(*) AS total, COALESCE(SUM(client_mentioned),0) AS cited FROM geo_queries WHERE tenant_id=?",
+            (tenant_id,)
+        ).fetchone()
+        if geo_row:
+            geo_citations = int(geo_row["cited"] or 0)
+            geo_queries_total = int(geo_row["total"] or 0)
+    except Exception:
+        pass
+
     return render_template(
-        "pipeline/index.html",
+        "pipeline/professional.html",
         client=dict(client),
         layers=layers,
         activity=[dict(a) for a in activity],
@@ -180,6 +194,8 @@ def index(tenant_id):
         agents_error=agents_error,
         director_log=[dict(r) for r in director_log],
         cannibal_count=cannibal_count,
+        geo_citations=geo_citations,
+        geo_queries_total=geo_queries_total,
     )
 
 
@@ -214,17 +230,61 @@ def agents_page(tenant_id):
         (tenant_id,)
     ).fetchone()
 
+    # Additional stats for the professional dashboard
+    page_counts_full = db.execute(
+        """SELECT
+            COUNT(*) AS total,
+            SUM(CASE WHEN status='draft'     THEN 1 ELSE 0 END) AS draft,
+            SUM(CASE WHEN status='ready'     THEN 1 ELSE 0 END) AS ready,
+            SUM(CASE WHEN status='published' THEN 1 ELSE 0 END) AS published
+           FROM pages WHERE tenant_id=?""",
+        (tenant_id,)
+    ).fetchone()
+
+    comp_stats = {r["tier"]: r["cnt"] for r in db.execute(
+        "SELECT tier, COUNT(*) as cnt FROM competitors WHERE tenant_id=? AND (tier IS NULL OR tier != 0) GROUP BY tier", (tenant_id,)
+    ).fetchall()}
+
+    geo_citations = 0
+    try:
+        geo_row = db.execute(
+            "SELECT COALESCE(SUM(client_mentioned),0) AS cited FROM geo_queries WHERE tenant_id=?",
+            (tenant_id,)
+        ).fetchone()
+        if geo_row:
+            geo_citations = int(geo_row["cited"] or 0)
+    except Exception:
+        pass
+
     clients = _get_sidebar_clients()
     db.close()
 
     return render_template(
-        "agents/index.html",
+        "pipeline/professional.html",
         client=dict(client),
         layers=layers,
         activity=[dict(a) for a in activity],
         kw_count=kw_count,
-        page_counts=dict(page_counts) if page_counts else {"total": 0, "published": 0},
+        page_counts=dict(page_counts_full) if page_counts_full else {"total": 0, "draft": 0, "ready": 0, "published": 0},
         clients=clients,
         active_tenant=tenant_id,
         tenant_id=tenant_id,
+        kw_by_priority={},
+        kw_by_category={},
+        kw_by_difficulty={},
+        top_keywords=[],
+        pages_by_type={},
+        pages_by_status={},
+        avg_quality=0,
+        comp_stats=comp_stats,
+        tier1_names=[],
+        gap_kw_count=0,
+        last_runs=[],
+        total_runs=0,
+        agents_done=0,
+        agents_error=0,
+        director_log=[],
+        cannibal_count=0,
+        geo_citations=geo_citations,
+        geo_queries_total=0,
     )

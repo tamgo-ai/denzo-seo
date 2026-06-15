@@ -57,7 +57,7 @@ def _query_openai(api_key, query):
 
 def _query_gemini(api_key, query):
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
         r = requests.post(url,
             json={"contents": [{"parts": [{"text": query}]}],
                   "generationConfig": {"maxOutputTokens": 400, "temperature": 0.3}},
@@ -275,16 +275,19 @@ Return ONLY valid JSON. Make queries sound natural and specific to this business
             query = q["query"]
             self.set_status("working", f"Checking: {query[:55]}")
 
-            # Real AI engines
+            # Real AI engines (with rate-limit-aware delays)
             for engine_name, api_key in engines:
                 if self.should_stop():
                     break
                 self.set_status("working", f"[{engine_name}] {query[:45]}")
                 if engine_name == "perplexity":
                     result = _query_perplexity(api_key, query)
+                    time.sleep(2)   # Perplexity: 30 RPM safe
                 elif engine_name == "chatgpt":
+                    time.sleep(20)  # OpenAI free tier: 3 RPM max
                     result = _query_openai(api_key, query)
                 elif engine_name == "gemini":
+                    time.sleep(2)   # Gemini: 15 RPM safe
                     result = _query_gemini(api_key, query)
                 elif engine_name == "claude":
                     # Use shared rate limiter — intentionally no business context

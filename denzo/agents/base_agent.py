@@ -14,7 +14,10 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "denzo.db")
 
 # ── Global API rate limiter — shared across ALL tenants and ALL agents ────────
-_api_semaphore = threading.Semaphore(2)
+# Configurable via DENZO_API_CONCURRENCY (default 4). The 2-second inter-call
+# gap provides enough throttling; the semaphore controls peak parallelism.
+_MAX_CONCURRENCY = int(os.getenv("DENZO_API_CONCURRENCY", "4"))
+_api_semaphore = threading.Semaphore(_MAX_CONCURRENCY)
 _last_api_call = 0.0
 _api_lock = threading.Lock()
 
@@ -151,6 +154,32 @@ SERVICES OFFERED: {svcs}
 KNOWN COMPETITORS: {comp_list}
 {dont_sell_line}"""
 
+    def to_brand_voice_block(self, brand_voice: dict | None = None) -> str:
+        """Build a Brand Voice DNA prompt block from stored brand_voice settings.
+        Shared by ProgrammaticSEO, ContentOptimizer, and GEOOptimizer."""
+        if not brand_voice:
+            return ""
+        ctx = self
+        return f"""
+BRAND VOICE DNA — follow this exactly:
+- Brand name: {brand_voice.get('brand_name', ctx.client_name)}
+- Writing style: {brand_voice.get('writing_style', 'professional')}
+- Years of experience to reference: {brand_voice.get('years_experience', '')}
+- Clients served: {brand_voice.get('clients_served', '')}
+- Founder voice: {brand_voice.get('founder_name', '')}
+- Key proprietary insights to weave in: {brand_voice.get('key_insight_1', '')} / {brand_voice.get('key_insight_2', '')} / {brand_voice.get('key_insight_3', '')}
+- Contrarian position: {brand_voice.get('contrarian_position', '')}
+- Signature phrases to use: {brand_voice.get('phrases_to_use', '')}
+- Phrases to NEVER use: {brand_voice.get('phrases_to_avoid', '')}
+
+AUTHORITY SIGNAL RULES — include at least 2 of these in every piece:
+1. First-person data: "In our experience with [X clients/years]..."
+2. Named framework: Create a named methodology (e.g. "The [Brand] [Method/Framework/Approach]")
+3. Contrarian position: "Most [industry players] will tell you X, but that's wrong because..."
+4. Specific numbers: Use exact figures, percentages, timeframes — never vague estimates
+5. Expert quote: "As {brand_voice.get('founder_name', 'our founder')}, puts it: '...'"
+"""
+
     @property
     def all_cities(self) -> List[str]:
         cities = list(self.service_cities)
@@ -208,6 +237,126 @@ def db_write(sql: str, params=()):
 
 
 # ── Base Agent ───────────────────────────────────────────────────────────────
+
+def strip_html_wrappers(content: str) -> str:
+    """Strip full HTML document wrappers (DOCTYPE, html, head, body) from a fragment.
+    Claude occasionally wraps content in full HTML docs even when told not to.
+    Shared by ProgrammaticSEO, WordPressPublisher, and any future content generators."""
+    import re as _re
+    cleaned = _re.sub(r'<!DOCTYPE[^>]*>', '', content, flags=_re.IGNORECASE)
+    cleaned = _re.sub(r'<html[^>]*>', '', cleaned, flags=_re.IGNORECASE)
+    cleaned = _re.sub(r'</html>', '', cleaned, flags=_re.IGNORECASE)
+    cleaned = _re.sub(r'<head>.*?</head>', '', cleaned, flags=_re.IGNORECASE | _re.DOTALL)
+    cleaned = _re.sub(r'<body[^>]*>', '', cleaned, flags=_re.IGNORECASE)
+    cleaned = _re.sub(r'</body>', '', cleaned, flags=_re.IGNORECASE)
+    return cleaned.strip()
+
+
+def strip_h1_tags(content: str) -> str:
+    """Replace all H1 tags with H2 tags.
+    WordPress themes and site templates provide H1 from the page title,
+    so content fragments must never contain H1 tags."""
+    import re as _re
+    cleaned = _re.sub(r'<h1(\s|>)', lambda m: '<h2' + m.group(1), content)
+    cleaned = _re.sub(r'</h1>', '</h2>', cleaned)
+    return cleaned
+
+
+def validate_page_quality(content: str, page_type: str = "service") -> list[str]:
+    """Pre-publish quality gate. Returns list of issues (empty = passes).
+    Google's quality threshold: pages below these standards risk
+    'thin content' classification and won't rank."""
+    import re as _re
+    issues = []
+
+    if not content or len(content.strip()) < 200:
+        issues.append("Content too short (<200 chars)")
+        return issues
+
+    # Word count: strip HTML tags, count words
+    text = _re.sub(r'<[^>]+>', ' ', content)
+    text = _re.sub(r'\s+', ' ', text).strip()
+    word_count = len(text.split())
+    min_words = 500 if page_type in ("service", "location", "inventory", "financing") else 400
+    if word_count < min_words:
+        issues.append(f"Thin content: {word_count} words (min {min_words})")
+
+    # Must have at least one H2 heading
+    if not _re.search(r'<h2[^>]*>', content, _re.IGNORECASE):
+        issues.append("Missing H2 heading")
+
+    # Must have FAQ schema or definition block for SEO (supports both quote styles)
+    has_faq = 'schema.org/FAQPage' in content or \
+              'schema.org/Question' in content
+    has_definition = '<p' in content and (' is a ' in text or ' provides ' in text or ' offers ' in text)
+    if not has_faq and not has_definition:
+        issues.append("Missing FAQ schema or definition block (GEO requirement)")
+
+    # CTA must be present
+    has_cta = _re.search(r'href="(tel:|/contact|/quote|/appointment|/estimate|/demo)', content, _re.IGNORECASE) or \
+              'btn-primary' in content or 'cta' in content.lower()
+    if not has_cta:
+        issues.append("Missing call-to-action (CTA)")
+
+    return issues
+
+
+def build_llms_txt(ctx: "ClientContext", base_url: str = "") -> str:
+    """Build llms.txt markdown content from ClientContext.
+    Shared by WordPressPublisher and GitHubPublisher for consistency.
+    See https://llmstxt.org/ for the emerging standard."""
+    services_list = "\n".join(f"- {s}" for s in (ctx.services or []))
+    cities = ([ctx.primary_city] if getattr(ctx, "primary_city", None) else []) + \
+             (getattr(ctx, "service_cities", None) or [])
+    cities_list = "\n".join(f"- {c}" for c in cities if c)
+    certs_list  = "\n".join(f"- {c}" for c in (getattr(ctx, "certifications", None) or []))
+    diffs_list  = "\n".join(f"- {d}" for d in (getattr(ctx, "differentiators", None) or []))
+    ins_list    = "\n".join(f"- {i}" for i in (getattr(ctx, "insurance_partners", None) or []))
+
+    primary_city = getattr(ctx, "primary_city", "") or ""
+    state        = getattr(ctx, "state", "") or ""
+    address      = getattr(ctx, "address", "") or (f"{primary_city}, {state}".strip(", "))
+    tagline      = getattr(ctx, "tagline", "") or ""
+    description  = getattr(ctx, "description", "") or \
+                   f"{ctx.client_name} is a trusted local business serving {primary_city} and surrounding areas."
+
+    services_preview = ", ".join((ctx.services or [])[:2])
+    default_tagline  = f"Professional {services_preview} services in {primary_city}, {state}".strip(", .")
+
+    content = f"""# {ctx.client_name}
+
+> {tagline or default_tagline}
+
+## About
+{description}
+
+## Services
+{services_list or '- Professional services'}
+
+## Locations Served
+{cities_list or f'- {primary_city}'}
+
+## Certifications & Credentials
+{certs_list or '- Licensed and insured'}
+
+## Why Choose Us
+{diffs_list or '- Quality service'}
+
+## Contact
+- Phone: {ctx.phone or 'Call for info'}
+- Website: {ctx.domain or base_url}
+- Address: {address}
+"""
+    if ins_list:
+        content += f"\n## Insurance Partners\n{ins_list}\n"
+
+    domain = getattr(ctx, "domain", "") or ""
+    resolved_base = base_url or domain
+    if resolved_base:
+        content += f"\n## Sitemap\n- {resolved_base.rstrip('/')}/sitemap.xml\n"
+
+    return content
+
 
 SEO_EXPERTISE = """You are a Senior SEO + GEO Specialist with 15 years of experience in Local SEO.
 You understand:
@@ -384,7 +533,8 @@ class TenantAwareBaseAgent:
     # ── Claude API ───────────────────────────────────────────────────────────
 
     def call_claude(self, prompt: str, max_tokens: int = 1500,
-                    system: str = None, model: str = "claude-haiku-4-5-20251001") -> str:
+                    system: str = None, model: str = "claude-haiku-4-5-20251001",
+                    cache_system: bool = False) -> str:
         import anthropic
         if system is None:
             system = SEO_EXPERTISE
@@ -393,7 +543,20 @@ class TenantAwareBaseAgent:
         client = _get_anthropic_client()
         messages = [{"role": "user", "content": prompt}]
         kwargs = dict(model=model, max_tokens=max_tokens, messages=messages)
-        if system:
+
+        # Prompt caching: when cache_system=True, wrap the system prompt with
+        # cache_control so Anthropic caches it. Subsequent calls with the same
+        # system prompt get ~90% cost reduction on the cached portion.
+        # Minimum 1024 tokens required for Claude 4 cacheable blocks.
+        if cache_system and system:
+            kwargs["system"] = [
+                {
+                    "type": "text",
+                    "text": system,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ]
+        elif system:
             kwargs["system"] = system
 
         for attempt in range(4):
@@ -425,6 +588,15 @@ class TenantAwareBaseAgent:
             if retry_wait:
                 time.sleep(retry_wait)
         return ""
+
+    def build_cacheable_system(self, extra: str = "") -> str:
+        """Build a cacheable system prompt combining SEO_EXPERTISE + ClientContext.
+        Total is typically 1500-2500 tokens — well above the 1024 minimum for caching.
+        Use with call_claude(..., cache_system=True)."""
+        base = SEO_EXPERTISE + "\n\n" + self.ctx.to_prompt_block()
+        if extra:
+            base += "\n\n" + extra
+        return base
 
     def call_claude_vision(self, image_url: str, prompt: str, max_tokens: int = 500) -> str:
         """Send an image URL to Claude Vision and return the text response."""

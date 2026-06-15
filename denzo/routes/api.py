@@ -107,6 +107,40 @@ def agents_status(tenant_id):
     return jsonify([dict(r) for r in rows])
 
 
+# ── Content review ─────────────────────────────────────────────────────────────
+
+@bp.route("/<tenant_id>/pages/<int:page_id>/approve", methods=["POST"])
+@login_required
+def approve_page(tenant_id, page_id):
+    """Approve a page for publishing. Removes [PENDING_REVIEW] tag, adds [APPROVED]."""
+    if not _can_access_tenant(tenant_id):
+        return jsonify({"error": "Access denied"}), 403
+    db = get_db()
+    db.execute(
+        "UPDATE pages SET notes=REPLACE(COALESCE(notes,''),'[PENDING_REVIEW]','')||' [APPROVED]', "
+        "updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
+        (page_id, tenant_id)
+    )
+    db.commit(); db.close()
+    return jsonify({"status": "approved"})
+
+
+@bp.route("/<tenant_id>/pages/<int:page_id>/reject", methods=["POST"])
+@login_required
+def reject_page(tenant_id, page_id):
+    """Reject a page. Returns it to draft for rework."""
+    if not _can_access_tenant(tenant_id):
+        return jsonify({"error": "Access denied"}), 403
+    db = get_db()
+    db.execute(
+        "UPDATE pages SET status='draft', notes=REPLACE(COALESCE(notes,''),'[PENDING_REVIEW]','')||' [REJECTED]', "
+        "updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
+        (page_id, tenant_id)
+    )
+    db.commit(); db.close()
+    return jsonify({"status": "rejected"})
+
+
 # ── Stats ──────────────────────────────────────────────────────────────────────
 
 @bp.route("/<tenant_id>/stats")

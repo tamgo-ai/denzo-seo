@@ -8,8 +8,9 @@ Supports two output formats:
 import json
 import base64
 import time
+import random
 import requests
-from denzo.agents.base_agent import TenantAwareBaseAgent, ClientContext, db_execute, db_write
+from denzo.agents.base_agent import TenantAwareBaseAgent, ClientContext, db_execute, db_write, build_llms_txt, validate_page_quality
 
 
 def _build_html_page(title, meta_description, content, style_guide=None, ctx=None, canonical_url=None):
@@ -150,8 +151,36 @@ class GitHubPublisher(TenantAwareBaseAgent):
 
     PREREQUISITES = ["Programmatic SEO"]
 
+    MAX_PAGES_PER_DAY = 30
+    MIN_DELAY_SECONDS = 30
+    MAX_DELAY_SECONDS = 90
+
     def __init__(self, ctx: ClientContext):
         super().__init__("GitHub Publisher", ctx, layer=5, color="slate")
+
+    def _load_velocity_settings(self):
+        import json as _json
+        rows = db_execute(
+            "SELECT value FROM settings WHERE tenant_id=? AND key='publish_velocity'",
+            (self.ctx.tenant_id,)
+        )
+        if rows:
+            try:
+                overrides = _json.loads(rows[0]["value"])
+                self.MAX_PAGES_PER_DAY = overrides.get("max_per_day", self.MAX_PAGES_PER_DAY)
+                self.MIN_DELAY_SECONDS = overrides.get("min_delay", self.MIN_DELAY_SECONDS)
+                self.MAX_DELAY_SECONDS = overrides.get("max_delay", self.MAX_DELAY_SECONDS)
+            except Exception:
+                pass
+
+    def _pages_published_today(self) -> int:
+        rows = db_execute(
+            """SELECT COUNT(*) n FROM pages
+               WHERE tenant_id=? AND status='published'
+               AND published_at >= datetime('now', '-24 hours')""",
+            (self.ctx.tenant_id,)
+        )
+        return rows[0]["n"] if rows else 0
 
     def _publish_file(self, session: requests.Session, repo: str, branch: str,
                       path: str, content_b64: str, message: str) -> bool:
@@ -235,20 +264,22 @@ class GitHubPublisher(TenantAwareBaseAgent):
             "X-GitHub-Api-Version": "2022-11-28"
         })
 
-        # Prereq check: need pages with status='ready'
+        # Prereq check: need pages with status='ready' AND reviewed
         ready_check = db_execute(
-            "SELECT COUNT(*) AS n FROM pages WHERE tenant_id=? AND status='ready' AND content IS NOT NULL AND content != ''",
+            "SELECT COUNT(*) AS n FROM pages WHERE tenant_id=? AND status='ready' AND content IS NOT NULL AND content != '' "
+            "AND (notes IS NULL OR notes NOT LIKE '%[PENDING_REVIEW]%')",
             (ctx.tenant_id,)
         )
         ready_count = ready_check[0]["n"] if ready_check else 0
         if ready_count == 0:
-            self.log("No ready pages to publish. Run Programmatic SEO and content agents first.", "warning")
-            self.set_status("idle", "No ready pages — run content agents first")
+            self.log("No reviewed pages to publish. Review pages in the dashboard first.", "warning")
+            self.set_status("idle", "No reviewed pages — review them first")
             return
 
         pages = db_execute(
             "SELECT id, title, slug, type, meta_title, meta_description, content FROM pages "
             "WHERE tenant_id=? AND status='ready' AND content IS NOT NULL AND content != '' "
+            "AND (notes IS NULL OR notes NOT LIKE '%[PENDING_REVIEW]%') "
             "ORDER BY id",
             (ctx.tenant_id,)
         )
@@ -258,7 +289,13 @@ class GitHubPublisher(TenantAwareBaseAgent):
             self.set_status("idle", "No ready pages")
             return
 
+        self._load_velocity_settings()
         self.log(f"Publishing {len(pages)} pages ({fmt} format)...")
+        self.log(
+            f"Velocity control: max {self.MAX_PAGES_PER_DAY}/day, "
+            f"{self.MIN_DELAY_SECONDS}-{self.MAX_DELAY_SECONDS}s between pages",
+            "info"
+        )
 
         # Load Next.js assets once if needed
         nextjs_assets = self._load_nextjs_assets() if fmt == "nextjs" else {}
@@ -267,13 +304,36 @@ class GitHubPublisher(TenantAwareBaseAgent):
 
         published = 0
         failed    = 0
+        today_count = self._pages_published_today()
 
         for page in pages:
             if self.should_stop():
                 break
 
+            if today_count + published >= self.MAX_PAGES_PER_DAY:
+                remaining = len(pages) - published - failed
+                self.log(
+                    f"Daily publishing limit reached ({self.MAX_PAGES_PER_DAY}/day). "
+                    f"{remaining} pages remain in 'ready' state for next cycle.",
+                    "warning"
+                )
+                break
+
             page_dict = dict(page)
             title     = page_dict.get("title", "Untitled")
+            ptype     = page_dict.get("type", "page")
+
+            # ── Quality gate ──
+            issues = validate_page_quality(page_dict.get("content", ""), ptype)
+            if issues:
+                db_write(
+                    "UPDATE pages SET notes=COALESCE(notes||' ','')||?, status='ready', "
+                    "updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
+                    (f"[QC_FAIL:{';'.join(issues[:3])}]", page_dict["id"], ctx.tenant_id)
+                )
+                self.log(f"✗ Quality gate failed: {title} — {', '.join(issues[:2])}", "warning")
+                failed += 1
+                continue
             slug      = page_dict.get("slug", "page").lstrip("/")
             ptype     = page_dict.get("type", "page")
             meta_desc = page_dict.get("meta_description", title)
@@ -313,7 +373,11 @@ class GitHubPublisher(TenantAwareBaseAgent):
                 self.log(f"✗ Failed: {title}", "error")
                 failed += 1
 
-            time.sleep(0.5)
+            delay = random.randint(self.MIN_DELAY_SECONDS, self.MAX_DELAY_SECONDS)
+            for _ in range(delay):
+                if self.should_stop():
+                    break
+                time.sleep(1)
 
         # Generate and publish sitemap.xml + robots.txt
         if published > 0 and _base:
@@ -377,53 +441,7 @@ class GitHubPublisher(TenantAwareBaseAgent):
     def _publish_llms_txt(self, session, repo, branch, ctx, base_url, path_prefix):
         """Generate and publish llms.txt — structured business data for AI crawlers
         (ChatGPT, Perplexity, Claude, Gemini) per the emerging llms.txt standard."""
-        services_list = "\n".join(f"- {s}" for s in (ctx.services or []))
-        cities = ([ctx.primary_city] if getattr(ctx, "primary_city", None) else []) + \
-                 (getattr(ctx, "service_cities", None) or [])
-        cities_list = "\n".join(f"- {c}" for c in cities if c)
-        certs_list  = "\n".join(f"- {c}" for c in (getattr(ctx, "certifications", None) or []))
-        diffs_list  = "\n".join(f"- {d}" for d in (getattr(ctx, "differentiators", None) or []))
-        ins_list    = "\n".join(f"- {i}" for i in (getattr(ctx, "insurance_partners", None) or []))
-
-        primary_city = getattr(ctx, "primary_city", "") or ""
-        state        = getattr(ctx, "state", "") or ""
-        address      = getattr(ctx, "address", "") or (f"{primary_city}, {state}".strip(", "))
-        tagline      = getattr(ctx, "tagline", "") or ""
-        description  = getattr(ctx, "description", "") or \
-                       f"{ctx.client_name} is a trusted local business serving {primary_city} and surrounding areas."
-
-        services_preview = ", ".join((ctx.services or [])[:2])
-        default_tagline  = f"Professional {services_preview} services in {primary_city}, {state}".strip(", .")
-
-        content = f"""# {ctx.client_name}
-
-> {tagline or default_tagline}
-
-## About
-{description}
-
-## Services
-{services_list or '- Professional services'}
-
-## Locations Served
-{cities_list or f'- {primary_city}'}
-
-## Certifications & Credentials
-{certs_list or '- Licensed and insured'}
-
-## Why Choose Us
-{diffs_list or '- Quality service'}
-
-## Contact
-- Phone: {ctx.phone or 'Call for info'}
-- Website: {ctx.domain or base_url}
-- Address: {address}
-"""
-
-        if ins_list:
-            content += f"\n## Insurance Partners\n{ins_list}\n"
-
-        content += f"\n## Sitemap\n- {base_url}/sitemap.xml\n"
+        content = build_llms_txt(ctx, base_url=base_url)
 
         txt_b64  = base64.b64encode(content.encode("utf-8")).decode("utf-8")
         txt_path = f"{path_prefix}llms.txt" if path_prefix else "llms.txt"

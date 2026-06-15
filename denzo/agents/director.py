@@ -21,18 +21,20 @@ from denzo.agents.base_agent import (
 # ── Agent names by layer ──────────────────────────────────────────────────────
 
 LAYER_1 = [
-    "Keyword Strategist", "Competitor Intel", "Technical Auditor",
-    "Site Style Analyzer", "Data Intelligence", "GBP Optimizer",
+    "Keyword Strategist", "Keyword Clusterer", "Competitor Intel",
+    "Technical Auditor", "Site Style Analyzer", "Data Intelligence",
+    "GBP Optimizer",
 ]
 LAYER_2 = ["E-E-A-T Architect", "Schema Engineer"]
 LAYER_2B = ["Vertical Matrix Generator"]  # needs EEAT done
 LAYER_3 = ["Programmatic SEO"]
 LAYER_4 = ["Content Optimizer", "Visual Content Optimizer", "GEO Optimizer", "Internal Linker"]
 LAYER_4B = ["Content Freshness"]  # needs pages published
-LAYER_5 = ["GitHub Publisher", "WordPress Publisher"]
+LAYER_5 = ["GitHub Publisher", "WordPress Publisher", "Indexation Accelerator"]
 LAYER_6 = [
     "Rank Tracker", "GEO Query Generator", "GEO Monitor",
     "SERP Intelligence", "Reviews Intelligence", "ROI Attribution",
+    "Content Duplicate Checker", "Perplexity Tracker", "GEO Gap Closer",
 ]
 
 ALL_AGENTS = LAYER_1 + LAYER_2 + LAYER_2B + LAYER_3 + LAYER_4 + LAYER_4B + LAYER_5 + LAYER_6
@@ -335,16 +337,25 @@ Return ONLY valid JSON."""
         quality_ok = avg_score >= 70 or self._agent_run_count("Content Optimizer", agents) >= 5
         publisher_ran = self._any_done(LAYER_5, agents)
 
+        _PUBLISHERS = ["GitHub Publisher", "WordPress Publisher"]
+        _INDEXERS  = ["Indexation Accelerator"]
+
+        # Publishers: start when pages are ready and quality is OK
         if pg_ready >= 1 and quality_ok and not publisher_ran:
-            for pub_name in LAYER_5:
+            for pub_name in _PUBLISHERS:
                 pub_status = self._agent_status(pub_name, agents)
                 if pub_status == "idle":
                     to_start.append(pub_name)
                 elif pub_status == "error":
-                    # Check if it self-skipped (missing config)
                     task = next((a.get("current_task", "") for a in agents if a["name"] == pub_name), "")
                     if "Skipped" not in task and self._agent_run_count(pub_name, agents) < 3:
                         to_start.append(pub_name)
+
+        # Indexation Accelerator: start AFTER at least one publisher is done
+        if self._any_done(_PUBLISHERS, agents):
+            ia_status = self._agent_status("Indexation Accelerator", agents)
+            if ia_status == "idle" and self._agent_run_count("Indexation Accelerator", agents) == 0:
+                to_start.append("Indexation Accelerator")
 
         # ── Layer 4B: Content Freshness ────────────────────────────────────
         if pg_pub >= 1:
@@ -518,6 +529,9 @@ Return ONLY valid JSON."""
     # ── Main Run Loop ─────────────────────────────────────────────────────────
 
     def run(self):
+        # Singleton guard is handled by AgentRunner.start() — it checks the DB
+        # before setting status='working'. By the time we reach here, we ARE the
+        # only Director instance for this tenant.
         self.log("[Director] Autonomous pipeline director activated (state machine mode).", "success")
         self.set_status("working", "Orchestrating pipeline")
         self._stop_flag = False
@@ -528,7 +542,7 @@ Return ONLY valid JSON."""
         except Exception as e:
             self.log(f"[Director] Strategy generation failed (non-fatal): {e}", "warning")
 
-        MAX_CYCLES = 60  # 60 × 30s = 30 minutes max (can be re-started)
+        MAX_CYCLES = 240  # 240 × 30s = 2 hours max per run (can be restarted, Director persists state)
         cycles = 0
 
         while not self.should_stop() and not self._stop_flag and cycles < MAX_CYCLES:
@@ -567,6 +581,15 @@ Return ONLY valid JSON."""
                         break
                     self._start_agent(agent_name)
 
+                # Save progress every 10 cycles for resume capability
+                if cycles % 10 == 0 and to_start:
+                    self.save_output("pipeline_progress", {
+                        "cycles_completed": cycles,
+                        "agents_started_this_cycle": to_start,
+                        "kw_total": state["keywords"]["total"],
+                        "pg_pub": state["pages"]["published"],
+                    })
+
                 if not to_start:
                     self.log(f"[Director] No agents to start this cycle — waiting.", "info")
 
@@ -584,7 +607,13 @@ Return ONLY valid JSON."""
                     time.sleep(0.5)
 
         if not self._stop_flag:
-            self.set_status("done", "Orchestration complete")
+            if cycles >= MAX_CYCLES:
+                # Ran out of cycles — pipeline not complete, save progress for resume
+                self.save_output("pipeline_progress", {"cycles_completed": cycles, "last_state": self._assess_state()})
+                self.set_status("idle", f"Paused after {cycles} cycles — click Run Pipeline to continue")
+                self.log(f"[Director] Paused after {MAX_CYCLES} cycles. Progress saved. Restart to continue.", "warning")
+            else:
+                self.set_status("done", "Pipeline complete — all layers executed")
         self.log("[Director] Director shutting down.", "info")
 
     def _start_agent(self, agent_name: str):

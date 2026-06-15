@@ -322,7 +322,29 @@
       <div style="margin-bottom:16px">
         <label>Industry</label>
         <select name="industry">
-          {% for val, label in [('general','General Business'),('auto_body','Auto Body / Collision'),('auto_dealership','Auto Dealership'),('dental','Dental / Healthcare'),('medical_imaging','Medical Imaging / Radiology'),('medical','Medical / Healthcare'),('legal','Legal Services'),('real_estate','Real Estate'),('restaurant','Restaurant / Food'),('ecommerce','E-Commerce'),('saas','SaaS / Software'),('education','Education / Training'),('beauty','Beauty / Salon / Spa')] %}
+          {% for val, label in [
+            ('auto_body_shop','Auto Body / Collision Repair'),
+            ('automotive_dealership','Auto Dealership'),
+            ('dental_clinic','Dental Clinic'),
+            ('medical_clinic','Medical Clinic'),
+            ('veterinary','Veterinary'),
+            ('law_firm','Law Firm'),
+            ('insurance_agency','Insurance Agency'),
+            ('financial_services','Financial Services'),
+            ('restaurant','Restaurant'),
+            ('hotel','Hotel / Hospitality'),
+            ('spa','Spa / Beauty'),
+            ('gym','Gym / Fitness'),
+            ('home_services','Home Services'),
+            ('real_estate','Real Estate'),
+            ('saas_tech','SaaS / Tech'),
+            ('agency','Marketing Agency'),
+            ('ecommerce','E-commerce'),
+            ('education_academy','Education / Academy'),
+            ('online_courses','Online Courses'),
+            ('coaching','Coaching'),
+            ('other','Other / General')
+          ] %}
           <option value="{{ val }}" {% if industry == val %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
         </select>

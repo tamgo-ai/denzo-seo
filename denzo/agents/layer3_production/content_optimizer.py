@@ -24,27 +24,7 @@ class ContentOptimizer(TenantAwareBaseAgent):
         keyword = page.get("target_keyword", title)
 
         # Build Brand Voice DNA block
-        brand_voice_block = ""
-        if brand_voice:
-            brand_voice_block = f"""
-BRAND VOICE DNA — follow this exactly:
-- Brand name: {brand_voice.get('brand_name', ctx.client_name)}
-- Writing style: {brand_voice.get('writing_style', 'professional')}
-- Years of experience to reference: {brand_voice.get('years_experience', '')}
-- Clients served: {brand_voice.get('clients_served', '')}
-- Founder voice: {brand_voice.get('founder_name', '')}
-- Key proprietary insights to weave in: {brand_voice.get('key_insight_1', '')} / {brand_voice.get('key_insight_2', '')} / {brand_voice.get('key_insight_3', '')}
-- Contrarian position: {brand_voice.get('contrarian_position', '')}
-- Signature phrases to use: {brand_voice.get('phrases_to_use', '')}
-- Phrases to NEVER use: {brand_voice.get('phrases_to_avoid', '')}
-
-AUTHORITY SIGNAL RULES — include at least 2 of these in every piece:
-1. First-person data: "In our experience with [X clients/years]..."
-2. Named framework: Create a named methodology (e.g. "The [Brand] [Method/Framework/Approach]")
-3. Contrarian position: "Most [industry players] will tell you X, but that's wrong because..."
-4. Specific numbers: Use exact figures, percentages, timeframes — never vague estimates
-5. Expert quote: "As {brand_voice.get('founder_name', 'our founder')}, puts it: '...'"
-"""
+        brand_voice_block = ctx.to_brand_voice_block(brand_voice)
 
         # Two-pass approach: score first, then rewrite if needed (avoids token overflow)
         # PASS 1: Score only (fast, low tokens)
@@ -68,7 +48,8 @@ Score on:
 Return JSON only:
 {{"score": 0-100, "issues": ["specific issue 1", "specific issue 2", "specific issue 3"]}}
 """
-        raw = self.call_claude(score_prompt, max_tokens=400, model="claude-haiku-4-5-20251001")
+        raw = self.call_claude(score_prompt, max_tokens=400, model="claude-haiku-4-5-20251001",
+                              system=self.build_cacheable_system(), cache_system=True)
         if not raw:
             return None, ""  # API failed — caller will skip DB update
         try:
@@ -108,11 +89,13 @@ Rules:
 - Add specific numbers and facts
 - Return ONLY the improved HTML fragment, no explanation
 """
-        new_raw = self.call_claude(fix_prompt, max_tokens=5000, model="claude-sonnet-4-6")
+        new_raw = self.call_claude(fix_prompt, max_tokens=5000, model="claude-sonnet-4-6",
+                                  system=self.build_cacheable_system(), cache_system=True)
         if not new_raw:
             # Retry with simplified prompt
             simple_prompt = f"Rewrite this page to score above {self.MIN_SCORE}/100. Fix: {', '.join(issues[:3])}.\n\nTarget keyword: {keyword}\n\nContent:\n{content[:3000]}\n\nReturn only improved HTML."
-            new_raw = self.call_claude(simple_prompt, max_tokens=4000, model="claude-sonnet-4-6")
+            new_raw = self.call_claude(simple_prompt, max_tokens=4000, model="claude-sonnet-4-6",
+                                       system=self.build_cacheable_system(), cache_system=True)
         if not new_raw:
             return score, ""
         cleaned2 = new_raw.strip()
@@ -143,6 +126,10 @@ Rules:
             self.set_status("idle", "All pages meet quality threshold — nothing to optimize")
             return
 
+        # Hard cap: each page can be rewritten at most 3 times before giving up.
+        # After 3 attempts, the page is tagged [CO_MAX_RETRIES] and excluded from future runs.
+        MAX_REWRITES = 3
+
         # Load Brand Voice DNA once
         brand_voice = None
         bv_row = db_execute(
@@ -164,9 +151,10 @@ Rules:
         while not self.should_stop() and round_num < MAX_ROUNDS:
             round_num += 1
             pages = db_execute(
-                "SELECT id, title, slug, target_keyword, content FROM pages "
+                "SELECT id, title, slug, target_keyword, content, notes FROM pages "
                 "WHERE tenant_id=? AND status IN ('ready','published') AND content IS NOT NULL AND content != '' "
                 "AND (quality_score IS NULL OR quality_score < ?) "
+                "AND (notes IS NULL OR (notes NOT LIKE '%[CO_MAX_RETRIES]%' AND notes NOT LIKE '%[CO:3]%' AND notes NOT LIKE '%[CO:4]%' AND notes NOT LIKE '%[CO:5]%')) "
                 "ORDER BY id LIMIT ?",
                 (self.ctx.tenant_id, self.MIN_SCORE, self.BATCH)
             )
@@ -190,23 +178,52 @@ Rules:
                 self.log(f"{title[:50]} → score {score}/100")
 
                 if new_content and len(new_content.strip()) > 200:
-                    # Save score above MIN_SCORE so the page isn't re-selected next round.
-                    # Original score was < MIN_SCORE (why it was rewritten); store a passing
-                    # value so the next quality check doesn't re-queue the same page forever.
-                    saved_score = max(score + 15, self.MIN_SCORE + 1)
+                    # Save original content version before overwriting (rollback safety)
+                    old_content = page_dict.get("content", "")
+                    if old_content:
+                        db_write(
+                            "INSERT INTO content_versions (tenant_id, page_id, content, quality_score) "
+                            "VALUES (?,?,?,?)",
+                            (self.ctx.tenant_id, page_dict["id"], old_content, score)
+                        )
+                        # Trim: keep max 100 versions per tenant
+                        db_write(
+                            "DELETE FROM content_versions WHERE tenant_id=? AND id NOT IN ("
+                            "SELECT id FROM content_versions WHERE tenant_id=? "
+                            "ORDER BY id DESC LIMIT 100)",
+                            (self.ctx.tenant_id, self.ctx.tenant_id)
+                        )
+
+                    # Track rewrite attempts in notes to prevent infinite loops.
+                    # Extract current rewrite count from notes (format: [CO:N]).
+                    import re as _re
+                    old_notes = page_dict.get("notes") or ""
+                    rc_match = _re.search(r'\[CO:(\d+)\]', old_notes)
+                    rewrite_count = int(rc_match.group(1)) if rc_match else 0
+                    rewrite_count += 1
+                    new_notes = _re.sub(r'\s*\[CO:\d+\]', '', old_notes)
+
+                    if rewrite_count >= MAX_REWRITES:
+                        new_notes += f" [CO_MAX_RETRIES] [PENDING_REVIEW]"
+                        self.log(f"✗ Max rewrites reached: {title} (score {score}/100 after {rewrite_count} attempts)", "warning")
+                    else:
+                        new_notes += f" [CO:{rewrite_count}] [PENDING_REVIEW]"
+
                     db_write(
-                        "UPDATE pages SET content=?, quality_score=?, status='ready', "
-                        "updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
-                        (new_content, saved_score, page_dict["id"], self.ctx.tenant_id)
+                        "UPDATE pages SET content=?, quality_score=?, scored_by='haiku-4-5-scored', "
+                        "notes=?, status='ready', updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
+                        (new_content, score, new_notes, page_dict["id"], self.ctx.tenant_id)
                     )
-                    self.log(f"✓ Improved: {title} ({score} → {saved_score})", "success")
+                    self.log(f"✓ Improved: {title} (score {score}/100, rewrite #{rewrite_count})", "success")
                     improved += 1
                 else:
-                    # Mark with score so it won't be re-selected next round
+                    # Mark with real score and tag as already-passed
+                    old_notes = page_dict.get("notes") or ""
+                    tag = " [CO_OK]" if score >= self.MIN_SCORE else ""
                     db_write(
-                        "UPDATE pages SET quality_score=?, updated_at=CURRENT_TIMESTAMP "
-                        "WHERE id=? AND tenant_id=?",
-                        (score, page_dict["id"], self.ctx.tenant_id)
+                        "UPDATE pages SET quality_score=?, scored_by='haiku-4-5-scored', "
+                        "notes=notes || ?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
+                        (score, tag, page_dict["id"], self.ctx.tenant_id)
                     )
                     skipped += 1
 

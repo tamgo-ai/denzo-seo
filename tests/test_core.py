@@ -88,7 +88,7 @@ class TestBilling:
 class TestAgentSystem:
     def test_all_agents_registered(self):
         from denzo.agents.registry import AGENT_REGISTRY
-        assert len(AGENT_REGISTRY) >= 25
+        assert len(AGENT_REGISTRY) >= 27
         assert "Pipeline Director" in AGENT_REGISTRY
         assert "Keyword Strategist" in AGENT_REGISTRY
         assert "Programmatic SEO" in AGENT_REGISTRY
@@ -124,14 +124,14 @@ class TestAgentSystem:
 
     def test_director_state_machine(self):
         from denzo.agents.director import PipelineDirector, LAYER_1, LAYER_2, LAYER_2B, LAYER_3, LAYER_4, LAYER_4B, LAYER_5, LAYER_6
-        assert len(LAYER_1) == 6
+        assert len(LAYER_1) == 7
         assert len(LAYER_2) == 2
         assert len(LAYER_2B) == 1
         assert len(LAYER_3) == 1
         assert len(LAYER_4) == 4
         assert len(LAYER_4B) == 1
-        assert len(LAYER_5) == 2
-        assert len(LAYER_6) == 6
+        assert len(LAYER_5) == 3
+        assert len(LAYER_6) == 9
 
     def test_agent_runner_singleton(self):
         from denzo.agents.runner import AgentRunner
@@ -204,4 +204,4 @@ class TestDataIntegrity:
             agents = db_execute(
                 "SELECT COUNT(*) as n FROM agents WHERE tenant_id=?", (c["tenant_id"],)
             )
-            assert agents[0]["n"] >= 20, f"Client {c['tenant_id']} has only {agents[0]['n']} agents"
+            assert agents[0]["n"] >= 25, f"Client {c['tenant_id']} has only {agents[0]['n']} agents"
