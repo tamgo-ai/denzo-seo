@@ -117,19 +117,17 @@ def create_app():
     from flask_limiter import Limiter
     from flask_limiter.util import get_remote_address
 
-    # Use Redis if available (production), fall back to memory (dev)
+    # Always try Redis first (production), fall back to memory (dev)
     _redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/1")
-    _limiter_storage = _redis_url if os.getenv("DENZO_EXECUTOR") == "rq" else "memory://"
+    _limiter_storage = "memory://"
     try:
-        if _limiter_storage.startswith("redis"):
-            import redis as _redis_check
-            _r = _redis_check.Redis.from_url(_redis_url, socket_connect_timeout=1)
-            _r.ping()
-            _r.close()
-        else:
-            raise Exception("using memory backend")
+        import redis as _redis_check
+        _r = _redis_check.Redis.from_url(_redis_url, socket_connect_timeout=1)
+        _r.ping()
+        _r.close()
+        _limiter_storage = _redis_url
+        print(f"[DENZO] Rate limiter: Redis ({_redis_url})")
     except Exception:
-        _limiter_storage = "memory://"
         print("[DENZO] Rate limiter: memory:// (Redis not available — install redis-server for production)")
 
     limiter = Limiter(

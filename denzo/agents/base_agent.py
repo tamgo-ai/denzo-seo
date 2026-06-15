@@ -467,13 +467,39 @@ class TenantAwareBaseAgent:
     # ── Structured output ─────────────────────────────────────────────────────
 
     def save_output(self, key: str, data: dict):
-        """Persist agent output to settings so downstream agents can read it."""
+        """Persist agent output to settings so downstream agents can read it.
+
+        Validates against registered Pydantic schema if one exists for this key.
+        Validation errors are logged as warnings — they don't crash the pipeline
+        (set DENZO_STRICT_SCHEMAS=true to make them fatal).
+        """
         import json
+        from denzo.schemas import validate_setting
+        # Validate before saving — catches contract breakage early
+        validated = validate_setting(key, data)
+        data_to_save = validated if isinstance(validated, dict) else data
         db_write(
             "INSERT OR REPLACE INTO settings (tenant_id, key, value, updated_at) "
             "VALUES (?,?,?,CURRENT_TIMESTAMP)",
-            (self.tenant_id, key, json.dumps(data, ensure_ascii=False))
+            (self.tenant_id, key, json.dumps(data_to_save, ensure_ascii=False))
         )
+
+    def load_output(self, key: str) -> dict | None:
+        """Read agent output from settings. Validates against registered schema."""
+        import json
+        rows = db_execute(
+            "SELECT value FROM settings WHERE tenant_id=? AND key=?",
+            (self.tenant_id, key)
+        )
+        if not rows or not rows[0]["value"]:
+            return None
+        try:
+            data = json.loads(rows[0]["value"])
+        except json.JSONDecodeError:
+            return None
+        from denzo.schemas import validate_setting
+        validated = validate_setting(key, data)
+        return validated if isinstance(validated, dict) else data
 
     def log_result(self, what: str, count: int, examples: list[str] = None, score: str = ""):
         """Standardized completion log showing what the agent produced with examples."""
