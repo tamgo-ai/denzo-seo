@@ -33,7 +33,8 @@ LAYER_2B = ["Vertical Matrix Generator"]  # needs EEAT done
 LAYER_3 = ["Programmatic SEO"]
 LAYER_4 = ["Content Optimizer", "Visual Content Optimizer", "GEO Optimizer", "Internal Linker"]
 LAYER_4B = ["Content Freshness"]  # needs pages published
-LAYER_5 = ["GitHub Publisher", "WordPress Publisher", "Indexation Accelerator"]
+LAYER_5 = ["GitHub Publisher", "WordPress Publisher", "Indexation Accelerator",
+           "GBP Autopilot", "Video Engine"]
 LAYER_6 = [
     "Rank Tracker", "GEO Query Generator", "GEO Monitor",
     "SERP Intelligence", "Reviews Intelligence", "ROI Attribution",

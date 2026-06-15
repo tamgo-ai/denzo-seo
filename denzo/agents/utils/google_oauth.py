@@ -35,6 +35,11 @@ PROVIDER_SCOPES = {
         "https://www.googleapis.com/auth/indexing",
         "openid", "email", "profile",
     ],
+    "youtube": [
+        "https://www.googleapis.com/auth/youtube.upload",
+        "https://www.googleapis.com/auth/youtube",
+        "openid", "email", "profile",
+    ],
 }
 
 

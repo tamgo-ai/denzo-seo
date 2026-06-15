@@ -42,6 +42,9 @@ AGENT_REGISTRY = {
     "Perplexity Tracker":        ("layer5_monitoring.perplexity_tracker",        "PerplexityTracker",       6, "violet"),
     "GEO Gap Closer":            ("layer5_monitoring.geo_gap_closer",            "GEOGapCloser",            6, "emerald"),
     "Indexation Accelerator":   ("layer4_publishing.indexation_accelerator",    "IndexationAccelerator",   5, "emerald"),
+    # Layer 5 — Action Agents (autonomous management beyond content)
+    "GBP Autopilot":             ("layer4_publishing.gbp_autopilot",              "GBPAutopilot",            5, "amber"),
+    "Video Engine":              ("layer4_publishing.video_engine",               "VideoEngine",             5, "rose"),
     # ── Capa 0.5 — Discovery & Reconciliation (runs BEFORE all generation) ──
     "Site Inventory":            ("layer1_research.site_inventory",               "SiteInventoryAgent",      1, "stone"),
     "Keyword Footprint":         ("layer1_research.keyword_footprint",             "KeywordFootprintAgent",   1, "sand"),
