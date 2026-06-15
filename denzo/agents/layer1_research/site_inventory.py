@@ -27,7 +27,8 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
 
     MAX_PAGES = 100       # Safety cap — don't crawl giant sites
     MAX_DEPTH = 3         # BFS depth limit
-    REQUEST_DELAY = 1.0   # Be nice to the server
+    REQUEST_DELAY = 0.3   # Be nice to the server (reduced — SPA sites return instantly)
+    FETCH_TIMEOUT = 6     # Quick timeout — modern sites load fast or are SPAs
 
     def __init__(self, ctx):
         super().__init__(name="Site Inventory", ctx=ctx, layer=1, color="stone")
@@ -67,18 +68,30 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
 
         # ── Phase 2: Fetch and inventory each URL ───────────────────────────
         existing_slugs = set()
+        content_hashes = set()  # Early dedup: skip same-content pages instantly
         new_pages = 0
         errors = 0
 
-        for url in urls[:self.MAX_PAGES]:
+        for i, url in enumerate(urls[:self.MAX_PAGES]):
             if self.should_stop():
                 break
+
+            # Progress every 20 URLs
+            if i > 0 and i % 20 == 0:
+                self.log(f"Inventory progress: {i}/{len(urls[:self.MAX_PAGES])} URLs ({new_pages} new pages)")
 
             try:
                 result = self._fetch_page_data(url)
                 if not result:
                     errors += 1
                     continue
+
+                # Early exit: skip duplicate content (common on SPAs like Next.js)
+                ch = result.get("content_hash", "")
+                if ch and ch in content_hashes:
+                    continue
+                if ch:
+                    content_hashes.add(ch)
 
                 slug = result["slug"]
                 if slug in existing_slugs:
@@ -121,7 +134,7 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
 
         for sitemap_url in sitemap_urls:
             try:
-                result = fetch_html(sitemap_url, timeout=15)
+                result = fetch_html(sitemap_url, timeout=self.FETCH_TIMEOUT)
                 if not result["ok"]:
                     continue
 
@@ -172,7 +185,7 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
                 visited.add(url)
 
                 try:
-                    result = fetch_html(url, timeout=15)
+                    result = fetch_html(url, timeout=self.FETCH_TIMEOUT)
                     if not result["ok"]:
                         continue
 
@@ -206,7 +219,7 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
         """Fetch and parse a single page. Returns dict or None on failure."""
         from denzo.agents.utils.stealth_fetch import fetch_html, parse_html
 
-        result = fetch_html(url, timeout=15)
+        result = fetch_html(url, timeout=self.FETCH_TIMEOUT)
         if not result["ok"] or not result.get("html"):
             return None
 
