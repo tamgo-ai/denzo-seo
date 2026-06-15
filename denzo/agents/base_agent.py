@@ -567,30 +567,39 @@ class TenantAwareBaseAgent:
                 (self.tenant_id, target_keyword)
             )
             if not topic_rows:
-                self.log(
-                    f"BLOCKED '{title}': keyword '{target_keyword}' has no topic_map entry. "
-                    "Pages must originate from a canonical intent in topic_map.",
-                    "error"
+                # Check if topic_map is completely empty for this tenant (bootstrapping)
+                any_topic = db_execute(
+                    "SELECT COUNT(*) as n FROM topic_map WHERE tenant_id=?",
+                    (self.tenant_id,)
                 )
-                return
+                if any_topic and any_topic[0]["n"] > 0:
+                    # topic_map exists but this keyword isn't in it → block
+                    self.log(
+                        f"BLOCKED '{title}': keyword '{target_keyword}' has no topic_map entry. "
+                        "Pages must originate from a canonical intent in topic_map.",
+                        "error"
+                    )
+                    return
+                # else: topic_map is empty → pipeline bootstrapping → allow
 
-            topic = topic_rows[0]
-            if topic["status"] == "owned_existing":
-                self.log(
-                    f"BLOCKED '{title}': keyword '{target_keyword}' already owned by "
-                    f"existing client content at {topic['owner_url']}. Cannibalization prevented.",
-                    "error"
-                )
-                return
+            topic = topic_rows[0] if topic_rows else None
+            if topic:  # Only enforce ownership checks if topic_map entry exists
+                if topic["status"] == "owned_existing":
+                    self.log(
+                        f"BLOCKED '{title}': keyword '{target_keyword}' already owned by "
+                        f"existing client content at {topic['owner_url']}. Cannibalization prevented.",
+                        "error"
+                    )
+                    return
 
-            if topic["owner_page_id"]:
-                # Another generated page already owns this keyword
-                self.log(
-                    f"BLOCKED '{title}': keyword '{target_keyword}' already owned by page_id={topic['owner_page_id']}. "
-                    "One intent, one page.",
-                    "error"
-                )
-                return
+                if topic["owner_page_id"]:
+                    # Another generated page already owns this keyword
+                    self.log(
+                        f"BLOCKED '{title}': keyword '{target_keyword}' already owned by page_id={topic['owner_page_id']}. "
+                        "One intent, one page.",
+                        "error"
+                    )
+                    return
 
         # ── Gate 2: Semantic duplicate check ────────────────────────────────
         if content and target_keyword:
@@ -619,10 +628,12 @@ class TenantAwareBaseAgent:
                 (self.tenant_id, slug)
             )
             if new_page:
+                # INSERT OR REPLACE — creates entry if bootstrapping, updates if exists
                 db_write(
-                    "UPDATE topic_map SET owner_page_id=?, status='owned_generated' "
-                    "WHERE tenant_id=? AND primary_keyword=?",
-                    (new_page[0]["id"], self.tenant_id, target_keyword)
+                    """INSERT OR REPLACE INTO topic_map
+                       (tenant_id, primary_keyword, owner_page_id, status)
+                       VALUES (?, ?, ?, 'owned_generated')""",
+                    (self.tenant_id, target_keyword, new_page[0]["id"])
                 )
 
         self.log(f"Page: '{title}'", level="success")

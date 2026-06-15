@@ -99,9 +99,21 @@ Return ONLY the JSON object, no explanation or markdown.
         try:
             result = json.loads(cleaned)
         except json.JSONDecodeError as e:
-            self.log(f"JSON parse failed — preview: {cleaned[:200]}", "error")
-            self.set_status("error", f"Parse error: {e}")
-            return
+            # ── Repair: try to salvage partial JSON ──────────────────
+            self.log(f"JSON parse error, attempting repair...", "warning")
+            repaired = self._repair_json(cleaned)
+            if repaired:
+                try:
+                    result = json.loads(repaired)
+                    self.log("JSON repaired successfully", "info")
+                except json.JSONDecodeError as e2:
+                    self.log(f"JSON repair also failed: {e2}", "error")
+                    self.set_status("error", f"Parse error (unrepairable): {e2}")
+                    return
+            else:
+                self.log(f"JSON parse failed — preview: {cleaned[:200]}", "error")
+                self.set_status("error", f"Parse error: {e}")
+                return
 
         clusters = result.get("clusters", [])
         cannibalization_risks = result.get("cannibalization_risks", [])
@@ -215,3 +227,48 @@ Return ONLY the JSON object, no explanation or markdown.
                     pass  # UNIQUE constraint
 
         self.log(f"topic_map: {inserted} planned, {skipped} owned by existing content")
+
+    @staticmethod
+    def _repair_json(text: str) -> str | None:
+        """Attempt to repair truncated/ malformed JSON from LLM output.
+        Common failures: unterminated strings, missing closing brackets.
+        Returns repaired JSON string or None if unrepairable."""
+        if not text or not text.strip().startswith('{'):
+            return None
+        # Strategy: find the last valid complete object/array by counting brackets
+        # Remove everything after the last valid structural close
+        depth = 0
+        in_string = False
+        escape = False
+        last_valid_pos = len(text)
+        for i, ch in enumerate(text):
+            if escape:
+                escape = False
+                continue
+            if ch == '\\':
+                escape = True
+                continue
+            if ch == '"' and not escape:
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch in '{[':
+                depth += 1
+            elif ch in '}]':
+                depth -= 1
+                if depth <= 0:
+                    last_valid_pos = i + 1
+                    if depth < 0:
+                        break
+        if last_valid_pos < len(text):
+            repaired = text[:last_valid_pos]
+            # Try to close unclosed strings
+            if repaired.rstrip().endswith('"') or repaired.rstrip().endswith(']'):
+                return repaired
+            # Try adding closing brackets
+            open_braces = repaired.count('{') - repaired.count('}')
+            open_brackets = repaired.count('[') - repaired.count(']')
+            suffix = '}' * open_braces + ']' * open_brackets
+            return repaired + suffix
+        return text[:last_valid_pos]
