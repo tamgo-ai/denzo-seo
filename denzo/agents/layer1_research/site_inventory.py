@@ -260,10 +260,9 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
             db_write(
                 """UPDATE pages SET
                    source_url=?, content_hash=?, origin='existing', managed=0,
-                   status='live_external', word_count=?
+                   status='live_external'
                    WHERE id=? AND tenant_id=?""",
                 (data["source_url"], data["content_hash"],
-                 data.get("word_count", 0),
                  existing[0]["id"], self.tenant_id)
             )
             return
