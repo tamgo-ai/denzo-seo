@@ -494,7 +494,7 @@
           {% else %}color:#3b82f6;{% endif %}">
           {% if entry.level == 'success' %}✓{% elif entry.level == 'error' %}✗{% elif entry.level == 'warning' %}⚠{% else %}·{% endif %}
         </span>
-        <span class="log-time">{{ entry.created_at[5:16] if entry.created_at else '' }}</span>
+        <span class="log-time" data-utc="{{ entry.created_at if entry.created_at else '' }}">{{ entry.created_at[5:16].replace(' ',' ') if entry.created_at else '' }} PDT</span>
         {% if entry.agent %}
         <span class="log-agent">{{ entry.agent[:20] }}</span>
         {% endif %}
@@ -814,14 +814,22 @@ function professionalDashboard(tenantId) {
     // Formatting
     fmtTime(ts) {
       if (!ts) return '';
-      const d = new Date(ts.includes('T') ? ts : ts.replace(' ', 'T') + 'Z');
-      if (isNaN(d.getTime())) return '';
-      return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':' + String(d.getSeconds()).padStart(2, '0');
+      // DB stores UTC. Convert to local time for display.
+      let iso = ts.trim();
+      if (!iso.includes('T')) iso = iso.replace(' ','T');
+      if (!iso.endsWith('Z') && !iso.includes('+') && !iso.includes('-',10)) iso += 'Z';
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return ts.slice(11,19) || ts;
+      // Use local time (browser timezone — California = PDT)
+      return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
     },
     fmtDate(ts) {
       if (!ts) return '';
-      const d = new Date(ts.includes('T') ? ts : ts.replace(' ', 'T') + 'Z');
-      if (isNaN(d.getTime())) return '';
+      let iso = ts.trim();
+      if (!iso.includes('T')) iso = iso.replace(' ','T');
+      if (!iso.endsWith('Z') && !iso.includes('+') && !iso.includes('-',10)) iso += 'Z';
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return ts.slice(5,16) || ts;
       return (d.getMonth()+1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
     },
     levelColor(level) {

@@ -55,11 +55,20 @@ def index(tenant_id):
             }
         layers[layer_num]["agents"].append(dict(a))
 
-    # Activity log — last 50
+    # Activity log — last 50 (convert UTC → Pacific)
+    from datetime import datetime, timezone, timedelta
+    PDT = timezone(timedelta(hours=-7))
     activity = db.execute(
         "SELECT * FROM activity WHERE tenant_id=? ORDER BY id DESC LIMIT 50",
         (tenant_id,)
     ).fetchall()
+    # Convert timestamps to Pacific time for display
+    for a in activity:
+        try:
+            dt = datetime.strptime(a["created_at"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+            a["created_at"] = dt.astimezone(PDT).strftime("%Y-%m-%d %H:%M:%S")
+        except (ValueError, TypeError):
+            pass
 
     # Stats
     kw_count = db.execute(
@@ -220,9 +229,17 @@ def agents_page(tenant_id):
             layers[layer_num] = {"label": LAYER_LABELS.get(layer_num, f"Layer {layer_num}"), "agents": []}
         layers[layer_num]["agents"].append(dict(a))
 
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    _PDT = _tz(_td(hours=-7))
     activity = db.execute(
         "SELECT * FROM activity WHERE tenant_id=? ORDER BY id DESC LIMIT 50", (tenant_id,)
     ).fetchall()
+    for a in activity:
+        try:
+            dt = _dt.strptime(a["created_at"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=_tz.utc)
+            a["created_at"] = dt.astimezone(_PDT).strftime("%Y-%m-%d %H:%M:%S")
+        except (ValueError, TypeError):
+            pass
 
     kw_count = db.execute("SELECT COUNT(*) FROM keywords WHERE tenant_id=?", (tenant_id,)).fetchone()[0]
     page_counts = db.execute(
