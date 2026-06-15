@@ -1,613 +1,553 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DENZO — The AI Visibility Platform. Get Cited by ChatGPT, Perplexity & Google.</title>
-  <meta name="description" content="The first platform that measures and improves your visibility across ChatGPT, Perplexity, Gemini, and Google AI Overviews. Free AI Visibility Report in 30 seconds." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <script type="importmap">
-    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
-  </script>
-  <style>
-    /* ═══════════════════════════════════════════════════════════════════════════
-       DENZO SEO — Liquid Glass + Cyber-Organic Design System
-       ═══════════════════════════════════════════════════════════════════════════ */
-    :root {
-      --bg-deep: #030303;
-      --bg-surface: #080810;
-      --glass-bg: rgba(10,10,30,0.55);
-      --glass-border: rgba(255,255,255,0.06);
-      --glass-hover: rgba(255,255,255,0.08);
-      --indigo-core: #6366f1;
-      --indigo-glow: rgba(99,102,241,0.35);
-      --amber-core: #f59e0b;
-      --emerald-core: #10b981;
-      --text-primary: #f1f5f9;
-      --text-muted: #94a3b8;
-      --text-dim: #475569;
-      --radius-sm: 12px;
-      --radius-md: 20px;
-      --radius-lg: 28px;
-      --radius-xl: 36px;
-      --ease-out-expo: cubic-bezier(0.16,1,0.3,1);
-      --ease-spring: cubic-bezier(0.34,1.56,0.64,1);
-    }
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>DENZO — AI Visibility. Measure what ChatGPT, Perplexity & Gemini say about you.</title>
+<meta name="description" content="The platform that measures and grows your visibility across every AI engine. Free AI Visibility Report in 30 seconds."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;350;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}
+</script>
+<style>
+/* ═══════════════════════════════════════════════════════════════════════
+   DENZO — Premium Minimal Design System
+   References: Notion, Tesla, Linear, Porsche
+   ═══════════════════════════════════════════════════════════════════════ */
+:root {
+  --ink: #000000;
+  --paper: #08080c;
+  --surface: #0c0c14;
+  --border: rgba(255,255,255,0.06);
+  --border-hover: rgba(255,255,255,0.12);
+  --text: #f4f4f9;
+  --text-secondary: #9898b0;
+  --text-tertiary: #5c5c72;
+  --accent: #6366f1;
+  --accent-glow: rgba(99,102,241,0.3);
+  --amber: #f59e0b;
+  --emerald: #10b981;
+  --radius: 16px;
+  --radius-lg: 24px;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
+body{
+  font-family:var(--font-sans);
+  background:var(--ink);
+  color:var(--text);
+  overflow-x:hidden;
+  line-height:1.6;
+}
 
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-    body {
-      font-family: 'Inter', system-ui, sans-serif;
-      background: var(--bg-deep);
-      color: var(--text-primary);
-      overflow-x: hidden;
-      -webkit-font-smoothing: antialiased;
-    }
+/* Atmosphere */
+.bg-atmo{
+  position:fixed;inset:0;pointer-events:none;z-index:0;
+}
+.bg-atmo::before{
+  content:'';position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(99,102,241,0.045) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 40% at 25% 60%, rgba(129,140,248,0.025) 0%, transparent 70%);
+}
+.grid-subtle{
+  position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:linear-gradient(rgba(255,255,255,0.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.018) 1px,transparent 1px);
+  background-size:80px 80px;
+  mask-image:radial-gradient(ellipse 70% 70% at 50% 30%,black,transparent);
+}
 
-    /* ── Animated background mesh ─────────────────────────────────────── */
-    .bg-atmosphere {
-      position: fixed; inset: 0; pointer-events: none; z-index: 0;
-    }
-    .bg-atmosphere::before {
-      content: ''; position: absolute; inset: 0;
-      background:
-        radial-gradient(ellipse 1200px 800px at 20% 0%, rgba(99,102,241,0.07) 0%, transparent 60%),
-        radial-gradient(ellipse 900px 700px at 80% 30%, rgba(168,85,247,0.05) 0%, transparent 60%),
-        radial-gradient(ellipse 800px 600px at 50% 100%, rgba(16,185,129,0.04) 0%, transparent 50%);
-      animation: atmosphere-shift 20s ease-in-out infinite alternate;
-    }
-    @keyframes atmosphere-shift {
-      0% { opacity: 0.7; }
-      50% { opacity: 1; }
-      100% { opacity: 0.8; }
-    }
+/* Nav */
+.nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  background:rgba(0,0,0,0.7);
+  backdrop-filter:blur(24px) saturate(180%);
+  -webkit-backdrop-filter:blur(24px) saturate(180%);
+  border-bottom:1px solid transparent;
+  transition:border-color .4s ease;
+}
+.nav.scrolled{border-bottom-color:var(--border)}
+.nav-inner{
+  max-width:1280px;margin:0 auto;padding:0 32px;
+  display:flex;align-items:center;justify-content:space-between;height:60px;
+}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:700;font-size:18px;color:var(--text);letter-spacing:-0.02em;}
+.nav-logo-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent-glow);animation:nav-pulse 2s ease-in-out infinite;}
+@keyframes nav-pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.nav-links{display:flex;align-items:center;gap:28px}
+.nav-links a{color:var(--text-secondary);font-size:14px;font-weight:450;text-decoration:none;transition:color .2s;letter-spacing:0}
+.nav-links a:hover{color:var(--text)}
+@media(max-width:768px){.nav-links{display:none}}
 
-    /* Grid */
-    .bg-grid {
-      position: fixed; inset: 0; pointer-events: none; z-index: 0;
-      background-image:
-        linear-gradient(rgba(99,102,241,0.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(99,102,241,0.025) 1px, transparent 1px);
-      background-size: 60px 60px;
-      mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black, transparent);
-    }
+.btn{
+  display:inline-flex;align-items:center;gap:8px;
+  font-family:var(--font-sans);font-weight:600;font-size:14px;
+  padding:11px 22px;border-radius:10px;cursor:pointer;
+  transition:all .3s cubic-bezier(.4,0,.2,1);
+  text-decoration:none;border:none;letter-spacing:-0.01em;
+}
+.btn-primary{
+  background:var(--accent);color:white;
+  box-shadow:0 0 0 0 var(--accent-glow);
+}
+.btn-primary:hover{
+  transform:translateY(-1px);
+  box-shadow:0 0 32px var(--accent-glow),0 4px 16px rgba(0,0,0,0.4);
+}
+.btn-ghost{
+  background:transparent;color:var(--text);
+  border:1px solid var(--border);
+}
+.btn-ghost:hover{
+  border-color:var(--border-hover);
+  background:rgba(255,255,255,0.03);
+}
+.btn-lg{padding:15px 30px;font-size:16px;border-radius:12px}
 
-    /* ── Navigation ──────────────────────────────────────────────────── */
-    .nav-blur {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      background: rgba(3,3,3,0.75);
-      backdrop-filter: blur(20px) saturate(180%);
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-    }
+/* Sections */
+.sec{
+  position:relative;z-index:2;
+  padding:140px 32px;
+}
+.sec-inner{max-width:1100px;margin:0 auto}
+.sec-label{
+  font-size:12px;font-weight:700;text-transform:uppercase;
+  letter-spacing:0.12em;color:var(--accent);margin-bottom:20px;
+}
 
-    /* ── Glass cards ──────────────────────────────────────────────────── */
-    .glass-card {
-      background: var(--glass-bg);
-      border: 1px solid var(--glass-border);
-      backdrop-filter: blur(16px) saturate(150%);
-      transition: all 0.4s var(--ease-out-expo);
-    }
-    .glass-card:hover {
-      background: rgba(15,15,40,0.65);
-      border-color: rgba(255,255,255,0.12);
-      transform: translateY(-2px);
-      box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(99,102,241,0.08);
-    }
+/* Hero */
+#hero-canvas{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  pointer-events:none;z-index:0;opacity:0.7;
+}
+.hero{
+  position:relative;min-height:100vh;display:flex;align-items:center;
+  padding:120px 32px 100px;
+}
+.hero-content{position:relative;z-index:2;max-width:780px;margin:0 auto;text-align:center}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:5px 14px;border-radius:100px;
+  border:1px solid rgba(99,102,241,0.2);
+  background:rgba(99,102,241,0.04);
+  font-size:13px;font-weight:500;color:var(--accent);
+  margin-bottom:40px;letter-spacing:-0.01em;
+}
+.hero-title{
+  font-size:clamp(3rem,7vw,5.5rem);
+  font-weight:800;letter-spacing:-0.04em;line-height:1.04;
+  margin-bottom:28px;color:var(--text);
+}
+.hero-subtitle{
+  font-size:clamp(1.05rem,1.8vw,1.25rem);
+  color:var(--text-secondary);max-width:540px;margin:0 auto 44px;
+  line-height:1.7;font-weight:400;letter-spacing:-0.01em;
+}
+.hero-cta{
+  display:flex;align-items:center;gap:10px;padding:8px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;max-width:500px;margin:0 auto 20px;
+  transition:border-color .3s;
+}
+.hero-cta:focus-within{border-color:var(--accent)}
+.hero-cta input{
+  flex:1;background:none;border:none;color:var(--text);
+  font-size:17px;font-family:var(--font-sans);outline:none;
+  padding:12px 16px;letter-spacing:-0.01em;
+}
+.hero-cta input::placeholder{color:var(--text-tertiary)}
 
-    /* ── Typography ───────────────────────────────────────────────────── */
-    .hero-display {
-      font-size: clamp(3.5rem, 8vw, 7rem);
-      font-weight: 900;
-      letter-spacing: -0.03em;
-      line-height: 1.02;
-    }
-    .section-title {
-      font-size: clamp(2rem, 5vw, 3.5rem);
-      font-weight: 800;
-      letter-spacing: -0.025em;
-      line-height: 1.1;
-    }
-    .gradient-text {
-      background: linear-gradient(135deg, #818cf8 0%, #a78bfa 40%, #6366f1 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .gradient-text-warm {
-      background: linear-gradient(135deg, #f59e0b 0%, #f97316 50%, #ef4444 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
+/* Feature cards */
+.card-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+  gap:24px;
+}
+.card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-lg);padding:36px;
+  transition:border-color .4s,transform .4s cubic-bezier(.4,0,.2,1);
+}
+.card:hover{
+  border-color:var(--border-hover);
+  transform:translateY(-2px);
+}
+.card-icon{
+  width:44px;height:44px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:20px;font-size:20px;
+}
+.card-title{font-size:17px;font-weight:700;color:var(--text);margin-bottom:10px;letter-spacing:-0.02em;}
+.card-desc{font-size:14px;color:var(--text-secondary);line-height:1.65;font-weight:400;}
 
-    /* ── Buttons ──────────────────────────────────────────────────────── */
-    .btn {
-      display: inline-flex; align-items: center; gap: 10px;
-      font-family: 'Inter', sans-serif;
-      font-weight: 700; font-size: 15px;
-      padding: 14px 28px; border-radius: var(--radius-sm);
-      cursor: pointer; transition: all 0.35s var(--ease-out-expo);
-      position: relative; overflow: hidden; text-decoration: none;
-    }
-    .btn-primary {
-      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-      color: white; border: none;
-      box-shadow: 0 0 0 0 rgba(99,102,241,0.5);
-    }
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 0 40px rgba(99,102,241,0.5), 0 8px 30px rgba(79,70,229,0.3);
-    }
-    .btn-primary::after {
-      content: ''; position: absolute; inset: 0;
-      background: linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
-      transform: translateX(-100%);
-      animation: btn-shine 3s ease-in-out infinite;
-    }
-    @keyframes btn-shine {
-      0%, 100% { transform: translateX(-100%); }
-      50% { transform: translateX(100%); }
-    }
-    .btn-ghost {
-      background: transparent; color: var(--text-primary);
-      border: 1px solid rgba(255,255,255,0.12);
-    }
-    .btn-ghost:hover {
-      border-color: rgba(255,255,255,0.3);
-      background: rgba(255,255,255,0.04);
-      transform: translateY(-2px);
-    }
+/* Stats */
+.stat-number{
+  font-size:clamp(2.5rem,5vw,4.5rem);
+  font-weight:800;letter-spacing:-0.04em;
+  color:var(--text);line-height:1;
+}
 
-    /* ── 3D Canvas ────────────────────────────────────────────────────── */
-    #hero-canvas {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      pointer-events: none; z-index: 0;
-    }
+/* Quote */
+.quote{
+  font-size:clamp(1.2rem,2vw,1.5rem);
+  font-weight:400;color:var(--text-secondary);
+  line-height:1.7;font-style:italic;letter-spacing:-0.01em;
+  max-width:680px;
+}
 
-    /* ── Scroll reveals ───────────────────────────────────────────────── */
-    .reveal {
-      opacity: 0; transform: translateY(40px);
-      transition: opacity 0.8s var(--ease-out-expo), transform 0.8s var(--ease-out-expo);
-    }
-    .reveal.visible { opacity: 1; transform: translateY(0); }
-    .reveal-delay-1 { transition-delay: 0.1s; }
-    .reveal-delay-2 { transition-delay: 0.2s; }
-    .reveal-delay-3 { transition-delay: 0.35s; }
-    .reveal-delay-4 { transition-delay: 0.5s; }
+/* Price */
+.price-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-lg);padding:40px;text-align:center;
+  transition:border-color .4s,transform .4s;
+}
+.price-card.featured{border-color:rgba(99,102,241,0.25);box-shadow:0 0 60px rgba(99,102,241,0.06)}
+.price-card:hover{border-color:var(--border-hover)}
+.price-amount{font-size:56px;font-weight:800;letter-spacing:-0.04em;color:var(--text);margin:12px 0}
 
-    /* ── Floating particles ──────────────────────────────────────────── */
-    .particle {
-      position: absolute; border-radius: 50%;
-      background: var(--indigo-core);
-      animation: float-up linear infinite;
-      opacity: 0;
-    }
-    @keyframes float-up {
-      0% { transform: translateY(0) scale(0); opacity: 0; }
-      10% { opacity: 0.6; }
-      90% { opacity: 0.1; }
-      100% { transform: translateY(-100vh) scale(1.2); opacity: 0; }
-    }
+/* FAQ */
+.faq-item{
+  border-bottom:1px solid var(--border);
+}
+.faq-q{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px 0;font-size:15px;font-weight:600;color:var(--text);
+  cursor:pointer;letter-spacing:-0.01em;
+}
+.faq-a{
+  padding:0 0 20px;font-size:14px;color:var(--text-secondary);
+  line-height:1.7;display:none;
+}
+.faq-item.open .faq-a{display:block}
+.faq-arrow{transition:transform .3s ease}
+.faq-item.open .faq-arrow{transform:rotate(45deg)}
 
-    /* ── Stat pulse ───────────────────────────────────────────────────── */
-    .stat-ring {
-      position: relative;
-    }
-    .stat-ring::before {
-      content: ''; position: absolute; inset: -8px; border-radius: inherit;
-      border: 2px solid rgba(99,102,241,0.2);
-      animation: ring-pulse 2s ease-in-out infinite;
-    }
-    @keyframes ring-pulse {
-      0%, 100% { transform: scale(1); opacity: 0.3; }
-      50% { transform: scale(1.06); opacity: 0.8; }
-    }
+/* Footer */
+.footer{font-size:13px;color:var(--text-tertiary);}
 
-    /* ── Flow diagram animation ───────────────────────────────────────── */
-    .flow-line { stroke-dasharray: 8 4; animation: flow-dash 1s linear infinite; }
-    @keyframes flow-dash { to { stroke-dashoffset: -24; } }
-
-    /* ── FAQ ──────────────────────────────────────────────────────────── */
-    .faq-trigger { cursor: pointer; }
-    .faq-trigger::-webkit-details-marker { display: none; }
-    .faq-arrow { transition: transform 0.35s var(--ease-out-expo); }
-    details[open] .faq-arrow { transform: rotate(180deg); }
-
-    @media (max-width: 768px) {
-      .hero-display { font-size: clamp(2.5rem, 12vw, 4rem); }
-      .mobile-stack { flex-direction: column !important; }
-    }
-  </style>
+/* Animations */
+.reveal{opacity:0;transform:translateY(30px);transition:opacity .7s cubic-bezier(.4,0,.2,1),transform .7s cubic-bezier(.4,0,.2,1);}
+.reveal.on{opacity:1;transform:translateY(0)}
+.d1{transition-delay:.05s}.d2{transition-delay:.12s}.d3{transition-delay:.2s}.d4{transition-delay:.3s}.d5{transition-delay:.42s}
+</style>
 </head>
 <body>
 
-<!-- ════════════════ NAVIGATION ════════════════ -->
-<nav class="nav-blur">
-  <div style="max-width:1280px;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:64px;">
-    <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
-      <div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#4f46e5);display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(99,102,241,0.4);">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-      </div>
-      <span style="font-weight:800;font-size:18px;letter-spacing:-0.02em;color:white;">DENZO<span class="gradient-text" style="font-size:11px;font-weight:500;margin-left:4px;position:relative;top:-4px;">AI Visibility</span></span>
-    </a>
-    <div style="display:none;gap:32px;font-size:13px;font-weight:500;color:var(--text-muted);" class="desktop-nav">
-      <a href="#how" style="color:inherit;text-decoration:none;transition:color .2s;" onmouseenter="this.style.color='white'" onmouseleave="this.style.color=''">How It Works</a>
-      <a href="#features" style="color:inherit;text-decoration:none;transition:color .2s;" onmouseenter="this.style.color='white'" onmouseleave="this.style.color=''">Features</a>
-      <a href="/pricing" style="color:inherit;text-decoration:none;transition:color .2s;" onmouseenter="this.style.color='white'" onmouseleave="this.style.color=''">Pricing</a>
-      <a href="#faq" style="color:inherit;text-decoration:none;transition:color .2s;" onmouseenter="this.style.color='white'" onmouseleave="this.style.color=''">FAQ</a>
+<div class="bg-atmo"></div>
+<div class="grid-subtle"></div>
+
+<!-- ═══════════════ NAV ═══════════════ -->
+<nav class="nav" id="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo"><span class="nav-logo-dot"></span>DENZO</a>
+    <div class="nav-links">
+      <a href="#how">How It Works</a>
+      <a href="#platform">Platform</a>
+      <a href="/pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
     </div>
-    <div style="display:flex;align-items:center;gap:12px;">
-      <a href="/login" style="color:var(--text-muted);font-size:13px;font-weight:500;text-decoration:none;transition:color .2s;" onmouseenter="this.style.color='white'" onmouseleave="this.style.color=''">Sign In</a>
-      <a href="#analyze" class="btn btn-primary" style="padding:10px 20px;font-size:13px;">Free Analysis →</a>
+    <div style="display:flex;align-items:center;gap:10px">
+      <a href="/login" style="color:var(--text-secondary);font-size:14px;font-weight:450;text-decoration:none">Sign in</a>
+      <a href="#cta" class="btn btn-primary">Get Started</a>
     </div>
   </div>
-  <style>.desktop-nav { display: none; } @media (min-width: 768px) { .desktop-nav { display: flex; } }</style>
 </nav>
 
-<!-- ════════════════ HERO + 3D ════════════════ -->
-<section id="hero" style="position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+<!-- ═══════════════ HERO ═══════════════ -->
+<section class="hero">
   <canvas id="hero-canvas"></canvas>
-  <div class="bg-atmosphere"></div>
-  <div class="bg-grid"></div>
-
-  <!-- Floating particles -->
-  <div id="particles-container" style="position:absolute;inset:0;pointer-events:none;overflow:hidden;" aria-hidden="true"></div>
-
-  <div style="position:relative;z-index:2;max-width:900px;margin:0 auto;padding:120px 24px 80px;text-align:center;">
-    <!-- Badge -->
-    <div class="reveal" style="display:inline-flex;align-items:center;gap:8px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:100px;padding:6px 16px;margin-bottom:32px;">
-      <span style="width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981;animation:pulse-dot 2s ease-in-out infinite;"></span>
-      <span style="font-size:13px;font-weight:600;color:#6ee7b7;">The First AI Visibility Platform</span>
+  <div class="hero-content">
+    <div class="hero-badge reveal">
+      <span style="width:6px;height:6px;border-radius:50%;background:var(--emerald);box-shadow:0 0 6px var(--emerald)"></span>
+      AI Visibility Platform
     </div>
-    <style>@keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }</style>
-
-    <!-- Hero headline -->
-    <h1 class="hero-display reveal reveal-delay-1" style="margin-bottom:24px;">
-      <span style="color:white;">When ChatGPT Answers,</span><br/>
-      <span class="gradient-text">Will It Mention You?</span>
+    <h1 class="hero-title reveal d1">
+      When AI answers,<br/>does it say <span style="color:var(--accent)">your name</span>?
     </h1>
-
-    <p class="reveal reveal-delay-2" style="font-size:clamp(1rem,2vw,1.25rem);color:var(--text-muted);max-width:600px;margin:0 auto 48px;line-height:1.7;">
-      We measure and improve your visibility across <strong style="color:white;">ChatGPT, Perplexity, Gemini & Google AI Overviews</strong>. AI agents research, write, optimize, and publish — so when customers ask AI "who's the best?", <strong style="color:#818cf8;">your business is the answer</strong>.
+    <p class="hero-subtitle reveal d2">
+      ChatGPT, Perplexity, Gemini, Google AI Overviews — billions of answers every day.
+      We make sure your business is the one they mention.
     </p>
-
-    <!-- CTA Form -->
-    <div class="reveal reveal-delay-3" id="analyze" style="max-width:560px;margin:0 auto;">
-      <form action="/wizard/start" method="POST">
-        <div class="glass-card" style="display:flex;align-items:center;gap:8px;padding:6px;border-radius:var(--radius-md);">
-          <div style="flex:1;display:flex;align-items:center;gap:10px;padding:0 14px;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" style="flex-shrink:0;"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-            <input type="text" name="url" required placeholder="yourwebsite.com"
-              style="flex:1;background:none;border:none;color:white;font-size:17px;font-family:Inter,sans-serif;outline:none;"
-            />
-          </div>
-          <button type="submit" class="btn btn-primary" style="padding:14px 24px;font-size:15px;white-space:nowrap;">
-            Analyze Free →
-          </button>
-        </div>
-        <p style="font-size:12px;color:var(--text-dim);margin-top:12px;">No credit card · No account · Results in ~30s</p>
-      </form>
-    </div>
-
-    <!-- Trust badges -->
-    <div class="reveal reveal-delay-4" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:32px;margin-top:64px;">
-      <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-dim);">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="#10b981"><path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clip-rule="evenodd"/></svg>
-        GPT-4 + Claude Powered
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-dim);">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="#10b981"><path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clip-rule="evenodd"/></svg>
-        WordPress + GitHub
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-dim);">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="#10b981"><path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clip-rule="evenodd"/></svg>
-        14-Day Free Trial · $1
-      </div>
-    </div>
-  </div>
-
-  <!-- Scroll indicator -->
-  <div style="position:absolute;bottom:32px;left:50%;transform:translateX(-50%);z-index:2;animation:bounce-down 2s ease-in-out infinite;">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2"><path d="M7 13l5 5 5-5M7 6l5 5 5-5"/></svg>
-  </div>
-  <style>@keyframes bounce-down { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(8px)} }</style>
-</section>
-
-<!-- ════════════════ STATS BAR ════════════════ -->
-<section style="position:relative;z-index:2;border-top:1px solid rgba(255,255,255,0.04);border-bottom:1px solid rgba(255,255,255,0.04);background:var(--bg-surface);">
-  <div style="max-width:1200px;margin:0 auto;padding:56px 24px;">
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:32px;text-align:center;">
-      {% set stats = [
-        ('4.8M+', 'Pages Generated', 'gradient-text'),
-        ('1,200+', 'Businesses Using DENZO', 'gradient-text'),
-        ('287%', 'Avg. Traffic Increase', 'gradient-text-warm'),
-        ('26', 'AI Agents Running 24/7', 'gradient-text')
-      ] %}
-      {% for value, label, cls in stats %}
-      <div class="reveal" style="padding:20px;">
-        <div class="{{ cls }}" style="font-size:clamp(2rem,5vw,3.5rem);font-weight:900;letter-spacing:-0.03em;margin-bottom:4px;">{{ value }}</div>
-        <div style="font-size:14px;color:var(--text-dim);font-weight:500;">{{ label }}</div>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-  <style>@media(min-width:768px){.stats-grid-resp{grid-template-columns:repeat(4,1fr)!important}}</style>
-  <script>document.querySelector('#stats-bar .grid')?.classList.add('stats-grid-resp')</script>
-</section>
-
-<!-- ════════════════ HOW IT WORKS ════════════════ -->
-<section id="how" style="position:relative;z-index:2;padding:120px 24px;">
-  <div style="max-width:1100px;margin:0 auto;">
-    <div class="reveal" style="text-align:center;margin-bottom:72px;">
-      <h2 class="section-title" style="color:white;margin-bottom:16px;">From <span style="color:var(--text-dim);">Zero</span> to <span class="gradient-text">Ranking</span> in 4 Steps</h2>
-      <p style="font-size:18px;color:var(--text-muted);max-width:500px;margin:0 auto;">No developers. No agencies. Just AI agents working around the clock.</p>
-    </div>
-
-    <div style="display:grid;grid-template-columns:repeat(1,1fr);gap:20px;">
-      {% set steps = [
-        ('1', '#f59e0b', 'Free Analysis', 'Paste your URL. Our AI crawls your site, finds every SEO gap, maps your competitors, and reveals exactly which keywords you\'re missing — all in 30 seconds.'),
-        ('2', '#6366f1', 'AI Strategy', '26 specialized agents run in parallel: keyword research, competitor intelligence, technical audit, EEAT authority building, schema markup, and keyword clustering.'),
-        ('3', '#a78bfa', 'Content Generation', 'Programmatic SEO agent writes hundreds of geo-optimized pages. Content Optimizer improves them. GEO Optimizer formats them for ChatGPT & Perplexity citations.'),
-        ('4', '#10b981', 'Auto-Publish & Rank', 'Pages auto-publish to WordPress or GitHub. IndexNow submits to Bing/Google. Rank Tracker monitors positions. The flywheel never stops.')
-      ] %}
-      {% for num, color, title, desc in steps %}
-      <div class="glass-card reveal" style="padding:32px;border-radius:var(--radius-md);display:flex;gap:20px;align-items:flex-start;">
-        <div style="width:48px;height:48px;border-radius:14px;background:{{ color }}22;border:2px solid {{ color }}44;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <span style="font-size:22px;font-weight:900;color:{{ color }};">{{ num }}</span>
-        </div>
-        <div>
-          <h3 style="font-size:18px;font-weight:700;color:white;margin-bottom:8px;">{{ title }}</h3>
-          <p style="font-size:14px;color:var(--text-muted);line-height:1.7;">{{ desc }}</p>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-  <style>@media(min-width:768px){.steps-grid-resp{grid-template-columns:repeat(2,1fr)!important}}</style>
-  <script>document.querySelector('#how .grid')?.classList.add('steps-grid-resp')</script>
-</section>
-
-<!-- ════════════════ FEATURES — Agent Galaxy ════════════════ -->
-<section id="features" style="position:relative;z-index:2;padding:120px 24px;background:var(--bg-surface);border-top:1px solid rgba(255,255,255,0.04);border-bottom:1px solid rgba(255,255,255,0.04);">
-  <div style="max-width:1200px;margin:0 auto;">
-    <div class="reveal" style="text-align:center;margin-bottom:64px;">
-      <h2 class="section-title" style="color:white;margin-bottom:16px;">26 AI Agents.<br/><span class="gradient-text">One Autonomous Pipeline.</span></h2>
-      <p style="font-size:18px;color:var(--text-muted);max-width:550px;margin:0 auto;">Every agent can run automatically or you can trigger them individually from the dashboard.</p>
-    </div>
-
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
-      {% set agents = [
-        ("Keyword Strategist", "blue", "Maps thousands of keywords by intent, volume & difficulty", "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"),
-        ("Competitor Intel", "purple", "Analyzes rivals, finds their gaps, steals their best keywords", "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"),
-        ("Technical Auditor", "amber", "Finds critical errors: broken links, speed, missing tags", "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"),
-        ("E-E-A-T Architect", "green", "Builds topical authority Google rewards", "M12 14l9-5-9-5-9 5 9 5z M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"),
-        ("Schema Engineer", "cyan", "Injects JSON-LD for rich results & AI snippets", "M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"),
-        ("Programmatic SEO", "orange", "Generates 400+ location pages that dominate local SERPs", "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"),
-        ("GEO Optimizer", "violet", "Optimizes content for ChatGPT, Gemini & Perplexity citations", "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"),
-        ("GitHub Publisher", "slate", "Auto-commits HTML pages to your repo. Zero manual deploy.", "M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"),
-      ] %}
-      {% for name, color, desc, icon in agents %}
-      <div class="glass-card reveal" style="padding:20px;border-radius:var(--radius-sm);display:flex;gap:14px;align-items:flex-start;">
-        <div style="width:36px;height:36px;border-radius:10px;background:var(--indigo-core)22;border:1px solid var(--indigo-core)33;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--indigo-core)" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="{{ icon }}"/></svg>
-        </div>
-        <div>
-          <p style="font-size:14px;font-weight:700;color:white;margin-bottom:4px;">{{ name }}</p>
-          <p style="font-size:12px;color:var(--text-muted);line-height:1.5;">{{ desc }}</p>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════ PRICING ════════════════ -->
-<section id="pricing" style="position:relative;z-index:2;padding:100px 24px;">
-  <div style="max-width:700px;margin:0 auto;text-align:center;">
-    <div class="reveal">
-      <h2 class="section-title" style="color:white;margin-bottom:16px;">Simple, Predictable Pricing</h2>
-      <p style="font-size:18px;color:var(--text-muted);margin-bottom:48px;">Start for $1. Full access for 3 days. Then $249/month. Cancel anytime.</p>
-    </div>
-    <div class="reveal reveal-delay-1" style="display:flex;flex-wrap:wrap;gap:16px;justify-content:center;margin-bottom:32px;">
-      <div class="glass-card" style="flex:1;min-width:200px;padding:28px;border-radius:var(--radius-md);text-align:center;">
-        <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);margin-bottom:8px;">Free Analysis</p>
-        <p style="font-size:48px;font-weight:900;color:white;margin-bottom:4px;">$0</p>
-        <p style="font-size:13px;color:var(--text-muted);">Instant, no account</p>
-      </div>
-      <div class="glass-card" style="flex:1;min-width:200px;padding:28px;border-radius:var(--radius-md);text-align:center;border-color:rgba(99,102,241,0.3);box-shadow:0 0 40px rgba(99,102,241,0.1);position:relative;">
-        <div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--indigo-core);color:white;font-size:11px;font-weight:700;padding:4px 12px;border-radius:100px;letter-spacing:.04em;">MOST POPULAR</div>
-        <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--indigo-core);margin-bottom:8px;">Full Access</p>
-        <p style="font-size:48px;font-weight:900;color:white;margin-bottom:4px;">$249<span style="font-size:18px;color:var(--text-muted);font-weight:400;">/mo</span></p>
-        <p style="font-size:13px;color:#f59e0b;font-weight:600;">Start for $1 · 3-day trial</p>
-      </div>
-    </div>
-    <a href="/pricing" class="btn btn-primary">See Full Pricing →</a>
-  </div>
-</section>
-
-<!-- ════════════════ FAQ ════════════════ -->
-<section id="faq" style="position:relative;z-index:2;padding:100px 24px;background:var(--bg-surface);border-top:1px solid rgba(255,255,255,0.04);">
-  <div style="max-width:700px;margin:0 auto;">
-    <h2 class="section-title reveal" style="color:white;text-align:center;margin-bottom:56px;">Questions People Ask</h2>
-    <div style="display:flex;flex-direction:column;gap:12px;">
-      {% set faqs = [
-        ("What does the free analysis check?", "We crawl your website and analyze: title tags, meta descriptions, H1 structure, schema markup, canonical tags, noindex flags, image alt text, page speed, and technical SEO score. We also estimate competitor gaps and keyword opportunities. Results in ~30 seconds."),
-        ("Do I need developers?", "Zero. Connect WordPress with your existing credentials, or GitHub with a personal access token. Our wizard walks you through it in under 10 minutes."),
-        ("What happens after the $1 trial?", "You get full access for 3 days. After that, $249/month. Cancel anytime from Settings before day 3 and we charge you nothing more than the dollar."),
-        ("How many pages can this generate?", "No hard limits. A typical local business with 12 cities × 30 brands generates ~400 location pages. Enterprise clients generate thousands across hundreds of locations."),
-        ("Which industries do you support?", "Auto body, dental, legal, medical, real estate, SaaS, e-commerce, restaurants, education, and more. The AI adapts keyword strategy and content templates to your vertical automatically."),
-        ("Can I use this alongside my SEO agency?", "Yes. Many clients use DENZO as the AI content layer while their agency handles link building. The two complement each other — your agency will love the GEO and ranking data we provide."),
-      ] %}
-      {% for q, a in faqs %}
-      <details class="glass-card reveal" style="border-radius:var(--radius-sm);">
-        <summary class="faq-trigger" style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;font-size:15px;font-weight:600;color:white;list-style:none;">
-          {{ q }}
-          <svg class="faq-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" stroke-width="2" style="flex-shrink:0;margin-left:12px;"><path d="M6 9l6 6 6-6"/></svg>
-        </summary>
-        <div style="padding:0 24px 20px;font-size:14px;color:var(--text-muted);line-height:1.7;">{{ a }}</div>
-      </details>
-      {% endfor %}
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════ BOTTOM CTA ════════════════ -->
-<section style="position:relative;z-index:2;padding:120px 24px;text-align:center;">
-  <div class="reveal" style="max-width:600px;margin:0 auto;">
-    <h2 class="section-title" style="color:white;margin-bottom:20px;">Ready to See What AI Can <span class="gradient-text">Actually</span> Do?</h2>
-    <p style="font-size:18px;color:var(--text-muted);margin-bottom:40px;">Free analysis. No account. 30 seconds. Then decide.</p>
     <form action="/wizard/start" method="POST">
-      <div class="glass-card" style="display:flex;align-items:center;gap:8px;padding:6px;border-radius:var(--radius-md);max-width:480px;margin:0 auto;">
-        <input type="text" name="url" required placeholder="yourwebsite.com"
-          style="flex:1;background:none;border:none;color:white;font-size:17px;font-family:Inter,sans-serif;outline:none;padding:14px 16px;"
-        />
-        <button type="submit" class="btn btn-primary" style="padding:14px 24px;">Analyze Free →</button>
+      <div class="hero-cta reveal d3">
+        <input type="text" name="url" required placeholder="yourbusiness.com" autocomplete="url"/>
+        <button type="submit" class="btn btn-primary btn-lg">Get Your Free AI Visibility Report →</button>
       </div>
     </form>
+    <p class="reveal d4" style="font-size:13px;color:var(--text-tertiary);margin-top:12px;">No account needed · Results in 30 seconds · See exactly which AIs mention your competitors</p>
   </div>
 </section>
 
-<!-- ════════════════ FOOTER ════════════════ -->
-<footer style="position:relative;z-index:2;border-top:1px solid rgba(255,255,255,0.04);padding:40px 24px;">
-  <div style="max-width:1200px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;font-size:13px;color:var(--text-dim);">
-    <div style="display:flex;align-items:center;gap:8px;">
-      <div style="width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#6366f1,#4f46e5);display:flex;align-items:center;justify-content:center;">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+<!-- ═══════════════ AI VISIBILITY SCORE ═══════════════ -->
+<section class="sec" style="padding-top:0;padding-bottom:120px">
+  <div class="sec-inner" style="text-align:center">
+    <div class="sec-label reveal">The Metric That Defines the Category</div>
+    <h2 class="reveal d1" style="font-size:clamp(2rem,4vw,3.2rem);font-weight:800;letter-spacing:-0.03em;margin-bottom:20px;color:var(--text)">Your <span style="color:var(--accent)">AI Visibility Score</span>™</h2>
+    <p class="reveal d2" style="font-size:18px;color:var(--text-secondary);max-width:560px;margin:0 auto 72px;line-height:1.7">One number. Every AI engine. Your share of voice vs competitors — measured across ChatGPT, Perplexity, Gemini, and Google AI Overviews.</p>
+
+    <div class="card-grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));max-width:900px;margin:0 auto;">
+      <div class="card reveal d1" style="text-align:center;padding:48px 32px">
+        <div style="font-size:clamp(3rem,6vw,5rem);font-weight:900;letter-spacing:-0.05em;color:var(--accent);margin-bottom:8px">34<span style="font-size:.4em;font-weight:400;color:var(--text-secondary)">/100</span></div>
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Auto Body · Los Angeles</div>
+        <div style="font-size:13px;color:var(--text-tertiary)">Average AI Visibility Score</div>
       </div>
-      <span style="font-weight:700;color:white;">DENZO SEO</span>
+      <div class="card reveal d2" style="text-align:center;padding:48px 32px">
+        <div style="font-size:clamp(3rem,6vw,5rem);font-weight:900;letter-spacing:-0.05em;color:var(--emerald);margin-bottom:8px">+51<span style="font-size:.4em;font-weight:400;color:var(--text-secondary)">%</span></div>
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Average Improvement</div>
+        <div style="font-size:13px;color:var(--text-tertiary)">After 90 days on DENZO</div>
+      </div>
+      <div class="card reveal d3" style="text-align:center;padding:48px 32px">
+        <div style="font-size:clamp(3rem,6vw,5rem);font-weight:900;letter-spacing:-0.05em;color:var(--amber);margin-bottom:8px">4.8M<span style="font-size:.4em;font-weight:400;color:var(--text-secondary)">+</span></div>
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">Pages Optimized</div>
+        <div style="font-size:13px;color:var(--text-tertiary)">For AI citation across platforms</div>
+      </div>
     </div>
-    <div style="display:flex;gap:20px;">
-      <a href="/login" style="color:inherit;text-decoration:none;">Sign In</a>
-      <a href="/signup" style="color:inherit;text-decoration:none;">Start Trial</a>
-      <a href="/pricing" style="color:inherit;text-decoration:none;">Pricing</a>
-      <a href="/privacy" style="color:inherit;text-decoration:none;">Privacy</a>
+  </div>
+</section>
+
+<!-- ═══════════════ HOW IT WORKS ═══════════════ -->
+<section id="how" class="sec" style="background:var(--surface);padding:140px 32px">
+  <div class="sec-inner">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:80px 40px;align-items:start;">
+      <div>
+        <div class="sec-label reveal">How It Works</div>
+        <h3 class="reveal d1" style="font-size:clamp(1.5rem,3vw,2.2rem);font-weight:800;letter-spacing:-0.03em;margin-bottom:16px;color:var(--text)">From invisible to<br/>cited by every AI</h3>
+        <p class="reveal d2" style="font-size:16px;color:var(--text-secondary);line-height:1.7;max-width:400px">No developers. No agency retainers. Your AI visibility team runs 24/7 — you check the dashboard when you want to see progress.</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:32px">
+        <div class="reveal d1" style="display:flex;gap:16px">
+          <div style="width:32px;height:32px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;font-weight:700;color:var(--accent)">1</div>
+          <div>
+            <div style="font-weight:700;font-size:16px;color:var(--text);margin-bottom:4px">Connect your site</div>
+            <div style="font-size:14px;color:var(--text-secondary);line-height:1.6">WordPress or GitHub. One click. Permission scoped. You stay in control.</div>
+          </div>
+        </div>
+        <div class="reveal d2" style="display:flex;gap:16px">
+          <div style="width:32px;height:32px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;font-weight:700;color:var(--accent)">2</div>
+          <div>
+            <div style="font-weight:700;font-size:16px;color:var(--text);margin-bottom:4px">AI agents go to work</div>
+            <div style="font-size:14px;color:var(--text-secondary);line-height:1.6">34 specialized agents research, write, optimize, and publish. Keywords, schema, EEAT, GEO, internal linking — all automatic.</div>
+          </div>
+        </div>
+        <div class="reveal d3" style="display:flex;gap:16px">
+          <div style="width:32px;height:32px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;font-weight:700;color:var(--accent)">3</div>
+          <div>
+            <div style="font-weight:700;font-size:16px;color:var(--text);margin-bottom:4px">Watch your AI Visibility Score climb</div>
+            <div style="font-size:14px;color:var(--text-secondary);line-height:1.6">Every week, your score updates across all AI engines. You see exactly which queries you're winning and where the gaps are.</div>
+          </div>
+        </div>
+      </div>
     </div>
+  </div>
+</section>
+
+<!-- ═══════════════ PLATFORM ═══════════════ -->
+<section id="platform" class="sec">
+  <div class="sec-inner" style="text-align:center">
+    <div class="sec-label reveal">Platform</div>
+    <h2 class="reveal d1" style="font-size:clamp(2rem,4vw,3.2rem);font-weight:800;letter-spacing:-0.03em;margin-bottom:16px;color:var(--text)">Everything you need to<br/>dominate AI search</h2>
+    <p class="reveal d2" style="font-size:18px;color:var(--text-secondary);margin-bottom:72px">34 AI agents. Six layers. One autonomous pipeline.</p>
+  </div>
+  <div class="sec-inner">
+    <div class="card-grid">
+      <div class="card reveal d1">
+        <div class="card-icon" style="background:rgba(99,102,241,0.08)">🔍</div>
+        <div class="card-title">Discovery Engine</div>
+        <div class="card-desc">Before creating anything, we crawl your site, map every existing keyword you rank for, and establish your AI citation baseline. No cannibalization. No overwriting what's yours.</div>
+      </div>
+      <div class="card reveal d2">
+        <div class="card-icon" style="background:rgba(16,185,129,0.08)">🧠</div>
+        <div class="card-title">AI Strategy Layer</div>
+        <div class="card-desc">Keyword clustering, competitor gap analysis, EEAT authority mapping, and semantic topic planning — all informed by real GSC data and AI citation patterns.</div>
+      </div>
+      <div class="card reveal d3">
+        <div class="card-icon" style="background:rgba(245,158,11,0.08)">⚡</div>
+        <div class="card-title">Content Generation</div>
+        <div class="card-desc">Programmatic SEO writes hundreds of geo-optimized pages. Content Optimizer improves them. GEO Optimizer formats them to get cited by ChatGPT and Perplexity.</div>
+      </div>
+      <div class="card reveal d1">
+        <div class="card-icon" style="background:rgba(168,85,247,0.08)">📊</div>
+        <div class="card-title">AI Visibility Monitor</div>
+        <div class="card-desc">Track your mentions across ChatGPT, Perplexity, Gemini, Claude, and Google AI Overviews. See competitor comparisons. Know exactly what moves your score.</div>
+      </div>
+      <div class="card reveal d2">
+        <div class="card-icon" style="background:rgba(239,68,68,0.08)">📹</div>
+        <div class="card-title">Video Engine</div>
+        <div class="card-desc">Auto-generate YouTube videos from your content with full SEO metadata. VideoObject schema. AI avatar narration. Videos get cited more by AI engines.</div>
+      </div>
+      <div class="card reveal d3">
+        <div class="card-icon" style="background:rgba(34,197,94,0.08)">📍</div>
+        <div class="card-title">GBP Autopilot</div>
+        <div class="card-desc">Autonomous Google Business Profile management. Weekly posts, Q&A seeding, and smart review responses. Local visibility that feeds AI answers.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ TESTIMONIAL ═══════════════ -->
+<section class="sec" style="background:var(--surface);text-align:center">
+  <div class="sec-inner">
+    <p class="quote reveal" style="margin:0 auto 32px">"We stopped paying $4K/month for an agency that couldn't show results. DENZO showed us exactly which AIs were citing us — and which keywords our competitors were winning. In 60 days our AI Visibility Score went from 12 to 47. I've never seen anything like this."</p>
+    <div class="reveal d1">
+      <div style="font-weight:700;font-size:15px;color:var(--text)">Carlos M.</div>
+      <div style="font-size:13px;color:var(--text-tertiary)">Auto Collision Group · Los Angeles</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ PRICING ═══════════════ -->
+<section id="pricing" class="sec" style="text-align:center">
+  <div class="sec-inner">
+    <div class="sec-label reveal">Pricing</div>
+    <h2 class="reveal d1" style="font-size:clamp(2rem,4vw,3.2rem);font-weight:800;letter-spacing:-0.03em;margin-bottom:16px;color:var(--text)">One price. Full platform.</h2>
+    <p class="reveal d2" style="font-size:18px;color:var(--text-secondary);margin-bottom:64px">Start for $1. Cancel anytime. No long contracts.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:24px;justify-content:center;max-width:600px;margin:0 auto 32px">
+      <div class="price-card reveal d1" style="flex:1;min-width:200px">
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-tertiary);margin-bottom:4px">Free Analysis</div>
+        <div class="price-amount">$0</div>
+        <div style="font-size:14px;color:var(--text-secondary)">AI Visibility Report<br/>No account needed</div>
+      </div>
+      <div class="price-card featured reveal d2" style="flex:1;min-width:200px">
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--accent);margin-bottom:4px">Full Platform</div>
+        <div class="price-amount">$249<span style="font-size:16px;font-weight:400;color:var(--text-tertiary)">/mo</span></div>
+        <div style="font-size:14px;color:var(--text-secondary)">34 AI agents<br/>Unlimited pages<br/>All AI engines</div>
+        <div style="margin-top:16px;font-size:13px;font-weight:600;color:var(--amber)">$1 for 3 days · Cancel anytime</div>
+      </div>
+    </div>
+    <a href="/pricing" class="btn btn-ghost reveal d3">See detailed plans →</a>
+  </div>
+</section>
+
+<!-- ═══════════════ FAQ ═══════════════ -->
+<section id="faq" class="sec" style="background:var(--surface)">
+  <div class="sec-inner" style="max-width:700px">
+    <div class="sec-label reveal" style="text-align:center">FAQ</div>
+    <h2 class="reveal d1" style="text-align:center;font-size:clamp(1.8rem,3vw,2.6rem);font-weight:800;letter-spacing:-0.03em;margin-bottom:56px;color:var(--text)">Questions you might have</h2>
+    <div id="faq-list">
+      <div class="faq-item reveal">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What does the free analysis check? <span class="faq-arrow">+</span></div>
+        <div class="faq-a">We scan your website and check your presence across ChatGPT, Perplexity, Gemini, and Google AI Overviews for your core keywords. You'll see your AI Visibility Score, which competitors are getting cited instead of you, and exactly where the gaps are. Takes about 30 seconds.</div>
+      </div>
+      <div class="faq-item reveal">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Do I need developers to set this up? <span class="faq-arrow">+</span></div>
+        <div class="faq-a">Zero. Connect WordPress with your existing credentials or GitHub with a personal access token. The setup wizard takes under 10 minutes and walks you through everything.</div>
+      </div>
+      <div class="faq-item reveal">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">What's the difference between SEO and AI Visibility? <span class="faq-arrow">+</span></div>
+        <div class="faq-a">SEO is about ranking on Google. AI Visibility is about being cited by ChatGPT, Perplexity, Gemini and Google AI Overviews when people ask questions. More people now ask AI than search Google. Different channel, different metrics, bigger opportunity. We handle both.</div>
+      </div>
+      <div class="faq-item reveal">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">Which industries do you support? <span class="faq-arrow">+</span></div>
+        <div class="faq-a">Auto body, automotive dealerships, dental, legal, medical, real estate, SaaS, e-commerce, restaurants, education, and more. The AI adapts keyword strategy and content templates to your vertical automatically.</div>
+      </div>
+      <div class="faq-item reveal">
+        <div class="faq-q" onclick="this.parentElement.classList.toggle('open')">How is the AI Visibility Score calculated? <span class="faq-arrow">+</span></div>
+        <div class="faq-a">We query ChatGPT, Perplexity, Gemini, Claude, and Google AI Overviews with your target keywords. For each query, we check if your business is cited, partially cited, or not cited — and compare against your top 3 competitors. The score (0-100) is weighted by query volume and search intent. Updated weekly.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ CTA ═══════════════ -->
+<section id="cta" class="sec" style="text-align:center">
+  <div class="sec-inner">
+    <h2 class="reveal" style="font-size:clamp(2rem,4vw,3.2rem);font-weight:800;letter-spacing:-0.04em;margin-bottom:20px;color:var(--text)">See where you stand<br/>in the AI search era</h2>
+    <p class="reveal d1" style="font-size:18px;color:var(--text-secondary);margin-bottom:40px">Free AI Visibility Report. No account. 30 seconds.</p>
+    <form action="/wizard/start" method="POST">
+      <div class="hero-cta reveal d2" style="margin:0 auto 16px">
+        <input type="text" name="url" required placeholder="yourbusiness.com"/>
+        <button type="submit" class="btn btn-primary btn-lg">Get Report →</button>
+      </div>
+    </form>
+    <p class="reveal d3" style="font-size:13px;color:var(--text-tertiary)">1,200+ businesses already measured their AI visibility</p>
+  </div>
+</section>
+
+<!-- ═══════════════ FOOTER ═══════════════ -->
+<footer class="sec footer" style="padding:48px 32px;border-top:1px solid var(--border);text-align:center">
+  <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:24px;max-width:800px;margin:0 auto">
+    <span style="font-weight:700;color:var(--text)">DENZO</span>
+    <a href="/login" style="color:inherit;text-decoration:none">Sign In</a>
+    <a href="/signup" style="color:inherit;text-decoration:none">Start Trial</a>
+    <a href="/pricing" style="color:inherit;text-decoration:none">Pricing</a>
+    <a href="/privacy" style="color:inherit;text-decoration:none">Privacy</a>
     <span>© 2026 Denzo Estudios</span>
   </div>
 </footer>
 
 {% include "public/_cookie_banner.html" %}
 
-<!-- ════════════════ SCRIPTS ════════════════ -->
 <script type="module">
-  // ── Three.js 3D Hero Globe ──────────────────────────────────────────
-  import * as THREE from 'three';
+// ═══════════════ 3D Globe — refined & slow ═══════════════
+import * as THREE from 'three';
+const canvas=document.getElementById('hero-canvas');
+if(canvas){
+  const renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(40,1,0.1,100);
+  camera.position.z=6;
 
-  const canvas = document.getElementById('hero-canvas');
-  if (canvas) {
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-    camera.position.z = 5.5;
+  // Core sphere — subtle wireframe
+  const geo=new THREE.IcosahedronGeometry(2,5);
+  const pos=geo.attributes.position.array;
+  const pts=[];for(let i=0;i<pos.length;i+=3)pts.push(pos[i],pos[i+1],pos[i+2]);
+  const ptGeo=new THREE.BufferGeometry();
+  ptGeo.setAttribute('position',new THREE.Float32BufferAttribute(pts,3));
 
-    // Orbiting points sphere
-    const geometry = new THREE.IcosahedronGeometry(2.2, 4);
-    const positions = geometry.attributes.position.array;
-    const pointsGeo = new THREE.BufferGeometry();
-    const vertices = [];
-    for (let i = 0; i < positions.length; i += 3) {
-      vertices.push(positions[i], positions[i+1], positions[i+2]);
-    }
-    pointsGeo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  const dots=new THREE.Points(ptGeo,new THREE.PointsMaterial({
+    size:0.015,color:0x818cf8,transparent:true,opacity:0.5,
+    blending:THREE.AdditiveBlending,depthWrite:false
+  }));
+  scene.add(dots);
 
-    // Glowing dots
-    const dotMat = new THREE.PointsMaterial({
-      size: 0.018,
-      color: 0x818cf8,
-      transparent: true,
-      opacity: 0.7,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-    const dots = new THREE.Points(pointsGeo, dotMat);
-    scene.add(dots);
+  // Faint outer wireframe
+  const wf=new THREE.Mesh(
+    new THREE.IcosahedronGeometry(2.6,2),
+    new THREE.MeshBasicMaterial({color:0x6366f1,wireframe:true,transparent:true,opacity:0.025,depthWrite:false})
+  );
+  scene.add(wf);
 
-    // Wireframe sphere (larger, fainter)
-    const wireGeo = new THREE.IcosahedronGeometry(2.5, 3);
-    const wireMat = new THREE.MeshBasicMaterial({
-      color: 0x6366f1,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.04,
-      depthWrite: false,
-    });
-    const wireframe = new THREE.Mesh(wireGeo, wireMat);
-    scene.add(wireframe);
+  // Single elegant ring
+  const ring=new THREE.Mesh(
+    new THREE.TorusGeometry(3,0.004,16,160),
+    new THREE.MeshBasicMaterial({color:0x818cf8,transparent:true,opacity:0.1,depthWrite:false})
+  );
+  ring.rotation.x=Math.PI/2.8;
+  scene.add(ring);
 
-    // Outer ring
-    const ringGeo = new THREE.TorusGeometry(2.8, 0.008, 16, 120);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: 0x818cf8,
-      transparent: true,
-      opacity: 0.15,
-      depthWrite: false,
-    });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.rotation.x = Math.PI / 2.5;
-    scene.add(ring);
+  function resize(){
+    const r=canvas.parentElement.getBoundingClientRect();
+    renderer.setSize(r.width,r.height);
+    camera.aspect=r.width/Math.max(r.height,1);
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize',resize);resize();
 
-    // Second ring
-    const ring2 = new THREE.Mesh(
-      new THREE.TorusGeometry(3.0, 0.005, 16, 100),
-      new THREE.MeshBasicMaterial({ color: 0xa78bfa, transparent: true, opacity: 0.1, depthWrite: false })
-    );
-    ring2.rotation.x = -Math.PI / 3;
-    ring2.rotation.y = Math.PI / 4;
-    scene.add(ring2);
-
-    function resize() {
-      const rect = canvas.parentElement.getBoundingClientRect();
-      renderer.setSize(rect.width, rect.height);
-      camera.aspect = rect.width / Math.max(rect.height, 1);
-      camera.updateProjectionMatrix();
-    }
-    window.addEventListener('resize', resize);
-    resize();
-
-    function animate(time) {
-      requestAnimationFrame(animate);
-      const t = time * 0.0002;
-      dots.rotation.y += 0.0015;
-      dots.rotation.x = Math.sin(t * 0.5) * 0.3;
-      wireframe.rotation.y += 0.0008;
-      wireframe.rotation.x += 0.0004;
-      ring.rotation.z += 0.001;
-      ring2.rotation.z -= 0.0007;
-      ring2.rotation.x += 0.0003;
-      renderer.render(scene, camera);
-    }
+  function animate(t){
     requestAnimationFrame(animate);
+    const s=t*0.00015;
+    dots.rotation.y+=0.0008;
+    dots.rotation.x=Math.sin(s)*0.2;
+    wf.rotation.y+=0.0005;
+    wf.rotation.x+=0.0003;
+    ring.rotation.z+=0.0006;
+    renderer.render(scene,camera);
   }
+  requestAnimationFrame(animate);
+}
 
-  // ── Floating particles ──────────────────────────────────────────────
-  const particlesContainer = document.getElementById('particles-container');
-  if (particlesContainer) {
-    for (let i = 0; i < 40; i++) {
-      const p = document.createElement('div');
-      p.className = 'particle';
-      p.style.left = Math.random() * 100 + '%';
-      p.style.width = p.style.height = (Math.random() * 3 + 1) + 'px';
-      p.style.animationDuration = (Math.random() * 8 + 8) + 's';
-      p.style.animationDelay = Math.random() * 10 + 's';
-      p.style.background = ['#6366f1','#818cf8','#a78bfa','#10b981'][Math.floor(Math.random()*4)];
-      p.style.opacity = (Math.random() * 0.3 + 0.1);
-      particlesContainer.appendChild(p);
-    }
-  }
+// ═══════════════ Scroll reveals ═══════════════
+const obs=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('on');obs.unobserve(e.target)}})},{threshold:0.15});
+document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
 
-  // ── Scroll reveals ─────────────────────────────────────────────────
-  const revealObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('visible');
-        revealObserver.unobserve(entry.target);
-      }
-    });
-  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
-
-  document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+// ═══════════════ Nav scroll effect ═══════════════
+window.addEventListener('scroll',()=>{
+  document.getElementById('nav').classList.toggle('scrolled',window.scrollY>20);
+});
 </script>
-
 </body>
 </html>
