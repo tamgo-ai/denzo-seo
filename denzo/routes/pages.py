@@ -145,10 +145,10 @@ def preview(tenant_id, page_id):
         client_name  = _esc(client_row["name"]  if client_row else "")
         client_phone = _esc(client_row["phone"] if client_row else "")
 
-        # Extract brand colors from style guide, fall back to Denzo orange
-        brand_color = "#f97316"
+        # Extract brand colors from style guide, fall back to clean indigo
+        brand_color = "#6366f1"
         brand_dark  = "#0f172a"
-        brand_color_hover = "#ea6a0a"
+        brand_color_hover = "#4f46e5"
         if style_row:
             try:
                 sg = _json.loads(style_row["value"])

@@ -89,7 +89,7 @@ img {
 
 /* ── HERO ── */
 .hero-section {
-  background: linear-gradient(135deg, var(--primary, #101330) 0%, #1a2550 60%, #0d1a3a 100%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary, #101330) 50%, #0f172a) 0%, #1a2550 55%, #0d1a3a 100%);
   color: #fff;
   padding: 5rem 1.5rem 4rem;
   text-align: center;
