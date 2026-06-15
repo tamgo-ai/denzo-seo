@@ -601,6 +601,12 @@
         {% endfor %}
       </div>
 
+      {% if config.get('TURNSTILE_SITE_KEY') or settings.turnstile_site_key %}
+      <!-- Cloudflare Turnstile -->
+      <div class="cf-turnstile" data-sitekey="{{ config.get('TURNSTILE_SITE_KEY', settings.turnstile_site_key|default('')) }}" style="margin-bottom:16px"></div>
+      <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+      {% endif %}
+
       <button type="submit" class="btn-primary" style="margin-bottom:12px">
         Create My Account & See My Dashboard →
       </button>

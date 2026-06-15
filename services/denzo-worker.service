@@ -1,0 +1,19 @@
+[Unit]
+Description=DENZO-SEO Agent Worker (RQ)
+After=network.target redis-server.service
+Wants=redis-server.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/denzo-seo
+EnvironmentFile=/root/denzo-seo/.env
+ExecStart=/usr/local/bin/rq worker denzo-seo --url redis://localhost:6379/0
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=denzo-worker
+
+[Install]
+WantedBy=multi-user.target

@@ -4,7 +4,7 @@ Same DB + agents as Enterprise, different frontend at /lite/<tenant_id>/
 """
 import json
 import logging
-from datetime import datetime, timedelta  # timedelta kept for next_run calc
+from datetime import datetime, timedelta  # timedelta kept for next_run calc, timezone
 from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify
 
 logger = logging.getLogger(__name__)
@@ -123,7 +123,7 @@ def dashboard(tenant_id):
 
     # Next run estimate
     if autopilot_on:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         next_9am = now.replace(hour=9, minute=0, second=0, microsecond=0)
         if now >= next_9am:
             next_9am += timedelta(days=1)
@@ -329,20 +329,27 @@ def update_settings(tenant_id):
         github_token    = f.get("github_token", "").strip()
         wp_app_password = f.get("wp_app_password", "").strip()
 
-        # Preserve existing tokens if blank
+        # Preserve existing tokens if blank — encrypt new values
+        from denzo.crypto import encrypt_token
         existing = db.execute(
-            "SELECT github_token, wp_app_password FROM client_context WHERE tenant_id=?", (tenant_id,)
+            "SELECT github_token, wp_app_password, encrypted FROM client_context WHERE tenant_id=?", (tenant_id,)
         ).fetchone()
-        if not github_token and existing:
+        if github_token:
+            if not github_token.startswith("gAAAAAB"):
+                github_token = encrypt_token(github_token)
+        elif existing:
             github_token = existing["github_token"] or ""
-        if not wp_app_password and existing:
+        if wp_app_password:
+            if not wp_app_password.startswith("gAAAAAB"):
+                wp_app_password = encrypt_token(wp_app_password)
+        elif existing:
             wp_app_password = existing["wp_app_password"] or ""
 
         db.execute("""
             UPDATE client_context SET
                 github_repo=?, github_branch=?, github_token=?, github_format=?,
                 wp_url=?, wp_user=?, wp_app_password=?,
-                pages_domain=?
+                pages_domain=?, encrypted=1
             WHERE tenant_id=?
         """, (
             f.get("github_repo", "").strip(),

@@ -12,7 +12,7 @@ import json
 import urllib.request
 import urllib.parse
 import urllib.error
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from denzo.db import get_db
 
@@ -78,7 +78,16 @@ def get_token_row(tenant_id: str, provider: str) -> dict | None:
         (tenant_id, provider),
     ).fetchone()
     db.close()
-    return dict(row) if row else None
+    if not row:
+        return None
+    result = dict(row)
+    # Decrypt tokens at rest
+    from denzo.crypto import decrypt_token
+    encrypted = bool(result.get("encrypted", 0))
+    result["access_token"] = decrypt_token(result["access_token"], encrypted)
+    if result.get("refresh_token"):
+        result["refresh_token"] = decrypt_token(result["refresh_token"], encrypted)
+    return result
 
 
 def save_token(
@@ -97,7 +106,7 @@ def save_token(
     refresh_token = token_payload.get("refresh_token")
     expires_in    = int(token_payload.get("expires_in", 3600))
     scopes        = token_payload.get("scope", "")
-    expires_at    = (datetime.utcnow() + timedelta(seconds=expires_in)).isoformat()
+    expires_at    = (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat()
 
     db = get_db()
     existing = db.execute(
@@ -119,11 +128,16 @@ def save_token(
     if existing and not account_id:
         account_id = existing["account_id"]
 
+    # Encrypt tokens at rest
+    from denzo.crypto import encrypt_token
+    encrypted_access  = encrypt_token(access_token)
+    encrypted_refresh = encrypt_token(refresh_token) if refresh_token else None
+
     db.execute("""
         INSERT INTO oauth_tokens (tenant_id, provider, access_token, refresh_token,
                                   expires_at, scopes, account_email, account_id,
-                                  location_id, site_url, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                                  location_id, site_url, encrypted, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
         ON CONFLICT(tenant_id, provider) DO UPDATE SET
             access_token  = excluded.access_token,
             refresh_token = COALESCE(excluded.refresh_token, oauth_tokens.refresh_token),
@@ -133,8 +147,9 @@ def save_token(
             account_id    = COALESCE(excluded.account_id,    oauth_tokens.account_id),
             location_id   = COALESCE(excluded.location_id,   oauth_tokens.location_id),
             site_url      = COALESCE(excluded.site_url,      oauth_tokens.site_url),
+            encrypted     = 1,
             updated_at    = CURRENT_TIMESTAMP
-    """, (tenant_id, provider, access_token, refresh_token, expires_at, scopes,
+    """, (tenant_id, provider, encrypted_access, encrypted_refresh, expires_at, scopes,
           account_email, account_id, location_id, site_url))
     db.commit()
     db.close()
@@ -221,7 +236,7 @@ def get_access_token(tenant_id: str, provider: str) -> str:
     if expires_at_str:
         try:
             expires_at = datetime.fromisoformat(expires_at_str)
-            if expires_at - datetime.utcnow() < timedelta(seconds=60):
+            if expires_at - datetime.now(timezone.utc) < timedelta(seconds=60):
                 if not row.get("refresh_token"):
                     raise OAuthError(
                         f"Token expired and no refresh_token for {provider}. "

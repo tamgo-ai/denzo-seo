@@ -9,10 +9,21 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "denzo.db")
 
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH, timeout=20)
+    """Return a new SQLite connection with consistent PRAGMAs.
+
+    Uses timeout=30 and busy_timeout=5000 — same as agent thread connections.
+    Caller is responsible for closing the connection.
+    """
+    return _open_conn(timeout=30)
+
+
+def _open_conn(timeout: int = 30):
+    """Unified SQLite connection factory. Used by both web and agent code."""
+    conn = sqlite3.connect(DB_PATH, timeout=timeout)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA busy_timeout=5000")  # 5s retry on locked DB
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -75,6 +86,7 @@ def init_db():
         wp_user            TEXT,
         wp_app_password    TEXT,
         dont_sell          TEXT DEFAULT '[]',
+        encrypted          INTEGER DEFAULT 0,
         FOREIGN KEY (tenant_id) REFERENCES clients(tenant_id)
     );
 
@@ -295,6 +307,7 @@ def init_db():
         account_id      TEXT,
         location_id     TEXT,
         site_url        TEXT,
+        encrypted       INTEGER DEFAULT 0,
         created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(tenant_id, provider),

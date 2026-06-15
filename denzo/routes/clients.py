@@ -392,6 +392,11 @@ def create_client():
         github_format = f.get("github_format", "html").strip() or "html"
         pages_domain  = f.get("pages_domain", "").strip()
 
+        # Encrypt tokens at rest (Fernet AES-128)
+        from denzo.crypto import encrypt_token
+        encrypted_gh_token    = encrypt_token(github_token)
+        encrypted_wp_password = encrypt_token(wp_app_password)
+
         db.execute("""
             INSERT INTO client_context (
                 tenant_id, tagline, service_cities, primary_city,
@@ -399,15 +404,15 @@ def create_client():
                 insurance_partners, domain, industry_vertical,
                 github_repo, github_branch, github_token, github_format,
                 wp_url, wp_user, wp_app_password,
-                dont_sell, pages_domain
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                dont_sell, pages_domain, encrypted
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             tenant_id, tagline, service_cities, primary_city,
             certifications, services, differentiators, competitors,
             insurance_partners, domain, business_type,
-            github_repo, github_branch, github_token, github_format,
-            wp_url, wp_user, wp_app_password,
-            dont_sell, pages_domain
+            github_repo, github_branch, encrypted_gh_token, github_format,
+            wp_url, wp_user, encrypted_wp_password,
+            dont_sell, pages_domain, 1
         ))
 
         # Seed agents
@@ -646,11 +651,24 @@ def update_client(tenant_id):
         comp_list = []
 
     # Preserve existing token/password if blank submitted ("leave blank to keep")
+    from denzo.crypto import encrypt_token
     existing = db.execute(
-        "SELECT github_token, wp_app_password FROM client_context WHERE tenant_id=?", (tenant_id,)
+        "SELECT github_token, wp_app_password, encrypted FROM client_context WHERE tenant_id=?", (tenant_id,)
     ).fetchone()
-    github_token    = f.get("github_token", "").strip() or (existing["github_token"] if existing else "")
-    wp_app_password = f.get("wp_app_password", "").strip() or (existing["wp_app_password"] if existing else "")
+    github_token    = f.get("github_token", "").strip()
+    wp_app_password = f.get("wp_app_password", "").strip()
+    # If the form value is already encrypted (Fernet prefix), keep as-is.
+    # Otherwise encrypt new plaintext. Blank → preserve existing.
+    if github_token:
+        if not github_token.startswith("gAAAAAB"):
+            github_token = encrypt_token(github_token)
+    else:
+        github_token = existing["github_token"] if existing else ""
+    if wp_app_password:
+        if not wp_app_password.startswith("gAAAAAB"):
+            wp_app_password = encrypt_token(wp_app_password)
+    else:
+        wp_app_password = existing["wp_app_password"] if existing else ""
 
     # Preserve existing dont_sell and github_path_prefix if blank submitted
     existing_ctx = db.execute(
@@ -679,7 +697,8 @@ def update_client(tenant_id):
             github_repo=?, github_branch=?, github_token=?,
             wp_url=?, wp_user=?, wp_app_password=?,
             industry_vertical=?, dont_sell=?,
-            github_format=?, github_path_prefix=?, pages_domain=?
+            github_format=?, github_path_prefix=?, pages_domain=?,
+            encrypted=1
         WHERE tenant_id=?
     """, (
         f.get("tagline", "").strip(),

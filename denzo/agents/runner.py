@@ -5,6 +5,10 @@ Every agent (including Pipeline Director) is launched and tracked here.
 There is exactly ONE way to run an agent. The Director, API routes,
 and any future entry points all go through AgentRunner.
 
+Execution modes (set via DENZO_EXECUTOR env var):
+- "thread" (default): daemon threads inside the web process — dev/single-tenant
+- "rq": Redis Queue jobs — production, decoupled from web process
+
 Features:
 - Thread tracking: every running agent is in _threads[tenant_id][agent_name]
 - Stop events: every agent gets a threading.Event wired to agent._stop
@@ -13,11 +17,14 @@ Features:
 - Cleanup: closes thread-local SQLite connection on exit
 """
 import json
+import os
 import sqlite3
 import threading
 import traceback
 
 from denzo.agents.base_agent import close_thread_connection, DB_PATH
+
+_EXECUTOR_MODE = os.getenv("DENZO_EXECUTOR", "thread")  # "thread" | "rq"
 
 
 class AgentRunner:
@@ -25,6 +32,7 @@ class AgentRunner:
 
     _threads: dict[str, dict[str, threading.Thread]] = {}
     _events: dict[str, dict[str, threading.Event]] = {}
+    _rq_jobs: dict[str, dict[str, str]] = {}  # tenant_id -> {agent_name: job_id}
     _lock = threading.Lock()
 
     @classmethod
@@ -155,6 +163,23 @@ class AgentRunner:
                         cls._events.get(tenant_id, {}).pop(agent_name, None)
                     close_thread_connection()
 
+            # ── RQ mode: enqueue job to Redis queue ──────────────────────────
+            if _EXECUTOR_MODE == "rq":
+                try:
+                    from redis import Redis
+                    from rq import Queue
+                    from denzo.worker import run_agent_job
+                    redis_conn = Redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379/0"))
+                    q = Queue("denzo-seo", connection=redis_conn)
+                    job = q.enqueue(run_agent_job, tenant_id, agent_name)
+                    # Track job ID so stop() can cancel it
+                    cls._rq_jobs.setdefault(tenant_id, {})[agent_name] = job.id
+                    return {"status": "started", "agent": agent_name, "executor": "rq", "job_id": job.id}
+                except Exception as e:
+                    # Fall back to thread mode if Redis is unavailable
+                    print(f"[AgentRunner] RQ unavailable ({e}), falling back to thread mode", flush=True)
+
+            # ── Thread mode (default) ────────────────────────────────────────
             t = threading.Thread(
                 target=_thread_target,
                 daemon=True,
@@ -163,7 +188,7 @@ class AgentRunner:
             tenant_threads[agent_name] = t
             t.start()
 
-        return {"status": "started", "agent": agent_name}
+        return {"status": "started", "agent": agent_name, "executor": "thread"}
 
     @classmethod
     def stop(cls, tenant_id: str, agent_name: str) -> dict:
@@ -171,17 +196,34 @@ class AgentRunner:
         with cls._lock:
             events = cls._events.get(tenant_id, {})
             event = events.get(agent_name)
+            rq_jobs = cls._rq_jobs.get(tenant_id, {})
+            job_id = rq_jobs.get(agent_name)
 
         if event:
             event.set()
             return {"status": "stop_requested", "agent": agent_name}
-        else:
-            from denzo.agents.base_agent import db_write
-            db_write(
-                "UPDATE agents SET status='idle', current_task='Stopped by user' WHERE tenant_id=? AND name=?",
-                (tenant_id, agent_name)
-            )
-            return {"status": "not_running", "agent": agent_name}
+
+        if job_id and _EXECUTOR_MODE == "rq":
+            try:
+                from redis import Redis
+                from rq import Queue
+                from rq.job import Job
+                redis_conn = Redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379/0"))
+                try:
+                    job = Job.fetch(job_id, connection=redis_conn)
+                    job.cancel()
+                except Exception:
+                    pass  # job already finished/gone
+                rq_jobs.pop(agent_name, None)
+            except Exception:
+                pass
+
+        from denzo.agents.base_agent import db_write
+        db_write(
+            "UPDATE agents SET status='idle', current_task='Stopped by user' WHERE tenant_id=? AND name=?",
+            (tenant_id, agent_name)
+        )
+        return {"status": "stop_requested", "agent": agent_name}
 
     @classmethod
     def stop_all(cls, tenant_id: str) -> dict:

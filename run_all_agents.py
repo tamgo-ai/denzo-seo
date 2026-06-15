@@ -11,7 +11,7 @@ are already working (e.g., Director is running). Use --force to override.
 """
 import sys
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 
 sys.path.insert(0, '/root/denzo-seo')
 
@@ -21,7 +21,7 @@ from denzo.agents.runner import AgentRunner
 
 
 def log(msg):
-    ts = datetime.utcnow().strftime("%H:%M:%S")
+    ts = datetime.now(timezone.utc).strftime("%H:%M:%S")
     print(f"[{ts}] {msg}", flush=True)
 
 
@@ -224,7 +224,7 @@ if __name__ == "__main__":
 
     mode_label = "FULL PIPELINE" if from_layer <= 1 else f"FROM LAYER {from_layer}"
     log(f"Starting {mode_label} for all tenants...")
-    log(f"Start time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
+    log(f"Start time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC")
 
     check_running_agents()
 
@@ -233,5 +233,5 @@ if __name__ == "__main__":
 
     log("\n" + "="*60)
     log("ALL TENANTS COMPLETE")
-    log(f"End time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
+    log(f"End time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC")
     log("="*60)

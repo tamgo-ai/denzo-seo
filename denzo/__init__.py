@@ -9,6 +9,10 @@ sock = Sock()
 
 
 def create_app():
+    # ── Structured logging (replaces print() across all agents) ────────────
+    from denzo.logging_config import setup_logging
+    setup_logging()
+
     app = Flask(__name__, template_folder="templates", static_folder="../static")
     _secret = os.getenv("SECRET_KEY")
     if not _secret:
@@ -112,14 +116,34 @@ def create_app():
     # ── Rate limiting ─────────────────────────────────────────────────────────
     from flask_limiter import Limiter
     from flask_limiter.util import get_remote_address
+
+    # Use Redis if available (production), fall back to memory (dev)
+    _redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/1")
+    _limiter_storage = _redis_url if os.getenv("DENZO_EXECUTOR") == "rq" else "memory://"
+    try:
+        if _limiter_storage.startswith("redis"):
+            import redis as _redis_check
+            _r = _redis_check.Redis.from_url(_redis_url, socket_connect_timeout=1)
+            _r.ping()
+            _r.close()
+        else:
+            raise Exception("using memory backend")
+    except Exception:
+        _limiter_storage = "memory://"
+        print("[DENZO] Rate limiter: memory:// (Redis not available — install redis-server for production)")
+
     limiter = Limiter(
         get_remote_address,
         app=app,
         default_limits=["200 per day", "60 per hour"],
-        storage_uri="memory://",
+        storage_uri=_limiter_storage,
     )
     # Stricter limits on auth endpoints
     limiter.limit("10 per minute")(app.view_functions.get("auth.login"))
+    # Anti-abuse: wizard account creation limit
+    limiter.limit("3 per hour")(app.view_functions.get("public.wizard_complete"))
+    # Also rate-limit wizard start (the AI analysis call)
+    limiter.limit("5 per hour")(app.view_functions.get("public.wizard_start"))
     app.config["LIMITER"] = limiter
 
     # ── Custom error handlers ──────────────────────────────────────────────────

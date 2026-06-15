@@ -5,7 +5,7 @@ Google rewards fresh content — this agent keeps the site evergreen.
 Works for ALL verticals.
 """
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from denzo.agents.base_agent import TenantAwareBaseAgent, ClientContext, db_execute, db_write, strip_json_fences
 
 
@@ -58,7 +58,7 @@ class ContentFreshness(TenantAwareBaseAgent):
             "info"
         )
 
-        current_year = datetime.utcnow().year
+        current_year = datetime.now(timezone.utc).year
         refreshed = 0
         skipped = 0
 
@@ -80,7 +80,7 @@ class ContentFreshness(TenantAwareBaseAgent):
             if updated_at_str:
                 try:
                     updated_dt = datetime.strptime(updated_at_str[:19], "%Y-%m-%d %H:%M:%S")
-                    age_days = (datetime.utcnow() - updated_dt).days
+                    age_days = (datetime.now(timezone.utc) - updated_dt).days
                 except ValueError:
                     pass
 
@@ -173,7 +173,7 @@ INSTRUCTIONS:
 2. Update ALL year references to {current_year} where appropriate (e.g. "As of {current_year}...")
 3. Update any price estimates to reflect {current_year} market rates
 4. If the content mentions vehicle models or product versions, update to current {current_year} equivalents
-5. Add "Updated: {datetime.utcnow().strftime('%B %Y')}" in a visible but unobtrusive location (e.g. in a small paragraph near the top or bottom)
+5. Add "Updated: {datetime.now(timezone.utc).strftime('%B %Y')}" in a visible but unobtrusive location (e.g. in a small paragraph near the top or bottom)
 6. DO NOT change: target keyword, slug, URL structure, meta description (unless clearly outdated)
 7. DO NOT change the overall page purpose or messaging
 8. Make the content feel like it was just written today

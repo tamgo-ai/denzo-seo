@@ -92,7 +92,7 @@
 </ul>
 
 <h2 id="security">9. Security</h2>
-<p>We use industry-standard encryption (TLS 1.2+ in transit, AES-256 at rest where applicable), hashed passwords (bcrypt/Werkzeug), per-tenant data isolation, and OAuth refresh-token rotation. We do not have plaintext access to your passwords. Stripe and Google credentials are stored separately from application data. We will notify affected users within 72 hours of confirming any breach involving personal data.</p>
+<p>We use industry-standard encryption (TLS 1.2+ in transit, Fernet AES-128-CBC + HMAC-SHA256 at rest for API keys and OAuth tokens), hashed passwords (bcrypt/Werkzeug), per-tenant data isolation, and OAuth refresh-token rotation. We do not have plaintext access to your passwords. Stripe and Google credentials are stored separately from application data. We will notify affected users within 72 hours of confirming any breach involving personal data.</p>
 
 <h2 id="contact">10. Contact</h2>
 <p>Questions, deletion requests, or complaints: <a href="mailto:hello@denzostudios.com">hello@denzostudios.com</a>.</p>

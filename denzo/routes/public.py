@@ -15,7 +15,7 @@ import logging
 import re
 import uuid
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
 import requests
@@ -1041,7 +1041,7 @@ def _get_plan(user_id: int) -> str:
     plan = row["plan"] or "free"
     if plan == "trial" and row["trial_ends_at"]:
         try:
-            if datetime.utcnow() > datetime.fromisoformat(row["trial_ends_at"]):
+            if datetime.now(timezone.utc) > datetime.fromisoformat(row["trial_ends_at"]):
                 return "expired"
         except Exception as e:
             logger.warning("Error: %s", e)
@@ -1209,6 +1209,28 @@ def wizard_complete():
     s3 = session.get("wizard_s3", {})
     s4 = session.get("wizard_s4", {})
 
+    # ── Turnstile captcha verification ──────────────────────────────────────────
+    turnstile_secret = os.getenv("TURNSTILE_SECRET_KEY", "").strip()
+    if turnstile_secret:
+        turnstile_token = request.form.get("cf-turnstile-response", "").strip()
+        if not turnstile_token:
+            flash("Security check required. Please complete the CAPTCHA.", "error")
+            return redirect(url_for("public.wizard_step", step=5))
+        try:
+            import requests as _req
+            resp = _req.post(
+                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                data={"secret": turnstile_secret, "response": turnstile_token},
+                timeout=5,
+            )
+            result = resp.json()
+            if not result.get("success"):
+                flash("Security check failed. Please try again.", "error")
+                return redirect(url_for("public.wizard_step", step=5))
+        except Exception:
+            # Don't block signups if Turnstile API is unreachable
+            pass
+
     email    = request.form.get("email", "").strip().lower()
     password = request.form.get("password", "").strip()
 
@@ -1302,7 +1324,7 @@ def wizard_complete():
     db.close()
 
     # Log in and auto-activate 14-day trial
-    trial_ends = datetime.utcnow() + timedelta(days=14)
+    trial_ends = datetime.now(timezone.utc) + timedelta(days=14)
     db2 = get_db()
     db2.execute(
         "UPDATE users SET plan='trial', trial_ends_at=? WHERE id=?",
@@ -1353,26 +1375,26 @@ def upgrade_page():
 @bp.route("/privacy")
 def privacy():
     from datetime import datetime
-    today = datetime.utcnow().strftime("%B %d, %Y")
+    today = datetime.now(timezone.utc).strftime("%B %d, %Y")
     return render_template(
         "public/privacy.html",
         page_title="Privacy Policy",
         page_description="How Denzo SEO handles your data and your Google account information.",
         effective_date=today,
-        year=datetime.utcnow().year,
+        year=datetime.now(timezone.utc).year,
     )
 
 
 @bp.route("/terms")
 def terms():
     from datetime import datetime
-    today = datetime.utcnow().strftime("%B %d, %Y")
+    today = datetime.now(timezone.utc).strftime("%B %d, %Y")
     return render_template(
         "public/terms.html",
         page_title="Terms of Service",
         page_description="The terms governing your use of Denzo SEO.",
         effective_date=today,
-        year=datetime.utcnow().year,
+        year=datetime.now(timezone.utc).year,
     )
 
 
@@ -1400,7 +1422,7 @@ def upgrade_page_legacy():
 @login_required
 def activate_trial():
     user_id    = session["user_id"]
-    trial_ends = datetime.utcnow() + timedelta(days=14)
+    trial_ends = datetime.now(timezone.utc) + timedelta(days=14)
     db = get_db()
     db.execute(
         "UPDATE users SET plan='trial', trial_ends_at=? WHERE id=?",

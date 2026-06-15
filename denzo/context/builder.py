@@ -2,6 +2,9 @@
 build_client_context(tenant_id) — loads DB rows into a ClientContext dataclass.
 This is the ONLY place that reads from DB into a ClientContext.
 Agents never read DB directly for client config.
+
+Tokens (github_token, wp_app_password) are decrypted transparently here
+so all downstream agents receive plaintext credentials.
 """
 import json
 from denzo.agents.base_agent import ClientContext, db_execute
@@ -16,7 +19,7 @@ def build_client_context(tenant_id: str) -> ClientContext:
                   cc.competitors, cc.insurance_partners, cc.domain,
                   cc.industry_vertical, cc.github_repo, cc.github_branch,
                   cc.github_token, cc.github_format, cc.github_path_prefix, cc.pages_domain,
-                  cc.wp_url, cc.wp_user, cc.wp_app_password, cc.dont_sell
+                  cc.wp_url, cc.wp_user, cc.wp_app_password, cc.dont_sell, cc.encrypted
            FROM clients c
            LEFT JOIN client_context cc ON c.tenant_id = cc.tenant_id
            WHERE c.tenant_id = ?""",
@@ -32,6 +35,10 @@ def build_client_context(tenant_id: str) -> ClientContext:
             return json.loads(val) if val else []
         except Exception:
             return []
+
+    # Decrypt tokens at rest (Fernet AES-128)
+    from denzo.crypto import decrypt_token
+    encrypted = bool(r["encrypted"]) if "encrypted" in r.keys() else False
 
     return ClientContext(
         tenant_id           = tenant_id,
@@ -57,12 +64,12 @@ def build_client_context(tenant_id: str) -> ClientContext:
         publisher_type      = r["publisher_type"] or "github",
         github_repo         = r["github_repo"] or "",
         github_branch       = r["github_branch"] or "main",
-        github_token        = r["github_token"] or "",
+        github_token        = decrypt_token(r["github_token"] or "", encrypted),
         github_format       = r["github_format"] or "html",
         github_path_prefix  = r["github_path_prefix"] or "",
         pages_domain        = r["pages_domain"] or "",
         dont_sell           = jlist(r["dont_sell"]),
         wp_url              = r["wp_url"] or "",
         wp_user             = r["wp_user"] or "",
-        wp_app_password     = r["wp_app_password"] or "",
+        wp_app_password     = decrypt_token(r["wp_app_password"] or "", encrypted),
     )

@@ -6,7 +6,7 @@ No hardcoded business info anywhere — everything flows from the DB via ClientC
 import sqlite3, os, time, threading
 from dataclasses import dataclass, field
 from typing import List
-from datetime import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
@@ -47,15 +47,15 @@ _sqlite_local = threading.local()
 
 
 def _get_conn():
-    """Return this thread's persistent SQLite connection. Creates it on first use."""
+    """Return this thread's persistent SQLite connection. Creates it on first use.
+
+    Uses the unified _open_conn from db.py so PRAGMAs never diverge
+    between web requests and agent threads.
+    """
     conn = getattr(_sqlite_local, "conn", None)
     if conn is None:
-        conn = sqlite3.connect(DB_PATH, timeout=30)
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        conn.execute("PRAGMA foreign_keys=ON")
-        conn.execute("PRAGMA busy_timeout=5000")  # 5s busy wait before raising locked
-        conn.row_factory = sqlite3.Row
+        from denzo.db import _open_conn
+        conn = _open_conn(timeout=30)
         _sqlite_local.conn = conn
     return conn
 
@@ -429,7 +429,7 @@ class TenantAwareBaseAgent:
     # ── Logging ───────────────────────────────────────────────────────────────
 
     def log(self, message: str, level: str = "info"):
-        now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         db_write(
             "INSERT INTO activity (tenant_id,type,message,agent,level,created_at) VALUES (?,?,?,?,?,?)",
             (self.tenant_id, "agent", message, self.name, level, now)
@@ -451,7 +451,7 @@ class TenantAwareBaseAgent:
         print(f"[{self.tenant_id}][{self.name}] {level.upper()}: {message}")
 
     def set_status(self, status: str, current_task: str = "", next_task: str = ""):
-        now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         db_write(
             "UPDATE agents SET status=?,current_task=?,next_task=?,updated_at=? WHERE tenant_id=? AND name=?",
             (status, current_task, next_task, now, self.tenant_id, self.name)

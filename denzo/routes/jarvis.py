@@ -13,7 +13,7 @@ Routes:
   GET  /clients/<tenant_id>/jarvis/agent/<name> Agent detail + recent output
 """
 import os, json, logging, time, uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
 from flask import Blueprint, render_template, jsonify, request, abort, Response, stream_with_context
@@ -121,8 +121,8 @@ def state(tenant_id):
     spark_pages = []
     spark_keywords = []
     for delta in range(6, -1, -1):
-        start = (datetime.utcnow() - timedelta(days=delta+1)).strftime("%Y-%m-%d")
-        end   = (datetime.utcnow() - timedelta(days=delta)).strftime("%Y-%m-%d")
+        start = (datetime.now(timezone.utc) - timedelta(days=delta+1)).strftime("%Y-%m-%d")
+        end   = (datetime.now(timezone.utc) - timedelta(days=delta)).strftime("%Y-%m-%d")
         p = db.execute("SELECT COUNT(*) AS n FROM pages WHERE tenant_id=? AND date(created_at) BETWEEN ? AND ?",
                        (tenant_id, start, end)).fetchone()
         spark_pages.append(int((p["n"] if p else 0) or 0))

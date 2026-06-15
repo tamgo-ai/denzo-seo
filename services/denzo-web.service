@@ -1,0 +1,19 @@
+[Unit]
+Description=DENZO-SEO Web (gunicorn)
+After=network.target redis-server.service
+Wants=redis-server.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/denzo-seo
+EnvironmentFile=/root/denzo-seo/.env
+ExecStart=/usr/local/bin/gunicorn -c gunicorn_config.py 'denzo:create_app()'
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=denzo-web
+
+[Install]
+WantedBy=multi-user.target
