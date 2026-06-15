@@ -615,7 +615,7 @@ class TenantAwareBaseAgent:
         db_write(
             "INSERT INTO pages (tenant_id,title,slug,type,location,target_keyword,"
             "meta_title,meta_description,content,status,notes,origin,managed) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (self.tenant_id, title, slug, page_type, location, target_keyword,
              meta_title, meta_description, content, "draft", notes,
              'generated', 1)

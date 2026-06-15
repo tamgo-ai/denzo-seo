@@ -19,9 +19,9 @@ class KeywordClusterer(TenantAwareBaseAgent):
         self.set_status("working", "Loading keywords from database")
         ctx = self.ctx
 
-        # Load all keywords for this tenant
+        # Load keywords — limit to 800 to avoid Claude token truncation
         rows = db_execute(
-            "SELECT keyword, intent, category, priority FROM keywords WHERE tenant_id=?",
+            "SELECT keyword, intent, category, priority FROM keywords WHERE tenant_id=? ORDER BY CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END LIMIT 800",
             (self.ctx.tenant_id,)
         )
 
@@ -88,7 +88,7 @@ Return a JSON object with this exact structure:
 Return ONLY the JSON object, no explanation or markdown.
 """
 
-        raw = self.call_claude(prompt, max_tokens=6000, model="claude-sonnet-4-6")
+        raw = self.call_claude(prompt, max_tokens=12000, model="claude-sonnet-4-6")
 
         if not raw:
             self.log("AI returned empty response", "error")
