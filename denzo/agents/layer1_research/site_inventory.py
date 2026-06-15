@@ -33,6 +33,15 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
         super().__init__(name="Site Inventory", ctx=ctx, layer=1, color="stone")
 
     def run(self):
+        try:
+            self._run_impl()
+        except Exception as e:
+            import traceback
+            self.log(f"CRASH: {e}", "error")
+            self.log(traceback.format_exc()[-300:], "error")
+            self.set_status("error", f"SiteInventory crashed: {str(e)[:150]}")
+
+    def _run_impl(self):
         self.log("SiteInventoryAgent: crawling existing site...")
         self.set_status("working", "Discovering existing site structure")
 
@@ -59,6 +68,7 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
         # ── Phase 2: Fetch and inventory each URL ───────────────────────────
         existing_slugs = set()
         new_pages = 0
+        errors = 0
 
         for url in urls[:self.MAX_PAGES]:
             if self.should_stop():
@@ -67,6 +77,7 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
             try:
                 result = self._fetch_page_data(url)
                 if not result:
+                    errors += 1
                     continue
 
                 slug = result["slug"]
@@ -81,18 +92,20 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
                 time.sleep(self.REQUEST_DELAY)
 
             except Exception as e:
+                errors += 1
                 self.log(f"Error inventorying {url}: {e}", "warning")
 
         # Save inventory snapshot to settings for downstream agents
         self.save_output("site_inventory", {
             "total_urls_found": len(urls),
             "pages_inventoried": new_pages,
+            "errors": errors,
             "base_url": base_url,
             "completed_at": datetime.now(timezone.utc).isoformat(),
         })
 
         self.set_status("done",
-            f"Inventoried {new_pages} existing pages from {domain} ({len(urls)} URLs found)")
+            f"Inventoried {new_pages} existing pages from {domain} ({len(urls)} URLs found, {errors} errors)")
 
     # ── Internal helpers ────────────────────────────────────────────────────
 
