@@ -20,6 +20,9 @@ from denzo.agents.base_agent import (
 
 # ── Agent names by layer ──────────────────────────────────────────────────────
 
+# Discovery agents (Capa 0.5) — must complete before any Layer 1+ generation
+DISCOVERY_AGENTS = ["Site Inventory", "Keyword Footprint", "GEO Baseline"]
+
 LAYER_1 = [
     "Keyword Strategist", "Keyword Clusterer", "Competitor Intel",
     "Technical Auditor", "Site Style Analyzer", "Data Intelligence",
@@ -250,6 +253,143 @@ Return ONLY valid JSON."""
         except Exception:
             self._strategy = {"strategy": "Default pipeline execution", "priority_keywords": [], "content_pillars": [], "estimated_pages": 0}
 
+    # ── Reconciliation ───────────────────────────────────────────────────────
+
+    def _reconcile_world_state(self, agents: dict):
+        """Consolidate SiteInventory + KeywordFootprint + GEOBaseline into world_state.
+        Called automatically when all 3 discovery agents are done.
+        """
+        import json as _json
+
+        # Load individual outputs from settings
+        inventory = self._load_json_setting("site_inventory")
+        footprint = self._load_json_setting("existing_keyword_map")
+        geo_baseline = self._load_json_setting("geo_baseline")
+
+        # Build existing_urls from pages with origin='existing'
+        inv_rows = db_execute(
+            "SELECT slug, title, source_url, target_keyword, content_hash FROM pages "
+            "WHERE tenant_id=? AND origin='existing'",
+            (self.tenant_id,)
+        )
+        existing_urls = [dict(r) for r in (inv_rows or [])]
+
+        # Build occupied_keywords map
+        occupied = {}
+        if footprint and isinstance(footprint, dict):
+            occupied = footprint.get("keywords", {})
+
+        # Build geo_gaps
+        geo_gaps = []
+        if geo_baseline and isinstance(geo_baseline, dict):
+            total = geo_baseline.get("total_checks", 0)
+            cited = geo_baseline.get("citations_found", 0)
+            geo_gaps = [f"{total - cited} queries without citation (baseline)"]
+
+        # Build managed_paths list
+        mp_rows = db_execute(
+            "SELECT publisher, path, managed FROM managed_paths WHERE tenant_id=?",
+            (self.tenant_id,)
+        )
+        managed = [dict(r) for r in (mp_rows or [])]
+        protected = [r for r in managed if r.get("managed") == 0]
+
+        world_state = {
+            "existing_urls": existing_urls,
+            "occupied_keywords": occupied,
+            "geo_gaps": geo_gaps,
+            "managed_paths": managed,
+            "protected_paths": protected,
+            "reconciled_at": __import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat(),
+        }
+
+        self.save_output("world_state", world_state)
+        self.log(f"[Director] World state reconciled: "
+                 f"{len(existing_urls)} existing URLs, "
+                 f"{len(occupied)} occupied keywords, "
+                 f"{len(geo_gaps)} GEO gaps, "
+                 f"{len(protected)} protected paths", "success")
+
+    def _load_json_setting(self, key: str):
+        """Helper: load a JSON setting value or return None."""
+        import json as _json
+        rows = db_execute(
+            "SELECT value FROM settings WHERE tenant_id=? AND key=?",
+            (self.tenant_id, key)
+        )
+        if rows and rows[0]["value"]:
+            try:
+                return _json.loads(rows[0]["value"])
+            except Exception:
+                pass
+        return None
+
+    # ── Prioritization / Feedback Loop ──────────────────────────────────────
+
+    def _build_content_backlog(self, state: dict):
+        """Write a prioritized content_backlog from Capa 6 signals.
+
+        Consumed by Capa 3/4 agents to prioritize what to generate/refresh next.
+        Called periodically when enough analytics data exists.
+        """
+        pg_pub = state["pages"]["published"]
+        if pg_pub < 5:
+            return  # Not enough data yet
+
+        backlog = []
+
+        # ── Signal 1: Declining rankings (from GSC / Rank Tracker) ──────────
+        try:
+            from denzo.agents.utils.gsc_client import is_gsc_connected, top_queries
+            if is_gsc_connected(self.tenant_id):
+                gsc_queries = top_queries(self.tenant_id, days=30, limit=30)
+                for q in (gsc_queries or []):
+                    pos = q.get("position", 100)
+                    if 8 <= pos <= 20:  # Page 2 — opportunity
+                        backlog.append({
+                            "type": "refresh",
+                            "keyword": q.get("query", ""),
+                            "reason": f"Position {pos:.1f} — near miss",
+                            "priority": "high" if pos <= 12 else "medium",
+                        })
+        except Exception:
+            pass
+
+        # ── Signal 2: GEO gaps (baseline vs monitor comparison) ─────────────
+        geo_baseline = self._load_json_setting("geo_baseline")
+        geo_monitor_data = self._load_json_setting("geo_monitor_results")
+        if geo_baseline and geo_monitor_data:
+            bl_cited = geo_baseline.get("citations_found", 0)
+            bl_total = geo_baseline.get("total_checks", 0)
+            mon_cited = geo_monitor_data.get("citations_found", 0)
+            mon_total = geo_monitor_data.get("total_checks", 0)
+
+            if mon_total > 0:
+                still_missing = max(0, bl_total - mon_cited)
+                if still_missing > 0:
+                    backlog.append({
+                        "type": "geo_gap",
+                        "reason": f"{still_missing} queries still not cited (baseline {bl_cited}/{bl_total}, monitor {mon_cited}/{mon_total})",
+                        "priority": "high",
+                    })
+
+        # ── Signal 3: Content freshness ─────────────────────────────────────
+        stale = state["pages"].get("stale_count", 0)
+        if stale > 0:
+            backlog.append({
+                "type": "refresh_stale",
+                "reason": f"{stale} pages >90 days old",
+                "priority": "medium",
+            })
+
+        if backlog:
+            self.save_output("content_backlog", {
+                "items": backlog,
+                "total": len(backlog),
+                "generated_at": __import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat(),
+            })
+            self.log(f"[Director] Content backlog: {len(backlog)} prioritized items", "info")
+
     # ── State Machine ──────────────────────────────────────────────────────────
 
     def _evaluate(self, state: dict) -> list[str]:
@@ -268,6 +408,30 @@ Return ONLY valid JSON."""
         unscored = state["quality"].get("unscored", 0) or 0
 
         to_start = []
+
+        # ── DISCOVERY GUARD: world_state must exist before any generation ────
+        world_state_exists = db_execute(
+            "SELECT value FROM settings WHERE tenant_id=? AND key='world_state'",
+            (self.tenant_id,)
+        )
+        if not world_state_exists:
+            # Only discovery agents can run. Block everything else.
+            discovery_idle = [a for a in DISCOVERY_AGENTS
+                              if self._agent_status(a, agents) in ("idle", "error")]
+            if discovery_idle:
+                self.log(f"[Director] DISCOVERY REQUIRED — starting: {discovery_idle}", "info")
+                for name in discovery_idle:
+                    to_start.append(name)
+            else:
+                # Discovery agents are running — wait, don't start anything else
+                discovery_running = [a for a in DISCOVERY_AGENTS
+                                     if self._agent_status(a, agents) == "working"]
+                if discovery_running:
+                    self.log(f"[Director] Discovery in progress: {discovery_running} — waiting", "info")
+                else:
+                    # All discovery done? Generate world_state
+                    self._reconcile_world_state(agents)
+            return to_start
 
         # ── Layer 1: Intelligence ───────────────────────────────────────────
         l1_idle = self._idle_in_layer(LAYER_1, agents)

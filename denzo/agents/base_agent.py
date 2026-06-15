@@ -527,21 +527,147 @@ class TenantAwareBaseAgent:
                  location or "", category, priority)
             )
 
+    # ── Content hashing (idempotency) ──────────────────────────────────────
+
+    @staticmethod
+    def compute_content_hash(html: str) -> str:
+        """SHA256 of normalized content. Used for idempotent publishing."""
+        import hashlib
+        # Normalize whitespace so formatting changes don't trigger re-publish
+        import re
+        normalized = re.sub(r'\s+', ' ', html.strip())
+        return hashlib.sha256(normalized.encode('utf-8')).hexdigest()
+
     def add_page(self, title: str, slug: str, page_type: str, location=None,
                  target_keyword=None, meta_title=None, meta_description=None,
                  content=None, notes=None):
+        """Insert a page with anti-cannibalization gate.
+
+        Before inserting, checks:
+        1. Slug uniqueness (existing guard)
+        2. topic_map ownership — one intent, one page
+        3. Semantic duplicate detection (>90% similar = blocked)
+        """
+        import json as _json
+
+        # ── Gate 0: Slug uniqueness ────────────────────────────────────────
         existing = db_execute(
             "SELECT id FROM pages WHERE tenant_id=? AND slug=?",
             (self.tenant_id, slug)
         )
-        if not existing:
-            db_write(
-                "INSERT INTO pages (tenant_id,title,slug,type,location,target_keyword,"
-                "meta_title,meta_description,content,status,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                (self.tenant_id, title, slug, page_type, location, target_keyword,
-                 meta_title, meta_description, content, "draft", notes)
+        if existing:
+            self.log(f"SKIP '{title}': slug '{slug}' already exists", "info")
+            return
+
+        # ── Gate 1: topic_map ownership ─────────────────────────────────────
+        if target_keyword:
+            topic_rows = db_execute(
+                "SELECT id, status, owner_page_id, owner_url FROM topic_map "
+                "WHERE tenant_id=? AND primary_keyword=?",
+                (self.tenant_id, target_keyword)
             )
-            self.log(f"Page: '{title}'", level="success")
+            if not topic_rows:
+                self.log(
+                    f"BLOCKED '{title}': keyword '{target_keyword}' has no topic_map entry. "
+                    "Pages must originate from a canonical intent in topic_map.",
+                    "error"
+                )
+                return
+
+            topic = topic_rows[0]
+            if topic["status"] == "owned_existing":
+                self.log(
+                    f"BLOCKED '{title}': keyword '{target_keyword}' already owned by "
+                    f"existing client content at {topic['owner_url']}. Cannibalization prevented.",
+                    "error"
+                )
+                return
+
+            if topic["owner_page_id"]:
+                # Another generated page already owns this keyword
+                self.log(
+                    f"BLOCKED '{title}': keyword '{target_keyword}' already owned by page_id={topic['owner_page_id']}. "
+                    "One intent, one page.",
+                    "error"
+                )
+                return
+
+        # ── Gate 2: Semantic duplicate check ────────────────────────────────
+        if content and target_keyword:
+            if self._check_semantic_duplicate(target_keyword, content, page_type):
+                self.log(
+                    f"BLOCKED '{title}': semantic duplicate of existing content "
+                    f"(keyword='{target_keyword}', type='{page_type}')",
+                    "error"
+                )
+                return
+
+        # ── All gates passed → create ───────────────────────────────────────
+        db_write(
+            "INSERT INTO pages (tenant_id,title,slug,type,location,target_keyword,"
+            "meta_title,meta_description,content,status,notes,origin,managed) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (self.tenant_id, title, slug, page_type, location, target_keyword,
+             meta_title, meta_description, content, "draft", notes,
+             'generated', 1)
+        )
+
+        # Update topic_map with owner_page_id
+        if target_keyword:
+            new_page = db_execute(
+                "SELECT id FROM pages WHERE tenant_id=? AND slug=?",
+                (self.tenant_id, slug)
+            )
+            if new_page:
+                db_write(
+                    "UPDATE topic_map SET owner_page_id=?, status='owned_generated' "
+                    "WHERE tenant_id=? AND primary_keyword=?",
+                    (new_page[0]["id"], self.tenant_id, target_keyword)
+                )
+
+        self.log(f"Page: '{title}'", level="success")
+
+    def _check_semantic_duplicate(self, keyword: str, content: str, page_type: str) -> bool:
+        """Check if content is semantically duplicate of existing same-type pages.
+        Uses keyword+title overlap as a lightweight semantic check.
+        Returns True if a duplicate is detected."""
+        import re
+
+        # Get existing same-type pages
+        rows = db_execute(
+            "SELECT id, title, target_keyword, content FROM pages "
+            "WHERE tenant_id=? AND type=? AND content IS NOT NULL AND content != '' "
+            "LIMIT 50",
+            (self.tenant_id, page_type)
+        )
+        if not rows:
+            return False
+
+        # Normalize the new content
+        def _normalize(text: str) -> set:
+            if not text:
+                return set()
+            text = re.sub(r'<[^>]+>', ' ', text)
+            text = re.sub(r'[^\w\s]', ' ', text.lower())
+            words = {w for w in text.split() if len(w) > 2}
+            return words
+
+        new_words = _normalize(f"{keyword} {content[:2000]}")
+
+        for row in rows:
+            existing_words = _normalize(f"{row['target_keyword'] or ''} {(row['content'] or '')[:2000]}")
+            if not existing_words or not new_words:
+                continue
+
+            # Jaccard similarity
+            intersection = new_words & existing_words
+            union = new_words | existing_words
+            similarity = len(intersection) / len(union) if union else 0
+
+            if similarity >= 0.85:
+                return True
+
+        return False
 
     def add_competitor(self, name: str, url=None, location=None,
                        strengths=None, weaknesses=None, notes=None):

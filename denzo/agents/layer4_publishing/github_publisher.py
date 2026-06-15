@@ -182,9 +182,32 @@ class GitHubPublisher(TenantAwareBaseAgent):
         )
         return rows[0]["n"] if rows else 0
 
+    def _check_path_ownership(self, path: str) -> str:
+        """
+        Check managed_paths table. Returns:
+          'ours'     — DENZO created this, safe to overwrite
+          'theirs'   — pre-existing client content, DO NOT TOUCH
+          'unknown'  — not in manifest, needs discovery
+        """
+        rows = db_execute(
+            "SELECT managed FROM managed_paths WHERE tenant_id=? AND publisher='github' AND path=?",
+            (self.ctx.tenant_id, path)
+        )
+        if rows:
+            return 'theirs' if rows[0]['managed'] == 0 else 'ours'
+        return 'unknown'
+
     def _publish_file(self, session: requests.Session, repo: str, branch: str,
-                      path: str, content_b64: str, message: str) -> bool:
+                      path: str, content_b64: str, message: str,
+                      content_hash: str = None) -> bool:
         api_url = f"https://api.github.com/repos/{repo}/contents/{path}"
+
+        # ── Rule #1: Never overwrite what we don't own ────────────────────
+        ownership = self._check_path_ownership(path)
+        if ownership == 'theirs':
+            self.log(f"⛔ SKIP {path}: pre-existing client content (managed=0)", "warning")
+            return False
+
         try:
             r = session.get(api_url, params={"ref": branch}, timeout=20)
             sha = r.json().get("sha") if r.status_code == 200 else None
@@ -192,13 +215,42 @@ class GitHubPublisher(TenantAwareBaseAgent):
             self.log(f"GitHub GET error for {path}: {e}", "warning")
             sha = None
 
+        # ── Rule #2: If file exists on GitHub but NOT in our manifest ─────
+        if sha and ownership == 'unknown':
+            # File exists on GitHub but we never tracked it → it's client content
+            db_write(
+                "INSERT OR REPLACE INTO managed_paths (tenant_id, publisher, path, managed, content_hash) "
+                "VALUES (?, 'github', ?, 0, ?)",
+                (self.ctx.tenant_id, path, content_hash or '')
+            )
+            self.log(f"⛔ SKIP {path}: discovered unmanaged file on GitHub → marked protected", "warning")
+            return False
+
+        # ── Rule #3: Idempotency — skip if content hasn't changed ─────────
+        if content_hash and ownership == 'ours':
+            existing_hash = db_execute(
+                "SELECT content_hash FROM managed_paths WHERE tenant_id=? AND publisher='github' AND path=?",
+                (self.ctx.tenant_id, path)
+            )
+            if existing_hash and existing_hash[0]['content_hash'] == content_hash:
+                self.log(f"⚡ SKIP {path}: content unchanged (hash match)", "info")
+                return True  # not an error — already published
+
         payload = {"message": message, "content": content_b64, "branch": branch}
         if sha:
             payload["sha"] = sha
 
         try:
             r = session.put(api_url, json=payload, timeout=30)
-            return r.status_code in (200, 201)
+            ok = r.status_code in (200, 201)
+            if ok and content_hash:
+                # Update manifest
+                db_write(
+                    "INSERT OR REPLACE INTO managed_paths (tenant_id, publisher, path, page_id, managed, content_hash) "
+                    "VALUES (?, 'github', ?, ?, 1, ?)",
+                    (self.ctx.tenant_id, path, getattr(self, '_current_page_id', None), content_hash)
+                )
+            return ok
         except Exception as e:
             self.log(f"GitHub PUT error for {path}: {e}", "error")
             return False
@@ -357,10 +409,12 @@ class GitHubPublisher(TenantAwareBaseAgent):
 
             content_b64 = base64.b64encode(file_content.encode("utf-8")).decode("utf-8")
             commit_msg  = f"SEO: {title}"
+            content_hash = self.compute_content_hash(file_content)
+            self._current_page_id = page_dict["id"]
 
             self.set_status("working", f"Publishing: {title[:50]}")
 
-            ok = self._publish_file(session, repo, branch, file_path, content_b64, commit_msg)
+            ok = self._publish_file(session, repo, branch, file_path, content_b64, commit_msg, content_hash)
             if ok:
                 db_write(
                     "UPDATE pages SET status='published', publish_url=?, updated_at=CURRENT_TIMESTAMP "

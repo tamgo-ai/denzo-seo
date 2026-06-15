@@ -203,11 +203,15 @@ Rules:
                     rewrite_count += 1
                     new_notes = _re.sub(r'\s*\[CO:\d+\]', '', old_notes)
 
+                    # Check if this page is client-owned (managed=0) — requires explicit approval
+                    page_managed = page_dict.get("managed", 1)
+                    managed_tag = " [MANAGED_APPROVAL_REQUIRED]" if page_managed == 0 else ""
+
                     if rewrite_count >= MAX_REWRITES:
-                        new_notes += f" [CO_MAX_RETRIES] [PENDING_REVIEW]"
+                        new_notes += f" [CO_MAX_RETRIES] [PENDING_REVIEW]{managed_tag}"
                         self.log(f"✗ Max rewrites reached: {title} (score {score}/100 after {rewrite_count} attempts)", "warning")
                     else:
-                        new_notes += f" [CO:{rewrite_count}] [PENDING_REVIEW]"
+                        new_notes += f" [CO:{rewrite_count}] [PENDING_REVIEW]{managed_tag}"
 
                     db_write(
                         "UPDATE pages SET content=?, quality_score=?, scored_by='haiku-4-5-scored', "

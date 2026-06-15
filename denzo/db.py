@@ -386,6 +386,37 @@ def init_db():
     );
     CREATE INDEX IF NOT EXISTS idx_content_versions_page ON content_versions(tenant_id, page_id);
 
+    -- ── TOPIC MAP — canonical owner for each search intent ──────────────────
+    -- Enforces: one primary_keyword → one owner page. Anti-cannibalization at DB level.
+    CREATE TABLE IF NOT EXISTS topic_map (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        tenant_id       TEXT NOT NULL,
+        primary_keyword TEXT NOT NULL,
+        cluster_label   TEXT,
+        intent          TEXT,
+        owner_page_id   INTEGER,
+        owner_url       TEXT,
+        status          TEXT DEFAULT 'planned',
+        created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(tenant_id, primary_keyword)
+    );
+    CREATE INDEX IF NOT EXISTS idx_topic_map_tenant ON topic_map(tenant_id);
+
+    -- ── MANAGED PATHS — manifest of what paths DENZO owns vs client's ──────
+    -- Before publishing to any path, consult this table. managed=0 = untouchable.
+    CREATE TABLE IF NOT EXISTS managed_paths (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        tenant_id    TEXT NOT NULL,
+        publisher    TEXT NOT NULL,
+        path         TEXT NOT NULL,
+        page_id      INTEGER,
+        managed      INTEGER DEFAULT 1,
+        content_hash TEXT,
+        created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(tenant_id, publisher, path)
+    );
+    CREATE INDEX IF NOT EXISTS idx_managed_paths_tenant ON managed_paths(tenant_id);
+
     -- Tenant cascade cleanup: when a client is deleted, drop all their data.
     -- We do this with a trigger because SQLite cannot ALTER TABLE existing FK
     -- constraints to add ON DELETE CASCADE, and the existing tables predate
@@ -410,6 +441,9 @@ def init_db():
         DELETE FROM geo_queries     WHERE tenant_id = OLD.tenant_id;
         DELETE FROM geo_query_bank  WHERE tenant_id = OLD.tenant_id;
         DELETE FROM content_versions WHERE tenant_id = OLD.tenant_id;
+        DELETE FROM topic_map       WHERE tenant_id = OLD.tenant_id;
+        DELETE FROM managed_paths   WHERE tenant_id = OLD.tenant_id;
+        DELETE FROM cannibalization_risks WHERE tenant_id = OLD.tenant_id;
     END;
     """)
 
@@ -437,6 +471,40 @@ def init_db():
         "ALTER TABLE client_context ADD COLUMN github_path_prefix TEXT DEFAULT ''",
         "ALTER TABLE client_context ADD COLUMN pages_domain TEXT DEFAULT ''",
         "ALTER TABLE pages ADD COLUMN scored_by TEXT",
+        # ── Discovery-First: content ownership & anti-cannibalization ───────
+        "ALTER TABLE pages ADD COLUMN origin TEXT DEFAULT 'generated'",
+        "ALTER TABLE pages ADD COLUMN managed INTEGER DEFAULT 1",
+        "ALTER TABLE pages ADD COLUMN content_hash TEXT",
+        "ALTER TABLE pages ADD COLUMN source_url TEXT",
+        "ALTER TABLE pages ADD COLUMN cluster_id INTEGER",
+        "ALTER TABLE pages ADD COLUMN canonical_to INTEGER",
+        # ── Recreate cleanup trigger to include new tables ─────────────────
+        # DROP + recreate because IF NOT EXISTS skips updates to existing DBs.
+        "DROP TRIGGER IF EXISTS trg_cleanup_tenant_data",
+        """CREATE TRIGGER IF NOT EXISTS trg_cleanup_tenant_data
+           AFTER DELETE ON clients
+           FOR EACH ROW
+           BEGIN
+               DELETE FROM agents          WHERE tenant_id = OLD.tenant_id;
+               DELETE FROM activity        WHERE tenant_id = OLD.tenant_id;
+               DELETE FROM keywords        WHERE tenant_id = OLD.tenant_id;
+               DELETE FROM pages           WHERE tenant_id = OLD.tenant_id;
+               DELETE FROM competitors     WHERE tenant_id = OLD.tenant_id;
+               DELETE FROM client_context  WHERE tenant_id = OLD.tenant_id;
+               DELETE FROM settings        WHERE tenant_id = OLD.tenant_id;
+               DELETE FROM locations       WHERE tenant_id = OLD.tenant_id;
+               DELETE FROM site_images     WHERE tenant_id = OLD.tenant_id;
+               DELETE FROM pipeline_runs   WHERE tenant_id = OLD.tenant_id;
+               DELETE FROM oauth_tokens    WHERE tenant_id = OLD.tenant_id;
+               DELETE FROM gbp_locations   WHERE tenant_id = OLD.tenant_id;
+               DELETE FROM gsc_queries     WHERE tenant_id = OLD.tenant_id;
+               DELETE FROM geo_queries     WHERE tenant_id = OLD.tenant_id;
+               DELETE FROM geo_query_bank  WHERE tenant_id = OLD.tenant_id;
+               DELETE FROM content_versions WHERE tenant_id = OLD.tenant_id;
+               DELETE FROM topic_map       WHERE tenant_id = OLD.tenant_id;
+               DELETE FROM managed_paths   WHERE tenant_id = OLD.tenant_id;
+               DELETE FROM cannibalization_risks WHERE tenant_id = OLD.tenant_id;
+           END;""",
         # SaaS funnel — user subscription + client ownership
         "ALTER TABLE users ADD COLUMN email TEXT",
         "ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'free'",

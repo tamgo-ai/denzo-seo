@@ -147,11 +147,71 @@ Return ONLY the JSON object, no explanation or markdown.
             "success"
         )
 
+        # ── Populate topic_map — one row per canonical intent ───────────────
+        self._populate_topic_map(clusters)
+
         if n_risks > 0:
             for risk in cannibalization_risks[:5]:
                 self.log(f"Cannibalization risk: {risk}", "warning")
 
         self.set_status(
             "done",
-            f"{n_clusters} keyword clusters — {n_risks} cannibalization risks resolved"
+            f"{n_clusters} keyword clusters — {n_risks} cannibalization risks resolved, {len(clusters)} intents in topic_map"
         )
+
+    def _populate_topic_map(self, clusters: list):
+        """Insert each cluster into topic_map as a canonical intent.
+
+        Checks existing_keyword_map first: if a keyword is already owned
+        by client content, marks it as 'owned_existing' (no new page needed).
+        """
+        # Load existing keyword map (from KeywordFootprintAgent)
+        existing_map = {}
+        rows = db_execute(
+            "SELECT value FROM settings WHERE tenant_id=? AND key='existing_keyword_map'",
+            (self.ctx.tenant_id,)
+        )
+        if rows and rows[0]["value"]:
+            try:
+                existing_map = json.loads(rows[0]["value"]).get("keywords", {})
+            except Exception:
+                pass
+
+        inserted = 0
+        skipped = 0
+        for cluster in clusters:
+            winner = (cluster.get("winner_keyword") or "").strip()
+            if not winner:
+                continue
+
+            intent = cluster.get("intent", "commercial")
+            label = cluster.get("cluster_name", "")
+
+            # Check if this keyword is already owned by existing content
+            if winner.lower() in {k.lower() for k in existing_map}:
+                owner_url = existing_map.get(winner) or existing_map.get(
+                    next((k for k in existing_map if k.lower() == winner.lower()), ""), ""
+                )
+                try:
+                    db_write(
+                        """INSERT OR REPLACE INTO topic_map
+                           (tenant_id, primary_keyword, cluster_label, intent, owner_url, status)
+                           VALUES (?, ?, ?, ?, ?, 'owned_existing')""",
+                        (self.ctx.tenant_id, winner, label, intent, owner_url)
+                    )
+                except Exception:
+                    pass  # UNIQUE constraint — already exists
+                skipped += 1
+            else:
+                try:
+                    db_write(
+                        """INSERT OR REPLACE INTO topic_map
+                           (tenant_id, primary_keyword, cluster_label, intent, status)
+                           VALUES (?, ?, ?, ?, 'planned')""",
+                        (self.ctx.tenant_id, winner, label, intent)
+                    )
+                    inserted += 1
+                except Exception:
+                    pass  # UNIQUE constraint
+
+        self.log(f"topic_map: {inserted} planned, {skipped} owned by existing content")

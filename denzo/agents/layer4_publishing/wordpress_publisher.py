@@ -229,6 +229,16 @@ class WordPressPublisher(TenantAwareBaseAgent):
             }
 
             try:
+                # ── Rule #1: Check ownership via managed_paths ──────────────
+                wp_path = slug  # WordPress uses slug as path identifier
+                owner_rows = db_execute(
+                    "SELECT managed FROM managed_paths WHERE tenant_id=? AND publisher='wordpress' AND path=?",
+                    (ctx.tenant_id, wp_path)
+                )
+                if owner_rows and owner_rows[0]['managed'] == 0:
+                    self.log(f"⛔ SKIP '{slug}': pre-existing client content (managed=0)", "warning")
+                    continue
+
                 # Check if page already exists by slug
                 existing = self._find_wp_page_by_slug(api_base, auth, slug)
 
@@ -237,7 +247,18 @@ class WordPressPublisher(TenantAwareBaseAgent):
                     failed += 1
                     continue
                 elif existing:
-                    # UPDATE existing page
+                    # ── Rule #2: If page found on WP but NOT in our manifest ──
+                    if not owner_rows:
+                        # This page exists on WP but we never created it → protect it
+                        db_write(
+                            "INSERT OR REPLACE INTO managed_paths (tenant_id, publisher, path, page_id, managed) "
+                            "VALUES (?, 'wordpress', ?, ?, 0)",
+                            (ctx.tenant_id, wp_path, page_dict["id"])
+                        )
+                        self.log(f"⛔ SKIP '{slug}': existing WordPress page not managed by DENZO → marked protected", "warning")
+                        continue
+
+                    # UPDATE existing page (we own it)
                     wp_id = existing["id"]
                     r = requests.post(f"{api_base}/pages/{wp_id}", auth=auth, json=payload, timeout=30)
                     action = "updated"
@@ -265,6 +286,13 @@ class WordPressPublisher(TenantAwareBaseAgent):
                         "UPDATE pages SET status='published', publish_url=?, publish_ref=?, "
                         "updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
                         (public_url, wp_post_id, page_dict["id"], ctx.tenant_id)
+                    )
+                    # Register/update managed_paths manifest
+                    content_hash = self.compute_content_hash(content) if content else None
+                    db_write(
+                        "INSERT OR REPLACE INTO managed_paths (tenant_id, publisher, path, page_id, managed, content_hash) "
+                        "VALUES (?, 'wordpress', ?, ?, 1, ?)",
+                        (ctx.tenant_id, wp_path, page_dict["id"], content_hash)
                     )
                     self.log(f"✓ {action.capitalize()}: {title} → {public_url}", "success")
                     if action == "updated":

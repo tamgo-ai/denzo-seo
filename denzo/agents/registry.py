@@ -42,7 +42,13 @@ AGENT_REGISTRY = {
     "Perplexity Tracker":        ("layer5_monitoring.perplexity_tracker",        "PerplexityTracker",       6, "violet"),
     "GEO Gap Closer":            ("layer5_monitoring.geo_gap_closer",            "GEOGapCloser",            6, "emerald"),
     "Indexation Accelerator":   ("layer4_publishing.indexation_accelerator",    "IndexationAccelerator",   5, "emerald"),
+    # ── Capa 0.5 — Discovery & Reconciliation (runs BEFORE all generation) ──
+    "Site Inventory":            ("layer1_research.site_inventory",               "SiteInventoryAgent",      1, "stone"),
+    "Keyword Footprint":         ("layer1_research.keyword_footprint",             "KeywordFootprintAgent",   1, "sand"),
+    "GEO Baseline":              ("layer5_monitoring.geo_baseline",                "GEOBaselineAgent",        1, "sky"),
 }
+
+DISCOVERY_AGENTS = ["Site Inventory", "Keyword Footprint", "GEO Baseline"]
 
 LAYER_LABELS = {
     0: "Director",
