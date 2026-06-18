@@ -138,7 +138,7 @@ def analyze_website():
     if not api_key:
         return jsonify({"error": "ANTHROPIC_API_KEY not configured"}), 500
 
-    client = anthropic.Anthropic(api_key=api_key)
+    client = anthropic.Anthropic(api_key=api_key, base_url="https://api.anthropic.com")
 
     context_block = json.dumps(scraped, ensure_ascii=False) if scraped else f"URL: {url} — scrape failed: {scrape_error}"
 
