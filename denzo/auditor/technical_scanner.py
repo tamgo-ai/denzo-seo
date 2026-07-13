@@ -88,7 +88,10 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
 
     # Check title descriptiveness (industry-agnostic — no hardcoded cities/keywords)
     title_lower = title.lower()
-    has_brand = domain.replace('www.','').split('.')[0] in title_lower
+    # Brand detection: try domain name first, then extract from title prefix (before separators)
+    domain_brand = domain.replace('www.','').split('.')[0]
+    title_brand = title.split('|')[0].split('—')[0].split('·')[0].split(' - ')[0].strip().lower()
+    has_brand = domain_brand in title_lower or (len(title_brand) > 3 and title_brand in title_lower)
     word_n = len(title.split())
     if word_n < 3:
         findings.append({"severity":"medium","module":"technical","title":f"Title not descriptive enough: only {word_n} word(s)","detail":f'Current: "{title}". A strong title communicates the page topic plus the brand. Very short titles waste SERP space and topical relevance.',"fix":"Expand to a descriptive phrase: primary topic/keyword + brand. Add location only if the business is location-based."})
@@ -367,9 +370,9 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
 
         for header_key, (display_name, description) in security_checks.items():
             if header_key not in headers_lower:
-                sev = 'medium' if header_key in ('content-security-policy','strict-transport-security') else 'low'
-                findings.append({"severity":sev,"module":"technical","title":f"Missing {display_name} header","detail":description,"fix":f"Add {display_name} header to server configuration (Vercel: vercel.json headers, Next.js: next.config.js headers() function)."})
-                if sev == 'medium': score -= 5
+                # Security headers are best practices, NOT confirmed SEO ranking factors.
+                # We report them as informational only — no score impact.
+                findings.append({"severity":"info","module":"technical","title":f"Missing {display_name} header (security best practice, not an SEO ranking factor)","detail":description,"fix":f"Add {display_name} header to server configuration (Vercel: vercel.json headers, Next.js: next.config.js headers() function)."})
 
         # Check for ETag / Last-Modified
         if 'etag' not in headers_lower and 'last-modified' not in headers_lower:

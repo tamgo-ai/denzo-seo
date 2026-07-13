@@ -88,9 +88,12 @@ def analyze_keyword_targeting(url: str, html: str, domain: str) -> dict:
     dominant_intent = max(intent_scores, key=intent_scores.get)
     total_signals = sum(intent_scores.values())
 
-    if total_signals < 3:
+    if total_signals < 1:
         findings.append({"severity":"high","module":"keywords","title":"Unclear search intent — content doesn't match any known intent pattern","detail":f"The page doesn't have clear signals for transactional, commercial, or informational intent. Google needs to understand WHY someone would want this page.","fix":"Add clear intent signals:\n• For service pages: 'Get a quote', 'Book now', 'Free estimate', pricing info\n• For informational content: 'How to...', 'Guide to...', clear educational structure\n• For product/comparison: features, pricing, pros/cons, 'vs' comparisons"})
         score -= 12
+    elif total_signals < 3:
+        findings.append({"severity":"low","module":"keywords","title":f"Subtle search intent: only {total_signals} clear intent signal(s) detected","detail":f"Dominant intent appears to be '{dominant_intent}' but signals are subtle. Stronger intent signals help Google confidently match your page to the right queries.","fix":"Strengthen intent signals:\n• Transactional: add 'Book now', 'Get a quote', pricing, 'Schedule appointment'\n• Commercial: add 'Compare', 'Best', 'Top-rated', 'Reviews'\n• Informational: add 'Guide', 'How to', 'What is', 'Learn'"})
+        score -= 4
     else:
         intent_labels = {
             'transactional': '🛒 Transactional — user wants to buy/hire/book',
