@@ -37,7 +37,7 @@ _UA_POOL = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15",
 ]
 
-# ── Accept-Language pool ─────────────────────────────────────────────────────
+# ── Accept-Language pool ─────────────────────────────────────────────
 _ACCEPT_LANG_POOL = [
     "en-US,en;q=0.9",
     "en-US,en;q=0.9,es;q=0.8",
@@ -163,7 +163,34 @@ def _curl_fetch(url: str, timeout: int = 20) -> Optional[str]:
         return None
 
 
-def fetch_html(url: str, timeout: int = 25, log_fn=None) -> dict:
+def _requests_meta(url: str, timeout: int = 15) -> Optional[dict]:
+    """
+    Lightweight companion request to capture HTTP response metadata that the
+    curl body-fetch cannot expose cleanly: response headers, redirect chain,
+    final URL and real status code. Uses stream=True so the body is NOT
+    downloaded (headers only). Best-effort — returns None on any failure.
+    """
+    try:
+        import requests
+        r = requests.get(
+            url, headers=_build_headers(), timeout=timeout,
+            allow_redirects=True, stream=True,
+        )
+        chain = [h.url for h in r.history] + [r.url]
+        headers = {k: v for k, v in r.headers.items()}
+        status = r.status_code
+        final = r.url
+        try:
+            r.close()
+        except Exception:
+            pass
+        return {"status": status, "headers": headers,
+                "redirect_chain": chain, "final_url": final}
+    except Exception:
+        return None
+
+
+def fetch_html(url: str, timeout: int = 25, log_fn=None, capture_meta: bool = False) -> dict:
     """
     Fetch URL with progressive fallback for Cloudflare-protected sites.
 
@@ -180,15 +207,25 @@ def fetch_html(url: str, timeout: int = 25, log_fn=None) -> dict:
         if log_fn:
             log_fn(msg)
 
+    # ── Response metadata (headers, redirect chain, real status) ────────────
+    # Captured once for the primary page fetch so downstream analyzers can
+    # audit security headers, caching, HTTP status and redirect chains.
+    # Skipped for auxiliary fetches (robots.txt, sitemaps, llms.txt) for speed.
+    _meta = {"headers": {}, "redirect_chain": [], "final_url": url}
+    if capture_meta:
+        _m = _requests_meta(url, timeout=min(timeout, 15))
+        if _m:
+            _meta = _m
+
     # ─── Pass 0: curl (best TLS fingerprint, no Python overhead) ─────────────
     html0 = _curl_fetch(url, timeout=min(timeout, 20))
     if html0 and not _is_cloudflare_block(200, html0):
         log(f"[stealth_fetch] Pass 0 (curl) OK")
-        return {"ok": True, "html": html0, "status": 200, "method": "curl"}
+        return {"ok": True, "html": html0, "status": _meta.get("status", 200) or 200, "method": "curl", "headers": _meta["headers"], "redirect_chain": _meta["redirect_chain"], "final_url": _meta["final_url"]}
     if html0:
         log("[stealth_fetch] Pass 0 (curl) blocked by CF — trying requests…")
 
-    # ─── Pass 1: requests with randomized headers ─────────────────────────────
+    # ─── Pass 1: requests with randomized headers ────────────────────────
     try:
         import requests
         ua = random.choice(_UA_POOL)
@@ -197,12 +234,12 @@ def fetch_html(url: str, timeout: int = 25, log_fn=None) -> dict:
         html = r.text
         if not _is_cloudflare_block(r.status_code, html):
             log(f"[stealth_fetch] Pass 1 (requests) OK — {r.status_code}")
-            return {"ok": True, "html": html, "status": r.status_code, "method": "requests"}
+            return {"ok": True, "html": html, "status": r.status_code, "method": "requests", "headers": (_meta["headers"] or {k: v for k, v in r.headers.items()}), "redirect_chain": (_meta["redirect_chain"] or ([h.url for h in r.history] + [r.url])), "final_url": (_meta["final_url"] or r.url)}
         log(f"[stealth_fetch] Pass 1 blocked ({r.status_code}) — trying cloudscraper…")
     except Exception as e:
         log(f"[stealth_fetch] Pass 1 error: {e} — trying cloudscraper…")
 
-    # ─── Pass 2: cloudscraper ─────────────────────────────────────────────────
+    # ─── Pass 2: cloudscraper ────────────────────────────────────────
     try:
         import cloudscraper
         ua2 = random.choice(_UA_POOL)
@@ -220,7 +257,7 @@ def fetch_html(url: str, timeout: int = 25, log_fn=None) -> dict:
         html2 = r2.text
         if not _is_cloudflare_block(r2.status_code, html2):
             log(f"[stealth_fetch] Pass 2 (cloudscraper) OK — {r2.status_code}")
-            return {"ok": True, "html": html2, "status": r2.status_code, "method": "cloudscraper"}
+            return {"ok": True, "html": html2, "status": r2.status_code, "method": "cloudscraper", "headers": (_meta["headers"] or {k: v for k, v in r2.headers.items()}), "redirect_chain": (_meta["redirect_chain"] or ([h.url for h in r2.history] + [r2.url])), "final_url": (_meta["final_url"] or r2.url)}
         log(f"[stealth_fetch] Pass 2 blocked ({r2.status_code}) — trying Playwright…")
     except Exception as e:
         log(f"[stealth_fetch] Pass 2 error: {e} — trying Playwright…")
@@ -329,7 +366,7 @@ def fetch_html(url: str, timeout: int = 25, log_fn=None) -> dict:
 
             if not _is_cloudflare_block(status3, html3):
                 log(f"[stealth_fetch] Pass 3 (Playwright) OK — {status3}")
-                return {"ok": True, "html": html3, "status": status3, "method": "playwright"}
+                return {"ok": True, "html": html3, "status": status3, "method": "playwright", "headers": (_meta["headers"] or (dict(resp.headers) if resp else {})), "redirect_chain": _meta["redirect_chain"] or [url], "final_url": (_meta["final_url"] or (resp.url if resp else url))}
             else:
                 log("[stealth_fetch] Pass 3 still blocked — site is hardened CF Enterprise")
                 return {
