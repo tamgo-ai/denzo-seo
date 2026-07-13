@@ -48,7 +48,7 @@ def build_report_html(result: dict, audit_id: str) -> str:
     fixed=[f for f in findings if f['severity']=='fixed']
 
     # ── Module score bars ──
-    mods=[('geo','GEO / AI Visibility',25,geo_r.get('score',0)),('technical','Technical SEO',20,tech.get('score',0)),('images','Image Optimization',15,images_r.get('score',0)),('performance','Core Web Vitals',15,perf_r.get('score',0)),('llms','llms.txt & AI Crawlers',10,llms_r.get('score',0)),('sitemap','Sitemap',10,sitemap_r.get('score',0)),('robots','Robots.txt',5,robots_r.get('score',0))]
+    mods=[('technical','Technical SEO',24,tech.get('score',0)),('geo','GEO / AI Visibility',22,geo_r.get('score',0)),('images','Image Optimization',14,images_r.get('score',0)),('sitemap','Sitemap',12,sitemap_r.get('score',0)),('performance','Core Web Vitals (estimated)',12,perf_r.get('score',0)),('robots','Robots.txt',8,robots_r.get('score',0)),('llms','llms.txt & AI Crawlers',8,llms_r.get('score',0))]
     bars=''
     for mod,label,w,s in mods:
         bc='#16a34a' if s>=70 else '#d97706' if s>=40 else '#dc2626'
