@@ -25,6 +25,7 @@ from denzo.auditor.llms_generator import generate_llms_txt
 from denzo.auditor.image_auditor import deep_image_audit
 from denzo.auditor.performance_estimator import estimate_performance
 from denzo.auditor.content_quality import analyze_content_quality
+from denzo.auditor.keyword_analyzer import analyze_keyword_targeting
 from denzo.auditor.local_business import check_local_business
 
 
@@ -47,6 +48,7 @@ MODULE_WEIGHTS = {
     'images': 8,
     'content': 10,
     'local_seo': 0,  # 0 weight when not a local business, adjusted at runtime
+    'keywords': 0,  # Informational — keyword targeting diagnosis, scored via content quality
     'llms': 0,  # llms.txt is NOT a ranking factor — informational only, no score impact
 }
 
@@ -133,6 +135,7 @@ class SiteAnalyzer:
             'images': lambda: deep_image_audit(self.url, html, self.domain, base_page_url=self.url),
             'performance': lambda: estimate_performance(self.url, html, self.domain, redirect_chain, 0),
             'content': lambda: analyze_content_quality(self.url, html, self.domain, industry),
+            'keywords': lambda: analyze_keyword_targeting(self.url, html, self.domain),
             'local_seo': lambda: check_local_business(self.url, html, self.domain, industry),
         }
 
@@ -146,7 +149,7 @@ class SiteAnalyzer:
 
         completed = 0
 
-        with ThreadPoolExecutor(max_workers=9) as executor:
+        with ThreadPoolExecutor(max_workers=10) as executor:
             futures = {executor.submit(fn): name for name, fn in modules.items()}
 
             for future in as_completed(futures):
@@ -187,7 +190,7 @@ class SiteAnalyzer:
 
         # Phase 4: Collect all findings
         all_findings = []
-        for module_name in ['sitemap', 'robots', 'llms', 'technical', 'geo', 'images', 'performance', 'content', 'local_seo']:
+        for module_name in ['sitemap', 'robots', 'llms', 'technical', 'geo', 'images', 'performance', 'content', 'keywords', 'local_seo']:
             if module_name in results:
                 for f in results[module_name].get('findings', []):
                     f['module'] = module_name
@@ -236,6 +239,7 @@ class SiteAnalyzer:
                 'sitemap': '8% — Crawl efficiency & indexation',
                 'robots': '7% — Crawler access & directives',
                 'local_seo': '0-10% — Local business signals (dynamic, only for local businesses)',
+                'keywords': '0% — Keyword targeting diagnosis (informational)',
                 'llms': '0% — Informational only, not a ranking factor',
             },
         }
