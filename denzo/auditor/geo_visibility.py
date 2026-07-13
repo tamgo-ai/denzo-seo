@@ -61,8 +61,12 @@ def analyze_geo_visibility(url: str, html: str, domain: str, industry_profile: d
     # 1. FAQ / Q&A CONTENT
     # ═════════════════════════════════════════════
     question_patterns = [
+        # English
         r'(?:what|how|where|when|why|who|can|do|does|is|are|should|will)\s+\w+[\s\w]{3,100}\?',
         r'^(?:Q|FAQ|Question)[\s:]+',
+        # Spanish
+        r'(?:qué|cómo|cuándo|cuando|dónde|donde|por qué|porque|cuál|cual|quién|quien|cuánto|cuanto|cuántos|cuantos)\s+\w+[\s\w]{3,100}\?',
+        r'^(?:P|R|Pregunta|Respuesta)[\s:]+',
     ]
     faq_matches = []
     for p in question_patterns:
@@ -104,9 +108,15 @@ def analyze_geo_visibility(url: str, html: str, domain: str, industry_profile: d
     # 3. DEFINITION BLOCK
     # ═════════════════════════════════════════════
     def_patterns = [
-        r'(?:is|are)\s+(?:a|an|the)\s+(?:certified|leading|premier|trusted|family-owned|professional|top|expert)\s+[\w\s]{15,80}(?:company|business|shop|center|provider|group|repair)',
+        # English patterns
+        r'(?:is|are)\s+(?:a|an|the)\s+(?:certified|leading|premier|trusted|family-owned|professional|top|expert)\s+[\w\s]{15,80}(?:company|business|shop|center|provider|group|repair|lab|laboratory|clinic|practice|firm)',
         r'(?:we|[A-Z][a-z]+\s(?:Inc|LLC|Co|Group|Corp)?)\s+(?:is|are|provides?|specializes?|offers?|operates?)\s+[\w\s]{20,120}',
         r'(?:founded|established|serving)\s+(?:in\s+)?\d{4}',
+        # Spanish patterns
+        r'(?:somos|es)\s+(?:un|una|el|la)\s+(?:certificado|acreditado|líder|principal|destacado|reconocido|profesional)\s+[\w\s]{15,80}(?:empresa|negocio|taller|clínica|centro|laboratorio|consultorio|estudio|despacho|consultora|agencia)',
+        r'(?:somos|somos una|es una)\s+(?:empresa|clínica|compañía|organización|institución)\s+(?:dedicada a|especializada en|enfocada en)\s+[\w\s]{20,120}',
+        r'(?:desde|fundad[oa]|establecid[oa]|cread[oa])\s+(?:en\s+)?(?:el\s+)?\d{4}',
+        r'(?:con\s+más\s+de\s+\d{1,2}\s+años\s+(?:de\s+)?experiencia)',
     ]
     has_definition = any(re.search(p, first_200_words, re.IGNORECASE) for p in def_patterns)
     if not has_definition:
@@ -137,15 +147,34 @@ def analyze_geo_visibility(url: str, html: str, domain: str, industry_profile: d
     # ═════════════════════════════════════════════
     # 6. ENTITY SIGNALS — scale, authority, trust
     # ═════════════════════════════════════════════
-    entity = {
-        'phone': bool(re.search(r'\d{3}[-.\s]?\d{3}[-.\s]?\d{4}', text)),
-        'locations_scale': bool(re.search(r'\d+\s+(?:locations?|offices?|shops?|centers?|facilities)', text, re.IGNORECASE)),
-        'certifications': bool(re.search(r'(?:certified|authorized|factory.trained|manufacturer.certified)', text, re.IGNORECASE)),
-        'founded_year': bool(re.search(r'(?:since|established|founded|serving\s+since)\s+\d{4}', text, re.IGNORECASE)),
-        'address': bool(re.search(r'\d+\s+\w+\s+(?:street|st|road|rd|ave|blvd|drive|dr|way|ln|lane)', text, re.IGNORECASE)),
-        'guarantee': bool(re.search(r'(?:guarantee|warranty|satisfaction\s+guaranteed|risk.free)', text, re.IGNORECASE)),
-        'credentials': bool(re.search(r'(?:licensed|insured|bonded|accredited)', text, re.IGNORECASE)),
-    }
+    # Detect page language first
+    text_lower = text.lower()
+    is_spanish = any(w in text_lower.split() for w in ['de', 'la', 'el', 'los', 'las', 'en', 'del', 'al', 'una', 'por', 'para', 'con', 'su', 'sus', 'más', 'como', 'servicio', 'servicios'])
+
+    if is_spanish:
+        entity = {
+            'phone': bool(re.search(r'(?:\+?\d{2,3}[-.\s]?)?\d{4}[-.\s]?\d{4}', text)),
+            'address': bool(re.search(r'(?:calle|avenida|av|colonia|blvd|paseo|calzada|urb|urbanización|residencial|edificio|local|n°|#)\s+\w+', text, re.IGNORECASE)),
+            'locations_scale': bool(re.search(r'\d+\s+(?:ubicaciones|sedes|oficinas|tiendas|centros|locations?|offices?|shops?|centers?|facilities)', text, re.IGNORECASE)),
+            'certifications': bool(re.search(r'(?:certificado|acreditado|licenciado|autorizado|avalado|colegiado|miembro de|asociado a|certified|accredited|licensed|authorized|board.certified)', text, re.IGNORECASE)),
+            'founded_year': bool(re.search(r'(?:desde|fundado|establecido|creado|iniciado|since|established|founded|serving\s+since)\s+\d{4}', text, re.IGNORECASE)),
+            'guarantee': bool(re.search(r'(?:garantía|garantizado|satisfacción garantizada|sin riesgo|guarantee|warranty|satisfaction\s+guaranteed|risk.free)', text, re.IGNORECASE)),
+            'credentials': bool(re.search(r'(?:doctor|médico|especialista|licenciado|ingeniero|abogado|colegiado|maestría|doctorado|PhD|MD|board|insured|bonded|asegurado)', text, re.IGNORECASE)),
+            'organization': bool(re.search(r'(?:miembro de|asociación|cámara|colegio|federación|confederación|member of|association|chamber|federation)', text, re.IGNORECASE)),
+            'years_experience': bool(re.search(r'(?:\d{1,2}\s*(?:años|years)\s*(?:de\s*)?experienc[ií]a)', text, re.IGNORECASE)),
+        }
+    else:
+        entity = {
+            'phone': bool(re.search(r'\d{3}[-.\s]?\d{3}[-.\s]?\d{4}', text)),
+            'address': bool(re.search(r'\d+\s+\w+\s+(?:street|st|road|rd|ave|blvd|drive|dr|way|ln|lane)', text, re.IGNORECASE)),
+            'locations_scale': bool(re.search(r'\d+\s+(?:locations?|offices?|shops?|centers?|facilities)', text, re.IGNORECASE)),
+            'certifications': bool(re.search(r'(?:certified|accredited|licensed|authorized|board.certified)', text, re.IGNORECASE)),
+            'founded_year': bool(re.search(r'(?:since|established|founded|serving\s+since)\s+\d{4}', text, re.IGNORECASE)),
+            'guarantee': bool(re.search(r'(?:guarantee|warranty|satisfaction\s+guaranteed|risk.free)', text, re.IGNORECASE)),
+            'credentials': bool(re.search(r'(?:doctor|physician|specialist|licensed|engineer|attorney|board|certified|PhD|MD)', text, re.IGNORECASE)),
+            'organization': bool(re.search(r'(?:member of|association|chamber|federation|accredited by)', text, re.IGNORECASE)),
+            'years_experience': bool(re.search(r'(?:\d{1,2}\+\s*years?\s*(?:of\s*)?experience)', text, re.IGNORECASE)),
+        }
     # Which signals are *expected* depends on the business type. Local businesses
     # are expected to expose address/phone/scale; national brands & SaaS are not,
     # so we don't penalise them for missing physical-location signals.

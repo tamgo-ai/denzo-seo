@@ -30,11 +30,22 @@ def check_local_business(url: str, html: str, domain: str, industry_profile: dic
     text = soup.get_text(separator=' ')
 
     # ── 1. NAP Detection (Name, Address, Phone) ──
-    phone_pattern = re.findall(r'(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', text)
-    phones_found = list(set(p.replace(' ', '-') for p in phone_pattern))
+    # Phone regex: supports US (+1), LATAM (+503, +52, +54, +57, +56, +51, +506, +507),
+    # Spain (+34), and generic international formats
+    phone_pattern = re.findall(
+        r'(?:\+?\d{1,3}[-.\s]?)?\d{3,4}[-.\s]?\d{3,4}[-.\s]?\d{3,4}',
+        text
+    )
+    phones_found = list(set(p.strip() for p in phone_pattern if len(re.sub(r'\D', '', p)) >= 7))
 
-    address_pattern = re.findall(r'\d{1,5}\s+\w+(?:\s+\w+){1,4}(?:,\s*\w+(?:\s+\w+)?,\s*[A-Z]{2}\s*\d{5})', text)
-    addresses_found = list(set(address_pattern))
+    # Address: supports Spanish and English formats
+    address_pattern_en = re.findall(r'\d{1,5}\s+\w+(?:\s+\w+){1,4}(?:,\s*\w+(?:\s+\w+)?,\s*[A-Z]{2}\s*\d{5})', text)
+    address_pattern_es = re.findall(
+        r'(?:calle|av\.?|avenida|col\.?|colonia|blvd\.?|paseo|calzada|urb\.?|urbanización|'
+        r'residencial|edificio|local|n[°º]|#)\s+\w+(?:\s+\w+){1,8}',
+        text, re.IGNORECASE
+    )
+    addresses_found = list(set(address_pattern_en + address_pattern_es))
 
     # Extract business name from title or profile
     business_name = profile.get('business_name', '')

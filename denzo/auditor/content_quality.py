@@ -6,6 +6,21 @@ import re
 from bs4 import BeautifulSoup
 
 
+def _count_syllables_approx(text: str) -> int:
+    """Rough syllable counter — works for English and Spanish."""
+    text = text.lower().strip()
+    if not text:
+        return 0
+    # Count vowel groups as syllables (works reasonably for both EN and ES)
+    import re as _re
+    # Spanish: a, e, i, o, u (very consistent syllabification)
+    # English: rougher approximation
+    syllables = len(_re.findall(r'[aeiouáéíóúü]+', text))
+    # Subtract silent e patterns (English only — small effect on Spanish)
+    syllables -= len(_re.findall(r'[aeiou]le\b', text))
+    return max(1, syllables)
+
+
 def analyze_content_quality(url: str, html: str, domain: str, industry_profile: dict = None) -> dict:
     """
     Analyze content quality beyond word count:
@@ -23,25 +38,46 @@ def analyze_content_quality(url: str, html: str, domain: str, industry_profile: 
     word_count = len(words)
     paragraphs = [p.get_text(strip=True) for p in soup.find_all('p') if len(p.get_text(strip=True)) > 50]
 
-    # ── 1. Readability ──
+    # ── 1. Readability (language-aware) ──
     sentences = re.split(r'[.!?]+', text)
     sentences = [s.strip() for s in sentences if len(s.strip().split()) > 3]
 
     avg_words_per_sentence = round(word_count / max(len(sentences), 1), 1)
     avg_word_length = round(sum(len(w) for w in words) / max(len(words), 1), 1)
 
-    # Flesch-Kincaid Grade Level approximation
-    if sentences:
-        flesch_kincaid = round(0.39 * (word_count / len(sentences)) + 11.8 * (sum(len(w) for w in words) / word_count) - 15.59, 1)
-    else:
-        flesch_kincaid = 0
+    # Detect language for appropriate readability formula
+    text_lower = text.lower()
+    is_spanish = any(w in text_lower.split() for w in ['de', 'la', 'el', 'los', 'en', 'del', 'por', 'para', 'con', 'una'])
+    syllable_count = _count_syllables_approx(text)
 
-    if flesch_kincaid > 14:
-        findings.append({"severity":"medium","module":"content","title":f"Content too complex: Grade {flesch_kincaid} reading level (college+)","detail":f"The average reader needs {flesch_kincaid} years of education to understand this content. Most web content should target grade 8-10 for broad accessibility.","fix":"Simplify sentences. Break long paragraphs. Use bullet points for complex ideas. Replace jargon with plain language. Aim for grade 8-10 unless the audience requires technical depth."})
-        score -= 8
-    elif flesch_kincaid < 6:
-        findings.append({"severity":"low","module":"content","title":f"Content very simple: Grade {flesch_kincaid} — may lack depth for competitive queries","detail":"While readability is good, very simple content may struggle to demonstrate expertise and depth for competitive keywords.","fix":"Add substantive detail: statistics, case studies, specific examples, expert insights. Depth doesn't require complexity — explain advanced concepts clearly."})
-        score -= 3
+    if is_spanish and sentences:
+        # Fernandez-Huerta formula for Spanish
+        # F-H = 206.84 - 0.60 * (syllables/100words) - 1.02 * (words/sentences)
+        syllables_per_100 = (syllable_count / word_count) * 100
+        fernandez_huerta = round(206.84 - 0.60 * syllables_per_100 - 1.02 * (word_count / len(sentences)), 1)
+        # Convert to approximate grade level for consistency
+        readability_score = max(0, min(18, round((100 - fernandez_huerta) / 5.5)))
+        readability_method = 'Fernandez-Huerta (Spanish)'
+    elif sentences:
+        # Flesch-Kincaid for English
+        if word_count > 0 and len(sentences) > 0:
+            avg_syllables_per_word = syllable_count / max(word_count, 1)
+            flesch_kincaid = round(0.39 * (word_count / len(sentences)) + 11.8 * avg_syllables_per_word - 15.59, 1)
+            readability_score = max(0, min(18, flesch_kincaid))
+            readability_method = 'Flesch-Kincaid (English)'
+        else:
+            readability_score = 0
+            readability_method = 'unknown'
+    else:
+        readability_score = 0
+        readability_method = 'unknown'
+
+    if readability_score > 14:
+        findings.append({"severity":"medium","module":"content","title":f"Content very complex: Grade {readability_score} reading level (college+)","detail":f"Readability calculated using {readability_method}. Most web content should target grade 8-10 for broad accessibility. For medical/technical content, grade 11-13 may be appropriate for the target audience.","fix":"Simplify sentences. Break long paragraphs. Use bullet points for complex ideas. Replace jargon with plain language where possible."})
+        score -= 6  # Reduced from 8 - complex is OK for medical/legal content
+    elif readability_score < 5 and word_count > 300:
+        findings.append({"severity":"low","module":"content","title":f"Content very simple: Grade {readability_score} — may lack depth for competitive queries","detail":"While readability is good, very simple content may struggle to demonstrate expertise for competitive queries.","fix":"Add substantive detail: statistics, case studies, specific examples, expert insights."})
+        score -= 2
 
     # ── 2. Content Structure ──
     avg_para_length = round(sum(len(p.split()) for p in paragraphs) / max(len(paragraphs), 1))
@@ -101,7 +137,8 @@ def analyze_content_quality(url: str, html: str, domain: str, industry_profile: 
         "score": max(0, score),
         "findings": findings,
         "word_count": word_count,
-        "flesch_kincaid_grade": flesch_kincaid,
+        "readability_score": readability_score,
+        "readability_method": readability_method,
         "avg_words_per_sentence": avg_words_per_sentence,
         "avg_para_length": avg_para_length,
         "paragraph_count": len(paragraphs),

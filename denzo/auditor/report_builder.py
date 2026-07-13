@@ -156,7 +156,7 @@ def build_report_html(result: dict, audit_id: str) -> str:
         cq_section = f'''<section id="content-quality"><div class="section-header"><h2>📝 Content Quality</h2></div>
     <table class="metric-table"><tbody>
     <tr><td>Word Count</td><td><strong>{cq.get('word_count', 0):,}</strong></td></tr>
-    <tr><td>Readability (Flesch-Kincaid)</td><td>Grade {cq.get('flesch_kincaid_grade', 'N/A')} {"(broadly accessible)" if cq.get('flesch_kincaid_grade', 99) <= 10 else "(complex)"}</td></tr>
+    <tr><td>Readability</td><td>Grade {cq.get('readability_score', 'N/A')} {"(broadly accessible)" if cq.get('readability_score', 99) <= 10 else "(complex)"} — {cq.get('readability_method', 'N/A')}</td></tr>
     <tr><td>Avg Words per Sentence</td><td>{cq.get('avg_words_per_sentence', 'N/A')}</td></tr>
     <tr><td>Avg Paragraph Length</td><td>{cq.get('avg_para_length', 'N/A')} words</td></tr>
     <tr><td>Originality Score</td><td><span class="{'pass' if cq.get('originality_score', 0) >= 15 else 'warn' if cq.get('originality_score', 0) >= 5 else 'fail'}">{cq.get('originality_score', 0)} data points</span></td></tr>

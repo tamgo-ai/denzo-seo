@@ -42,6 +42,71 @@ def _extract_meta(html: str) -> dict:
     }
 
 
+def _detect_from_schema(html: str) -> dict:
+    """Extract industry from JSON-LD schema @type — much more reliable than keywords."""
+    import json as _json
+    schema_types = []
+    try:
+        matches = re.findall(r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', html, re.IGNORECASE | re.DOTALL)
+        for match in matches:
+            try:
+                data = _json.loads(match.strip())
+                items = []
+                if isinstance(data, dict):
+                    if '@graph' in data:
+                        items = data['@graph']
+                    elif '@type' in data:
+                        items = [data]
+                elif isinstance(data, list):
+                    items = data
+                for item in items:
+                    if isinstance(item, dict):
+                        stype = item.get('@type', '')
+                        if isinstance(stype, list):
+                            schema_types.extend(stype)
+                        elif stype:
+                            schema_types.append(stype)
+            except: pass
+    except: pass
+
+    # Map schema types to industries
+    schema_to_industry = {
+        'MedicalBusiness': 'healthcare',
+        'DiagnosticLab': 'healthcare',
+        'MedicalClinic': 'healthcare',
+        'Hospital': 'healthcare',
+        'Physician': 'healthcare',
+        'Dentist': 'healthcare',
+        'AutoBodyShop': 'auto_body_shop',
+        'AutoRepair': 'auto_body_shop',
+        'AutomotiveBusiness': 'auto_body_shop',
+        'LocalBusiness': 'local_service',
+        'Restaurant': 'restaurant',
+        'RealEstateAgent': 'real_estate',
+        'LegalService': 'legal',
+        'Attorney': 'legal',
+        'School': 'education',
+        'CollegeOrUniversity': 'education',
+        'SoftwareApplication': 'tech_saas',
+        'WebApplication': 'tech_saas',
+        'Store': 'ecommerce',
+        'OnlineStore': 'ecommerce',
+    }
+
+    detected = []
+    for st in schema_types:
+        for schema_type, industry in schema_to_industry.items():
+            if schema_type in st:
+                detected.append(industry)
+
+    return {
+        'schema_types': list(set(schema_types)),
+        'schema_industry': list(set(detected)),
+        'has_medical_schema': any(t in str(schema_types) for t in ['Medical', 'Diagnostic', 'Hospital', 'Physician', 'Clinic', 'Health']),
+        'has_organization_schema': any('Organization' in t for t in schema_types),
+    }
+
+
 def quick_detect(html: str) -> dict:
     """
     Fast keyword-based industry detection. Returns a preliminary profile
@@ -58,6 +123,9 @@ def quick_detect(html: str) -> dict:
             'frame straightening', 'bumper repair', 'dent repair', 'hail damage',
             'aluminum repair', 'oem parts', 'certified collision', 'auto repair',
             'paint matching', 'towing service', 'fender', 'panel beating',
+            # Spanish
+            'taller', 'reparación', 'choque', 'colisión', 'pintura', 'enderezado',
+            'carrocero', 'hojalatería', 'pintor', 'aseguradora',
         ],
         'marketing_agency': [
             'marketing agency', 'digital marketing', 'seo services', 'ppc management',
@@ -74,16 +142,30 @@ def quick_detect(html: str) -> dict:
             'medical', 'clinic', 'hospital', 'doctor', 'patient', 'healthcare',
             'dental', 'dentist', 'radiology', 'imaging', 'diagnostic',
             'physician', 'surgery', 'treatment', 'therapy',
+            # Spanish
+            'médico', 'médica', 'clínica', 'hospital', 'doctor', 'paciente', 'salud',
+            'imagenología', 'imagen', 'diagnóstico', 'radiología', 'ecografía',
+            'ultrasonido', 'mamografía', 'resonancia', 'rayos x', 'rayos-x',
+            'laboratorio', 'diagnóstico por imagen', 'medicina', 'cirugía',
+            'doppler', 'tomografía', 'densitometría',
         ],
         'real_estate': [
             'real estate', 'realtor', 'property', 'homes for sale', 'listing',
             'broker', 'mortgage', 'buying', 'selling', 'rental', 'leasing',
             'commercial real estate', 'residential', 'condo', 'apartment',
+            # Spanish
+            'inmobiliaria', 'inmuebles', 'propiedad', 'bienes raíces', 'bienes raices',
+            'alquiler', 'venta', 'compra', 'casa', 'apartamento', 'corredor',
+            'agente inmobiliario', 'hipoteca',
         ],
         'legal': [
             'law firm', 'attorney', 'lawyer', 'legal services', 'litigation',
             'personal injury', 'divorce', 'bankruptcy', 'immigration',
             'criminal defense', 'corporate law',
+            # Spanish
+            'abogado', 'abogada', 'bufete', 'despacho jurídico', 'legal',
+            'derecho', 'litigio', 'divorcio', 'inmigración', 'penal',
+            'corporativo', 'firma legal', 'asesoría legal', 'consultoría jurídica',
         ],
         'ecommerce': [
             'shop', 'store', 'buy online', 'free shipping', 'add to cart',
@@ -103,6 +185,10 @@ def quick_detect(html: str) -> dict:
             'restaurant', 'cafe', 'bar', 'dining', 'menu', 'cuisine',
             'catering', 'food', 'chef', 'dinner', 'lunch', 'breakfast',
             'takeout', 'delivery', 'reservations',
+            # Spanish
+            'restaurante', 'cafetería', 'bar', 'menú', 'cocina', 'comida',
+            'chef', 'cena', 'almuerzo', 'desayuno', 'domicilio', 'reservas',
+            'carta', 'plato', 'gastronomía',
         ],
         'construction': [
             'construction', 'contractor', 'builder', 'renovation', 'remodeling',
@@ -144,6 +230,37 @@ def quick_detect(html: str) -> dict:
     )
     certifications = list(set(c.lower() for c in cert_pattern))
 
+    # Country/region detection (for adapting thresholds and patterns)
+    country_signals = {
+        'SV': ['el salvador', 'san salvador', 'santa ana', 'san miguel', '.sv'],
+        'MX': ['méxico', 'mexico', 'cdmx', 'guadalajara', 'monterrey', '.mx'],
+        'ES': ['españa', 'madrid', 'barcelona', 'valencia', 'sevilla', '.es'],
+        'AR': ['argentina', 'buenos aires', 'cordoba', 'rosario', '.ar'],
+        'CO': ['colombia', 'bogotá', 'medellín', 'cali', '.co'],
+        'CL': ['chile', 'santiago', 'valparaíso', '.cl'],
+        'PE': ['perú', 'peru', 'lima', '.pe'],
+        'US': ['united states', 'california', 'texas', 'florida', 'new york', '.us'],
+    }
+    detected_country = None
+    for country, patterns in country_signals.items():
+        if any(p in combined for p in patterns):
+            detected_country = country
+            break
+
+    # Phone-based country detection
+    if not detected_country:
+        if re.search(r'\+503', combined): detected_country = 'SV'
+        elif re.search(r'\+52', combined): detected_country = 'MX'
+        elif re.search(r'\+34', combined): detected_country = 'ES'
+        elif re.search(r'\+54', combined): detected_country = 'AR'
+        elif re.search(r'\+57', combined): detected_country = 'CO'
+        elif re.search(r'\+56', combined): detected_country = 'CL'
+        elif re.search(r'\+51', combined): detected_country = 'PE'
+        elif re.search(r'\+1', combined): detected_country = 'US'
+
+    # Try schema-based detection first (much more reliable)
+    schema_info = _detect_from_schema(html)
+
     return {
         'primary_industry': ranked[0][0] if ranked else 'general_business',
         'industry_scores': dict(ranked[:5]),
@@ -154,6 +271,8 @@ def quick_detect(html: str) -> dict:
         'title': meta['title'],
         'description': meta['description'],
         'h1': meta['h1'],
+        'detected_country': detected_country,
+        'schema_info': schema_info,
     }
 
 
