@@ -69,7 +69,7 @@ Be specific. Use real keywords that actual customers would search. For local key
 
             resp = client.messages.create(
                 model='claude-haiku-4-5-20251001',
-                max_tokens=800,
+                max_tokens=1200,
                 thinking={'type': 'disabled'},
                 messages=[{'role': 'user', 'content': prompt}],
             )
@@ -85,7 +85,14 @@ Be specific. Use real keywords that actual customers would search. For local key
             if raw:
                 match = re.search(r'\{[\s\S]*\}', raw)
                 if match:
-                    keyword_suggestions = json.loads(match.group(0))
+                    json_str = match.group(0)
+                    # Fix common Claude JSON issues: trailing commas, unclosed braces
+                    json_str = re.sub(r',\s*}', '}', json_str)
+                    json_str = re.sub(r',\s*]', ']', json_str)
+                    # Ensure the JSON is properly closed
+                    if json_str.count('{') > json_str.count('}'):
+                        json_str += '}' * (json_str.count('{') - json_str.count('}'))
+                    keyword_suggestions = json.loads(json_str)
         except Exception as e:
             keyword_suggestions = {'error': str(e)[:100]}
 
