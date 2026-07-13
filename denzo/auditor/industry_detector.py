@@ -326,12 +326,19 @@ Be SPECIFIC. Do NOT default to auto_body_shop unless the site clearly is one. Lo
         client = Anthropic()
         resp = client.messages.create(
             model='claude-haiku-4-5-20251001',
-            max_tokens=600,
+            max_tokens=800,
+            thinking={'type': 'disabled'},
             messages=[{'role': 'user', 'content': prompt}],
             timeout=30.0,
         )
-        text_block = resp.content.find(lambda b: b.type == 'text') if hasattr(resp.content, 'find') else resp.content[0]
-        raw = text_block.text if hasattr(text_block, 'text') else str(text_block)
+        # Extract text from response (skip thinking blocks)
+        raw = ''
+        for block in resp.content:
+            if hasattr(block, 'type') and block.type == 'text':
+                raw = block.text
+                break
+        if not raw and len(resp.content) > 0:
+            raw = getattr(resp.content[0], 'text', str(resp.content[0]))
 
         # Extract JSON
         match = re.search(r'\{[\s\S]*\}', raw)

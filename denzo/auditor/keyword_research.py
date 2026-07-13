@@ -69,17 +69,20 @@ Be specific. Use real keywords that actual customers would search. For local key
 
             resp = client.messages.create(
                 model='claude-haiku-4-5-20251001',
-                max_tokens=600,
+                max_tokens=800,
+                thinking={'type': 'disabled'},
                 messages=[{'role': 'user', 'content': prompt}],
             )
 
-            text_block = None
+            # Extract text from response (skip thinking blocks)
+            raw = ''
             for block in resp.content:
                 if hasattr(block, 'type') and block.type == 'text':
-                    text_block = block
+                    raw = block.text
                     break
-            if text_block:
-                raw = text_block.text
+            if not raw and hasattr(resp.content[0], 'text'):
+                raw = resp.content[0].text
+            if raw:
                 match = re.search(r'\{[\s\S]*\}', raw)
                 if match:
                     keyword_suggestions = json.loads(match.group(0))
