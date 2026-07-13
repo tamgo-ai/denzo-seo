@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audit History — Site Auditor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#08090b;--surface:#111318;--surface2:#1a1d24;--border:rgba(255,255,255,0.06);--text:#edf0f5;--muted:#7b8290;--accent:#6366f1;--accent-glow:rgba(99,102,241,0.25);--green:#22c55e;--green-bg:rgba(34,197,94,0.1);--orange:#f59e0b;--orange-bg:rgba(245,158,11,0.1);--red:#ef4444;--red-bg:rgba(239,68,68,0.1);}
+html,body{height:100%}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;min-height:100vh;}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+.toolbar{display:flex;align-items:center;justify-content:space-between;padding:1rem 2rem;border-bottom:1px solid var(--border);backdrop-filter:blur(12px);background:rgba(8,9,11,0.8);position:sticky;top:0;z-index:10;}
+.toolbar-brand{display:flex;align-items:center;gap:0.6rem;font-weight:700;font-size:1rem;letter-spacing:-0.01em;}
+.toolbar-brand .dot{width:8px;height:8px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px var(--accent-glow);}
+.toolbar-links{display:flex;gap:1.5rem;font-size:0.825rem;align-items:center;}
+.toolbar-links a{color:var(--muted);transition:color 0.2s;}
+.toolbar-links a:hover{color:var(--text);text-decoration:none;}
+.tool-footer{margin-top:auto;padding:1.5rem 2rem;text-align:center;border-top:1px solid var(--border);font-size:0.75rem;color:var(--muted);}
+
+.container{max-width:860px;margin:0 auto;padding:2rem 1.5rem;width:100%;}
+.container h1{font-size:1.5rem;font-weight:700;letter-spacing:-0.02em;margin-bottom:0.35rem;}
+.container .sub{color:var(--muted);font-size:0.875rem;margin-bottom:1.5rem;}
+
+.filter-bar{display:flex;gap:0.5rem;margin-bottom:1.5rem;}
+.filter-input{flex:1;padding:0.6rem 1rem;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.85rem;outline:none;}
+.filter-input:focus{border-color:var(--accent);}
+.filter-input::placeholder{color:var(--muted)}
+.btn-filter{padding:0.6rem 1.25rem;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:8px;font-size:0.85rem;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.btn-filter:hover{border-color:var(--accent);}
+
+.audit-list{display:flex;flex-direction:column;gap:0.35rem;}
+.audit-row{display:flex;align-items:center;justify-content:space-between;padding:0.8rem 1rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;transition:all 0.2s;gap:0.75rem;}
+.audit-row:hover{background:var(--surface2);}
+.audit-row .url-col{flex:1;min-width:0;}
+.audit-row .url-text{font-size:0.875rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;color:var(--text);}
+.audit-row .url-domain{font-size:0.7rem;color:var(--muted);margin-top:0.1rem;}
+.score-pill{font-size:0.8rem;font-weight:700;padding:0.2em 0.7em;border-radius:20px;flex-shrink:0;}
+.score-pill.good{background:var(--green-bg);color:var(--green)}
+.score-pill.warn{background:var(--orange-bg);color:var(--orange)}
+.score-pill.bad{background:var(--red-bg);color:var(--red)}
+.date-text{font-size:0.75rem;color:var(--muted);flex-shrink:0;}
+.empty-state{text-align:center;padding:3rem 1rem;color:var(--muted);}
+</style>
+</head>
+<body>
+
+<header class="toolbar">
+  <div class="toolbar-brand"><span class="dot"></span> DENZO Site Auditor</div>
+  <nav class="toolbar-links">
+    <a href="/auditor/">← New Audit</a>
+  </nav>
+</header>
+
+<main class="container">
+  <h1>Audit History</h1>
+  <p class="sub">{{ audits|length }} completed audits</p>
+  {% if filter_url %}<p style="color:var(--muted);margin-bottom:1rem;font-size:0.8rem;">Filtered: <strong>{{ filter_url }}</strong> · <a href="/auditor/history">clear</a></p>{% endif %}
+
+  {% if audits %}
+  <div class="audit-list">
+  {% for a in audits %}
+  <a href="/auditor/report/{{ a.audit_id }}" style="display:block;text-decoration:none;color:inherit;">
+    <div class="audit-row">
+      <div class="url-col">
+        <span class="url-text">{{ a.url }}</span>
+        <span class="url-domain">{{ a.domain or '' }} · {{ a.page_title or 'Untitled' }} · {{ a.html_size_kb }}KB</span>
+      </div>
+      <span class="score-pill {{ 'good' if a.overall_score >= 70 else 'warn' if a.overall_score >= 40 else 'bad' }}">{{ a.overall_score }}/100</span>
+      <span class="date-text">{{ a.created_at[:10] }}</span>
+    </div>
+  </a>
+  {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state"><p>No audits yet. <a href="/auditor/">Run your first →</a></p></div>
+  {% endif %}
+</main>
+
+<footer class="tool-footer"><p>DENZO Site Auditor · <a href="/auditor/">New Audit</a></p></footer>
+</body>
+</html>

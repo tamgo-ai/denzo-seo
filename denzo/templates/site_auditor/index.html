@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Site Auditor — SEO + GEO Analysis Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#08090b;
+  --surface:#111318;
+  --surface2:#1a1d24;
+  --border:rgba(255,255,255,0.06);
+  --text:#edf0f5;
+  --muted:#7b8290;
+  --accent:#6366f1;
+  --accent-glow:rgba(99,102,241,0.25);
+  --green:#22c55e;
+  --green-bg:rgba(34,197,94,0.1);
+  --orange:#f59e0b;
+  --orange-bg:rgba(245,158,11,0.1);
+  --red:#ef4444;
+  --red-bg:rgba(239,68,68,0.1);
+}
+html,body{height:100%}
+body{
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;min-height:100vh;
+}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* ── Header ── */
+.toolbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1rem 2rem;border-bottom:1px solid var(--border);
+  backdrop-filter:blur(12px);background:rgba(8,9,11,0.8);
+  position:sticky;top:0;z-index:10;
+}
+.toolbar-brand{display:flex;align-items:center;gap:0.6rem;font-weight:700;font-size:1rem;letter-spacing:-0.01em;}
+.toolbar-brand .dot{width:8px;height:8px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px var(--accent-glow);}
+.toolbar-links{display:flex;gap:1.5rem;font-size:0.825rem;align-items:center;}
+.toolbar-links a{color:var(--muted);transition:color 0.2s;}
+.toolbar-links a:hover{color:var(--text);text-decoration:none;}
+
+/* ── Hero ── */
+.hero{
+  text-align:center;padding:4rem 1.5rem 3rem;
+  background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(99,102,241,0.06) 0%,transparent 70%);
+}
+.hero h1{font-size:clamp(2rem,5vw,3rem);font-weight:800;letter-spacing:-0.03em;margin-bottom:0.75rem;line-height:1.15;}
+.hero h1 span{background:linear-gradient(135deg,#818cf8,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.hero .subtitle{font-size:1.1rem;color:var(--muted);max-width:520px;margin:0 auto 2.5rem;line-height:1.5;}
+
+/* ── URL Input ── */
+.url-section{max-width:680px;margin:0 auto;padding:0 1rem;}
+.url-wrap{
+  display:flex;gap:0.5rem;background:var(--surface);
+  border:1px solid var(--border);border-radius:14px;padding:0.4rem;
+  transition:border-color 0.3s,box-shadow 0.3s;
+}
+.url-wrap:focus-within{
+  border-color:var(--accent);
+  box-shadow:0 0 0 4px var(--accent-glow),0 8px 32px rgba(0,0,0,0.4);
+}
+.url-input{
+  flex:1;padding:0.9rem 1.25rem;font-size:1rem;background:transparent;
+  border:none;color:var(--text);font-family:inherit;outline:none;min-width:0;
+}
+.url-input::placeholder{color:var(--muted)}
+.btn-analyze{
+  padding:0.9rem 1.75rem;background:var(--accent);color:#fff;border:none;
+  border-radius:10px;font-size:0.95rem;font-weight:600;cursor:pointer;
+  white-space:nowrap;transition:all 0.2s;letter-spacing:-0.01em;
+}
+.btn-analyze:hover{background:#5558e6;transform:translateY(-1px);box-shadow:0 4px 16px var(--accent-glow);}
+.btn-analyze:disabled{opacity:0.4;cursor:not-allowed;transform:none;box-shadow:none;}
+.url-hint{font-size:0.75rem;color:var(--muted);margin-top:0.6rem;text-align:center;}
+
+/* ── Progress ── */
+.progress-section{max-width:680px;margin:2rem auto 0;padding:0 1rem;display:none;}
+.progress-section.active{display:block;}
+
+.progress-bar-wrap{
+  background:var(--surface2);border-radius:20px;height:4px;overflow:hidden;margin-bottom:1rem;
+}
+.progress-bar-fill{
+  height:100%;background:linear-gradient(90deg,var(--accent),#a78bfa);
+  border-radius:20px;transition:width 0.5s cubic-bezier(0.4,0,0.2,1);width:0%;
+}
+.progress-meta{display:flex;justify-content:space-between;font-size:0.8rem;color:var(--muted);margin-bottom:1.25rem;}
+
+/* Module progress cards */
+.module-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0.65rem;}
+.module-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:1rem 0.85rem;text-align:center;transition:all 0.4s;
+}
+.module-card .icon{font-size:1.35rem;margin-bottom:0.35rem;opacity:0.4;transition:opacity 0.3s;}
+.module-card .name{font-size:0.75rem;font-weight:500;color:var(--muted);transition:color 0.3s;}
+.module-card .status{font-size:0.65rem;color:var(--muted);margin-top:0.25rem;}
+.module-card.running{
+  border-color:var(--accent);box-shadow:0 0 16px var(--accent-glow);
+}
+.module-card.running .icon{opacity:1;animation:pulse 1.2s ease-in-out infinite;}
+.module-card.done{border-color:var(--green);background:var(--green-bg);}
+.module-card.done .icon{opacity:1}
+.module-card.done .name{color:var(--green)}
+.module-card.done .status{color:var(--green)}
+.module-card.error{border-color:var(--red);background:var(--red-bg);}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+
+.error-box{
+  max-width:680px;margin:1.5rem auto 0;padding:1rem 1.25rem;
+  background:var(--red-bg);border:1px solid rgba(239,68,68,0.25);
+  border-radius:12px;color:#fca5a5;font-size:0.875rem;display:none;
+}
+.error-box.active{display:block}
+
+/* ── Features strip ── */
+.features-strip{
+  max-width:780px;margin:3rem auto 0;padding:0 1rem;
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.75rem;
+}
+.feature-item{
+  text-align:center;padding:1.25rem 1rem;border-radius:12px;
+  background:var(--surface);border:1px solid var(--border);
+  transition:border-color 0.3s;
+}
+.feature-item:hover{border-color:var(--border);}
+.feature-item .f-icon{font-size:1.5rem;margin-bottom:0.4rem;}
+.feature-item .f-title{font-size:0.8rem;font-weight:600;margin-bottom:0.2rem;}
+.feature-item .f-desc{font-size:0.7rem;color:var(--muted);line-height:1.4;}
+
+/* ── Recent audits ── */
+.recent-section{max-width:780px;margin:3rem auto 4rem;padding:0 1rem;}
+.recent-section h3{font-size:0.95rem;font-weight:600;margin-bottom:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;}
+.audit-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0.75rem 1rem;background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;margin-bottom:0.4rem;transition:all 0.2s;gap:0.75rem;
+}
+.audit-row:hover{background:var(--surface2);border-color:var(--border);}
+.audit-row .url-col{flex:1;min-width:0;}
+.audit-row .url-text{font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;}
+.audit-row .url-domain{font-size:0.7rem;color:var(--muted);margin-top:0.1rem;}
+.score-pill{font-size:0.8rem;font-weight:700;padding:0.2em 0.7em;border-radius:20px;flex-shrink:0;}
+.score-pill.good{background:var(--green-bg);color:var(--green)}
+.score-pill.warn{background:var(--orange-bg);color:var(--orange)}
+.score-pill.bad{background:var(--red-bg);color:var(--red)}
+.date-text{font-size:0.75rem;color:var(--muted);flex-shrink:0;}
+
+/* ── Footer ── */
+.tool-footer{
+  margin-top:auto;padding:1.5rem 2rem;text-align:center;
+  border-top:1px solid var(--border);font-size:0.75rem;color:var(--muted);
+}
+.tool-footer a{color:var(--muted)}
+.tool-footer a:hover{color:var(--text)}
+</style>
+</head>
+<body>
+
+<header class="toolbar">
+  <div class="toolbar-brand">
+    <span class="dot"></span> DENZO Site Auditor
+  </div>
+  <nav class="toolbar-links">
+    <a href="/auditor/history">History</a>
+    <a href="https://denzostudiospro.com" target="_blank">by Denzo Studios</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <h1>Analyze any site.<br><span>SEO + GEO in seconds.</span></h1>
+    <p class="subtitle">Paste a URL and get a comprehensive audit covering sitemaps, schema, AI visibility, technical SEO, and more. No login required.</p>
+  </section>
+
+  <section class="url-section">
+    <form id="analyze-form" onsubmit="startAnalysis(event)">
+      <div class="url-wrap">
+        <input type="url" id="url-input" class="url-input" placeholder="https://example.com" required autofocus autocomplete="url">
+        <button type="submit" class="btn-analyze" id="analyze-btn">→ Analyze</button>
+      </div>
+    </form>
+    <p class="url-hint">Try: autoacg.com · nohocollisioncenter.com · denzostudiospro.com</p>
+    {% if error %}
+    <div class="error-box active"><p>{{ error }}</p></div>
+    {% endif %}
+  </section>
+
+  <section class="progress-section" id="progress-section">
+    <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-bar"></div></div>
+    <div class="progress-meta">
+      <span id="progress-step-label">Preparing...</span>
+      <span id="progress-pct">0%</span>
+    </div>
+    <div class="module-grid">
+      <div class="module-card" data-m="sitemap"><div class="icon">📄</div><div class="name">Sitemap</div><div class="status">Waiting</div></div>
+      <div class="module-card" data-m="robots"><div class="icon">🤖</div><div class="name">Robots.txt</div><div class="status">Waiting</div></div>
+      <div class="module-card" data-m="llms"><div class="icon">🧠</div><div class="name">llms.txt & AI</div><div class="status">Waiting</div></div>
+      <div class="module-card" data-m="technical"><div class="icon">⚙️</div><div class="name">Technical SEO</div><div class="status">Waiting</div></div>
+      <div class="module-card" data-m="geo"><div class="icon">🌐</div><div class="name">GEO / AI</div><div class="status">Waiting</div></div>
+      <div class="module-card" data-m="images"><div class="icon">🖼️</div><div class="name">Images</div><div class="status">Waiting</div></div>
+      <div class="module-card" data-m="performance"><div class="icon">⚡</div><div class="name">Performance</div><div class="status">Waiting</div></div>
+    </div>
+    <div class="error-box" id="error-box"><p id="error-msg"></p></div>
+  </section>
+
+  <section class="features-strip">
+    <div class="feature-item"><div class="f-icon">📊</div><div class="f-title">5 Analysis Modules</div><div class="f-desc">Sitemap, robots.txt, llms.txt, technical SEO, and GEO visibility — all in parallel.</div></div>
+    <div class="feature-item"><div class="f-icon">⚡</div><div class="f-title">Sub-second Results</div><div class="f-desc">Most audits complete in under 1 second with concurrent analysis.</div></div>
+    <div class="feature-item"><div class="f-icon">🤖</div><div class="f-title">AI Crawler Check</div><div class="f-desc">Verify GPTBot, Claude, Perplexity, and 10+ AI crawlers can access your content.</div></div>
+    <div class="feature-item"><div class="f-icon">📥</div><div class="f-title">Download Reports</div><div class="f-desc">Standalone HTML reports you can share with clients and team.</div></div>
+  </section>
+
+  {% if recent_audits %}
+  <section class="recent-section">
+    <h3>Recent Audits</h3>
+    {% for a in recent_audits %}
+    <a href="/auditor/report/{{ a.audit_id }}" style="display:block;text-decoration:none;color:inherit;">
+      <div class="audit-row">
+        <div class="url-col">
+          <span class="url-text">{{ a.url }}</span>
+          <span class="url-domain">{{ a.domain or '' }} · {{ a.page_title or 'Untitled' }}</span>
+        </div>
+        <span class="score-pill {{ 'good' if a.overall_score >= 70 else 'warn' if a.overall_score >= 40 else 'bad' }}">{{ a.overall_score }}/100</span>
+        <span class="date-text">{{ a.created_at[:10] }}</span>
+      </div>
+    </a>
+    {% endfor %}
+  </section>
+  {% endif %}
+</main>
+
+<footer class="tool-footer">
+  <p>DENZO Site Auditor · Built by <a href="https://denzostudiospro.com">Denzo Studios</a> · Powered by SEO intelligence agents · <a href="/auditor/history">Browse all audits</a></p>
+</footer>
+
+<script>
+function startAnalysis(e) {
+  e.preventDefault();
+  const url = document.getElementById('url-input').value.trim();
+  if (!url) return;
+
+  const btn = document.getElementById('analyze-btn');
+  const progress = document.getElementById('progress-section');
+  const errBox = document.getElementById('error-box');
+  btn.disabled = true; btn.textContent = 'Analyzing...';
+  progress.classList.add('active'); errBox.classList.remove('active');
+  document.getElementById('progress-bar').style.width = '0%';
+  document.querySelectorAll('.module-card').forEach(c => {c.classList.remove('running','done','error');c.querySelector('.status').textContent='Waiting';});
+
+  fetch('/auditor/analyze', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({url: url})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) { showError(data.error); return; }
+    listenProgress(data.audit_id);
+  })
+  .catch(err => showError('Connection error: ' + err.message));
+}
+
+function showError(msg) {
+  document.getElementById('error-box').classList.add('active');
+  document.getElementById('error-msg').textContent = msg;
+  const btn = document.getElementById('analyze-btn');
+  btn.disabled = false; btn.textContent = '→ Analyze';
+}
+
+function listenProgress(auditId) {
+  const evtSource = new EventSource('/auditor/progress/' + auditId);
+  const mods = ['sitemap','robots','llms','technical','geo','images','performance'];
+
+  evtSource.onmessage = function(event) {
+    const d = JSON.parse(event.data);
+    document.getElementById('progress-bar').style.width = d.progress + '%';
+    document.getElementById('progress-pct').textContent = d.progress + '%';
+    document.getElementById('progress-step-label').textContent = d.current_step || '';
+
+    const threshold = d.progress / 14;
+    mods.forEach((m, i) => {
+      const el = document.querySelector(`[data-m="${m}"]`);
+      if (!el) return;
+      if (threshold > i + 0.85) { el.classList.add('done'); el.classList.remove('running'); el.querySelector('.status').textContent = 'Done'; }
+      else if (threshold > i + 0.05) { el.classList.add('running'); el.querySelector('.status').textContent = 'Running...'; }
+    });
+
+    if (d.event === 'complete') { evtSource.close(); window.location.href = d.redirect; }
+    if (d.event === 'error') { evtSource.close(); showError(d.error || 'Analysis failed'); }
+  };
+
+  evtSource.onerror = () => { evtSource.close(); setTimeout(() => listenProgress(auditId), 1500); };
+}
+</script>
+</body>
+</html>

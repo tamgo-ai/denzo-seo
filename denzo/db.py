@@ -445,6 +445,34 @@ def init_db():
         DELETE FROM managed_paths   WHERE tenant_id = OLD.tenant_id;
         DELETE FROM cannibalization_risks WHERE tenant_id = OLD.tenant_id;
     END;
+
+    -- ── SITE AUDITOR — public tool, no tenant required ─────────────────────
+    CREATE TABLE IF NOT EXISTS site_audits (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        audit_id        TEXT UNIQUE NOT NULL,
+        url             TEXT NOT NULL,
+        domain          TEXT,
+        status          TEXT DEFAULT 'pending',
+        progress        INTEGER DEFAULT 0,
+        current_step    TEXT,
+        error_message   TEXT,
+        report_json     TEXT,
+        report_html     TEXT,
+        overall_score   INTEGER,
+        module_scores   TEXT,
+        fetch_method    TEXT,
+        page_title      TEXT,
+        page_status     INTEGER,
+        html_size_kb    INTEGER,
+        analysis_time_ms INTEGER,
+        user_id         INTEGER REFERENCES users(id),
+        created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_site_audits_url ON site_audits(url);
+    CREATE INDEX IF NOT EXISTS idx_site_audits_domain ON site_audits(domain);
+    CREATE INDEX IF NOT EXISTS idx_site_audits_user ON site_audits(user_id);
+    CREATE INDEX IF NOT EXISTS idx_site_audits_status ON site_audits(status);
     """)
 
     # Seed admin from env vars on first install — never hardcode credentials

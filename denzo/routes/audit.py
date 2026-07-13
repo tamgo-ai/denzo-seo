@@ -1,5 +1,5 @@
 import json
-from flask import Blueprint, render_template, flash, redirect, url_for
+from flask import Blueprint, render_template, flash, redirect, url_for, Response
 from denzo.auth import tenant_access_required
 from denzo.db import get_db
 
@@ -79,3 +79,30 @@ def audit(tenant_id):
         clients=clients,
         active_tenant=tenant_id,
     )
+
+
+@bp.route("/<tenant_id>/audit/llms.txt")
+@tenant_access_required
+def download_llms(tenant_id):
+    """Download generated llms.txt from the latest audit."""
+    db = get_db()
+    setting = db.execute(
+        "SELECT value FROM settings WHERE tenant_id=? AND key='audit_deep'",
+        (tenant_id,)
+    ).fetchone()
+    db.close()
+
+    if not setting:
+        return "No audit found", 404
+
+    try:
+        audit = json.loads(setting["value"])
+        llms_gen = audit.get("llms_generated", {})
+        llms_txt = llms_gen.get("llms_txt", "")
+        if not llms_txt:
+            return "No llms.txt generated for this audit", 404
+        domain = audit.get("url", "site").split("://")[1].split("/")[0].replace("www.", "")
+        return Response(llms_txt, mimetype="text/plain",
+                        headers={"Content-Disposition": f'attachment; filename="llms-{domain}.txt"'})
+    except Exception:
+        return "Error reading audit data", 500

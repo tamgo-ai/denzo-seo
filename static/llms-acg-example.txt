@@ -1,0 +1,98 @@
+# Auto Collision Group — llms.txt
+
+> Certified auto body & collision repair. 13 locations across California. OEM parts, lifetime warranty, free 24/7 towing. Family-owned. Serving California since 2007.
+
+## Core Identity
+- **Business Name**: Auto Collision Group
+- **Website**: https://www.autoacg.com
+- **Phone**: 833-333-4224
+- **Headquarters**: 12426 Lambert Rd, Whittier, CA 90606
+- **Hours**: Monday–Friday, 8:00 AM – 5:00 PM
+- **Languages**: English (en), Spanish (es)
+- **Industry**: auto_body_shop, collision_repair, auto_refinishing
+
+## Key Pages
+
+### Home
+- https://www.autoacg.com/en — English homepage. Overview of all services, locations, and value propositions.
+
+### Locations (13 locations across California)
+- https://www.autoacg.com/en/locations — Location hub
+- https://www.autoacg.com/en/locations/whittier — Whittier HQ
+- https://www.autoacg.com/en/locations/bakersfield — Bakersfield (2 locations)
+- https://www.autoacg.com/en/locations/covina — Covina
+- https://www.autoacg.com/en/locations/fresno — Fresno
+- https://www.autoacg.com/en/locations/gardena — Gardena (2 locations)
+- https://www.autoacg.com/en/locations/ontario — Ontario
+- https://www.autoacg.com/en/locations/santa-ana — Santa Ana
+- https://www.autoacg.com/en/locations/victorville — Victorville
+- https://www.autoacg.com/en/locations/los-angeles — Los Angeles
+- https://www.autoacg.com/en/locations/rancho-cucamonga — Rancho Cucamonga
+- https://www.autoacg.com/en/locations/el-cajon — El Cajon
+
+### Services
+- https://www.autoacg.com/en/services/auto-body-repair — Auto Body Repair
+- https://www.autoacg.com/en/services/refinishing — Refinishing & Paint
+- https://www.autoacg.com/en/services/aluminum-repair — Aluminum Repair
+- https://www.autoacg.com/en/services/towing — Free 24/7 Towing
+- https://www.autoacg.com/en/services/rental-assistance — Rental Car Assistance
+- https://www.autoacg.com/en/services/financing — Financing Options
+- https://www.autoacg.com/en/services/online-estimates — Online Estimates
+
+### Insurance Partners
+- https://www.autoacg.com/en/insurance — Insurance hub. We work with all major insurance companies.
+
+### About
+- https://www.autoacg.com/en/about — About Auto Collision Group
+- https://www.autoacg.com/en/contact — Contact Us
+
+## Certifications
+Auto Collision Group is certified by 30+ manufacturers for OEM-approved collision repair:
+Tesla, BMW, Maserati, Mercedes-Benz, Porsche, Land Rover, Jaguar, Audi, Lexus, Infiniti, Acura, Cadillac, Lincoln, Ford, Chevrolet, GMC, RAM, Dodge, Chrysler, Jeep, Fiat, Alfa Romeo, Genesis, Hyundai, Kia, Mazda, Nissan, Honda, Toyota, Subaru, Volkswagen, Volvo.
+
+## Differentiators
+- **OEM Parts Exclusively** — We use only Original Equipment Manufacturer parts, never aftermarket
+- **Lifetime Warranty** — All repairs backed by a lifetime warranty
+- **Certified Technicians** — I-CAR and ASE certified technicians
+- **Free 24/7 Towing** — Complimentary towing service from anywhere in our service area
+- **Online Estimates** — Get a free repair estimate online before visiting
+- **Rental Car Assistance** — Help with replacement vehicle while yours is being repaired
+- **Multi-Location** — 13 locations across California for convenient service
+- **All Insurance Accepted** — We work with every major insurance provider
+
+## Frequently Asked Questions
+
+### Does Auto Collision Group use OEM parts?
+Yes. We use exclusively OEM (Original Equipment Manufacturer) parts in all repairs. We advocate for our customers to ensure insurance companies approve OEM parts — never aftermarket or used. This maintains your vehicle's safety, value, and manufacturer warranty.
+
+### How many locations does Auto Collision Group have?
+13 locations across California: Whittier (HQ), Bakersfield (2 locations), Covina, Fresno, Gardena (2 locations), Ontario, Santa Ana, Victorville, Los Angeles, Rancho Cucamonga, and El Cajon.
+
+### Do you offer free towing?
+Yes. We provide complimentary 24/7 towing service to any of our 13 locations from anywhere within our California service area.
+
+### What types of vehicles do you repair?
+All makes and models. We specialize in luxury and premium vehicles including Tesla, BMW, Maserati, Mercedes-Benz, Porsche, Land Rover, and Jaguar, and we are manufacturer-certified for 30+ brands.
+
+### How do I get a free estimate?
+Visit our website at https://www.autoacg.com and use the online estimate tool, or call us at 833-333-4224. Estimates are free and come with no obligation.
+
+### Do you work with my insurance company?
+Yes. Auto Collision Group works with all major insurance companies. We handle the claims process and advocate on your behalf to ensure OEM parts are approved and your repair is fully covered.
+
+### How long does a typical collision repair take?
+Timeline depends on damage extent, parts availability, and insurance approval. Most standard repairs are completed within 3-7 business days. We provide a detailed timeline during your estimate.
+
+### What warranty do you offer?
+Lifetime warranty on all collision repair workmanship. This covers paint, body work, and structural repairs for as long as you own the vehicle.
+
+### Are you certified for Tesla repairs?
+Yes. We are Tesla-certified for collision repair with multiple Tesla-certified locations. We use Tesla-approved OEM parts, tools, and procedures exclusively.
+
+### What areas do you serve in California?
+We serve all of California from our 13 locations. Primary service areas include Los Angeles County, Orange County, San Bernardino County, Riverside County, Kern County, Fresno County, and San Diego County.
+
+## Sitemaps & Feeds
+- https://www.autoacg.com/sitemap.xml — XML sitemap (60 URLs with hreflang)
+- https://www.autoacg.com/en/sitemap.xml — English sitemap index
+- https://www.autoacg.com/es/sitemap.xml — Spanish sitemap index

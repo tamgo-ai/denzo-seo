@@ -109,8 +109,9 @@ def create_app():
     from denzo.routes.mission_control import bp as mission_control_bp
     from denzo.routes.billing     import bp as billing_bp
     from denzo.routes.jarvis      import bp as jarvis_bp
+    from denzo.routes.site_auditor import bp as site_auditor_bp
 
-    for bp in [public_bp, auth_bp, dash_bp, clients_bp, pipeline_bp, keywords_bp, pages_bp, competitors_bp, settings_bp, api_bp, audit_bp, images_bp, brand_voice_bp, data_intel_bp, geo_bp, reviews_bp, lite_bp, reporting_bp, oauth_bp, mission_control_bp, billing_bp, jarvis_bp]:
+    for bp in [public_bp, auth_bp, dash_bp, clients_bp, pipeline_bp, keywords_bp, pages_bp, competitors_bp, settings_bp, api_bp, audit_bp, images_bp, brand_voice_bp, data_intel_bp, geo_bp, reviews_bp, lite_bp, reporting_bp, oauth_bp, mission_control_bp, billing_bp, jarvis_bp, site_auditor_bp]:
         app.register_blueprint(bp)
 
     # ── Rate limiting ─────────────────────────────────────────────────────────
@@ -136,6 +137,14 @@ def create_app():
         default_limits=["200 per day", "60 per hour"],
         storage_uri=_limiter_storage,
     )
+    # Site Auditor: exempt from rate limits (SSE progress streams poll frequently)
+    limiter.exempt(app.view_functions.get("site_auditor.index"))
+    limiter.exempt(app.view_functions.get("site_auditor.analyze"))
+    limiter.exempt(app.view_functions.get("site_auditor.progress"))
+    limiter.exempt(app.view_functions.get("site_auditor.report"))
+    limiter.exempt(app.view_functions.get("site_auditor.download"))
+    limiter.exempt(app.view_functions.get("site_auditor.history"))
+    limiter.exempt(app.view_functions.get("site_auditor.compare"))
     # Stricter limits on auth endpoints
     limiter.limit("10 per minute")(app.view_functions.get("auth.login"))
     # Anti-abuse: wizard account creation limit

@@ -4,6 +4,8 @@ Generates content for all planned pages using Claude.
 Works through pages in 'draft' status and writes full HTML content.
 """
 import json
+import re
+
 from denzo.agents.base_agent import TenantAwareBaseAgent, ClientContext, db_execute, db_write
 
 
@@ -228,9 +230,9 @@ WRITING RULES — GOOGLE SEARCH QUALITY STANDARDS:
 
         # Fallback meta description: extract first <p> text if Claude didn't include META_DESC
         if not meta_desc:
-            p_match = _re.search(r'<p[^>]*>([^<]{30,})</p>', cleaned)
+            p_match = re.search(r'<p[^>]*>([^<]{30,})</p>', cleaned)
             if p_match:
-                raw_text = _re.sub(r'<[^>]+>', '', p_match.group(1))
+                raw_text = re.sub(r'<[^>]+>', '', p_match.group(1))
                 meta_desc = raw_text.strip()[:155]
 
         return cleaned, meta_desc
@@ -374,14 +376,37 @@ WRITING RULES — GOOGLE SEARCH QUALITY STANDARDS:
                 self.log(f"Skipped (empty response): {title}", "warning")
                 continue
 
+            # Quality gate: run technical + GEO audit on generated content
+            quality_score = 65
+            page_status = 'ready'
+            audit_note = '[PENDING_REVIEW]'
+            try:
+                from denzo.auditor.technical_scanner import scan_technical
+                from denzo.auditor.geo_visibility import analyze_geo_visibility
+                page_url = page_dict.get('slug','') or ''
+                page_domain = self.ctx.domain or 'localhost'
+                tech_audit = scan_technical(f"https://{page_domain}/{page_url}", content, page_domain, None, 200)
+                geo_audit = analyze_geo_visibility(f"https://{page_domain}/{page_url}", content, page_domain)
+                tech_score = tech_audit.get('score', 65)
+                geo_score = geo_audit.get('score', 65)
+                quality_score = round((tech_score + geo_score) / 2)
+                if quality_score < 50:
+                    page_status = 'needs_fix'
+                    audit_note = f'[AUTO-FLAGGED] Quality too low: technical={tech_score}, geo={geo_score}. Fix required before publishing.'
+                    self.log(f"⚠ {title} flagged — quality {quality_score}/100 (technical={tech_score}, geo={geo_score})", "warning")
+                else:
+                    self.log(f"✓ {title} passed quality gate — {quality_score}/100", "info")
+            except Exception as e:
+                self.log(f"Quality gate skipped for {title}: {e}", "warning")
+
             db_write(
-                "UPDATE pages SET content=?, meta_description=?, quality_score=65, scored_by='sonnet-4-6-initial', "
-                "schema_markup=?, status='ready', notes=COALESCE(notes||' ','')||'[PENDING_REVIEW]', "
+                "UPDATE pages SET content=?, meta_description=?, quality_score=?, scored_by='sonnet-4-6-initial', "
+                "schema_markup=?, status=?, notes=COALESCE(notes||' ','')||?, "
                 "updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
-                (content, meta_desc, schema_local_business, page_dict["id"], self.ctx.tenant_id)
+                (content, meta_desc, quality_score, schema_local_business, page_status, audit_note, page_dict["id"], self.ctx.tenant_id)
             )
             done += 1
-            self.log(f"✓ {title} ({len(content)} chars)", "success")
+            self.log(f"{'✓' if page_status=='ready' else '⚠'} {title} ({len(content)} chars, quality={quality_score})", "success" if page_status=='ready' else "warning")
 
         # Get examples of generated page titles
         example_rows = db_execute(
