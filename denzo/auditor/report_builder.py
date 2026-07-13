@@ -179,6 +179,41 @@ def build_report_html(result: dict, audit_id: str) -> str:
     <tr><td>Service Cities Detected</td><td>{', '.join(lb.get('service_cities', [])[:8]) or 'None detected'}</td></tr>
     </tbody></table></section>'''
 
+    # ── AI Citations section ──
+    ai_cite = results.get('ai_citations', {}) or {}
+    ai_section = ''
+    if ai_cite and ai_cite.get('queries_checked', 0) > 0:
+        cite_results = ai_cite.get('results', [])
+        cite_rows = ''
+        for r in cite_results:
+            icon = '✅' if r.get('cited') else '❌' if r.get('cited') is False else '⚠️'
+            cite_rows += f'<tr><td>{icon} {r.get("type","?")}</td><td>{html.escape(r.get("query","?"))}</td></tr>'
+        ai_section = f'''<section id="ai-citations"><div class="section-header"><h2>🤖 AI Search Visibility (Perplexity)</h2></div>
+    <table class="metric-table"><tbody>
+    <tr><td>Citations Found</td><td><span class="{"pass" if ai_cite.get("citations_found",0) >= 2 else "warn" if ai_cite.get("citations_found",0) >= 1 else "fail"}">{ai_cite.get("citations_found", 0)}/{ai_cite.get("queries_checked", 0)} queries cited</span></td></tr>
+    {cite_rows}
+    </tbody></table></section>'''
+
+    # ── Keyword Research section ──
+    kw_research = results.get('keyword_research', {}) or {}
+    kwr_section = ''
+    suggestions = kw_research.get('suggestions', {})
+    if suggestions and isinstance(suggestions, dict) and not suggestions.get('error'):
+        hp = suggestions.get('high_priority', [])
+        gaps = suggestions.get('content_gaps', [])
+        local = suggestions.get('local_keywords', [])
+        hp_rows = ''
+        for k in hp[:5]:
+            hp_rows += f'<tr><td>🎯</td><td><strong>{html.escape(k.get("keyword","?"))}</strong></td><td>{html.escape(k.get("intent","?"))}</td><td>{html.escape(k.get("why","?")[:100])}</td></tr>'
+        gap_rows = ''
+        for g in gaps[:3]:
+            gap_rows += f'<tr><td>📝</td><td><strong>{html.escape(g.get("keyword","?"))}</strong></td><td colspan="2">{html.escape(g.get("why","?")[:100])}</td></tr>'
+
+        kwr_section = f'''<section id="keyword-research"><div class="section-header"><h2>🔑 AI Keyword Suggestions (Claude)</h2></div>
+    {"<h3>High-Priority Keywords</h3><table class=\"metric-table\"><thead><tr><th></th><th>Keyword</th><th>Intent</th><th>Why</th></tr></thead><tbody>" + hp_rows + "</tbody></table>" if hp_rows else ""}
+    {"<h3>Content Gaps</h3><table class=\"metric-table\"><thead><tr><th></th><th>Keyword</th><th colspan=\"2\">Why</th></tr></thead><tbody>" + gap_rows + "</tbody></table>" if gap_rows else ""}
+    </section>'''
+
     # GEO benchmarks
     benchmarks=geo_r.get('benchmarks',{})
     bench_section=''
@@ -352,6 +387,8 @@ pre{{font-family:'SF Mono','Fira Code','JetBrains Mono',monospace;font-size:0.8r
 {kw_section}
 {cq_section}
 {lb_section}
+{ai_section}
+{kwr_section}
 {bench_section}
 {img_section}
 

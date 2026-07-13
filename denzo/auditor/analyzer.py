@@ -27,6 +27,8 @@ from denzo.auditor.performance_estimator import estimate_performance
 from denzo.auditor.content_quality import analyze_content_quality
 from denzo.auditor.keyword_analyzer import analyze_keyword_targeting
 from denzo.auditor.local_business import check_local_business
+from denzo.auditor.ai_citations import check_ai_citations
+from denzo.auditor.keyword_research import research_keywords
 
 
 # Weight distribution for overall score — based on actual ranking factor studies:
@@ -50,6 +52,8 @@ MODULE_WEIGHTS = {
     'local_seo': 0,  # 0 weight when not a local business, adjusted at runtime
     'keywords': 0,  # Informational — keyword targeting diagnosis, scored via content quality
     'llms': 0,  # llms.txt is NOT a ranking factor — informational only, no score impact
+    'ai_citations': 0,  # Informational — AI citation visibility check
+    'keyword_research': 0,  # Informational — keyword suggestions, not a score
 }
 
 assert sum(MODULE_WEIGHTS.values()) == 100, f"MODULE_WEIGHTS must sum to 100, got {sum(MODULE_WEIGHTS.values())}"
@@ -137,6 +141,8 @@ class SiteAnalyzer:
             'content': lambda: analyze_content_quality(self.url, html, self.domain, industry),
             'keywords': lambda: analyze_keyword_targeting(self.url, html, self.domain),
             'local_seo': lambda: check_local_business(self.url, html, self.domain, industry),
+            'ai_citations': lambda: check_ai_citations(self.url, html, self.domain, industry),
+            'keyword_research': lambda: research_keywords(self.url, html, self.domain, industry),
         }
 
         results = {'_industry': industry_profile}
@@ -149,7 +155,7 @@ class SiteAnalyzer:
 
         completed = 0
 
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=12) as executor:
             futures = {executor.submit(fn): name for name, fn in modules.items()}
 
             for future in as_completed(futures):
@@ -190,7 +196,7 @@ class SiteAnalyzer:
 
         # Phase 4: Collect all findings
         all_findings = []
-        for module_name in ['sitemap', 'robots', 'llms', 'technical', 'geo', 'images', 'performance', 'content', 'keywords', 'local_seo']:
+        for module_name in ['sitemap', 'robots', 'llms', 'technical', 'geo', 'images', 'performance', 'content', 'keywords', 'local_seo', 'ai_citations', 'keyword_research']:
             if module_name in results:
                 for f in results[module_name].get('findings', []):
                     f['module'] = module_name
@@ -241,5 +247,7 @@ class SiteAnalyzer:
                 'local_seo': '0-10% — Local business signals (dynamic, only for local businesses)',
                 'keywords': '0% — Keyword targeting diagnosis (informational)',
                 'llms': '0% — Informational only, not a ranking factor',
+                'ai_citations': '0% — AI citation visibility (informational)',
+                'keyword_research': '0% — Keyword suggestions (informational)',
             },
         }
