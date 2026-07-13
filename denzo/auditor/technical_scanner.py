@@ -20,9 +20,56 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
     text_bytes = len(text.encode('utf-8'))
     text_ratio = round(text_bytes / html_size * 100, 1) if html_size > 0 else 0
 
-    # ═══════════════════════════════════════════
+    headers_lower = {k.lower(): v for k, v in (http_headers or {}).items()}
+
+    # ═════════════════════════════════════════════
+    # 0. INDEXABILITY — the checks that override everything else
+    #    A page that is noindexed / non-200 / blocked cannot rank at all,
+    #    so these run first and carry the heaviest penalties.
+    # ═════════════════════════════════════════════
+
+    # 0a. HTTP status code
+    if status_code and status_code >= 400:
+        findings.append({"severity":"critical","module":"technical","title":f"Page returns HTTP {status_code} — not indexable","detail":f"The URL responded with {status_code}. Search engines drop 4xx/5xx pages from the index. Any SEO work on this URL is wasted until the status is fixed.","fix":"Return HTTP 200 for canonical content URLs. Fix server errors (5xx) or broken routes (4xx). If the page moved, 301 to the new location instead of serving an error.","impact":"Complete deindexation. 100% organic traffic loss for this URL."})
+        score -= 40
+    elif status_code and 300 <= status_code < 400:
+        findings.append({"severity":"high","module":"technical","title":f"Page returns a {status_code} redirect at the canonical URL","detail":f"The requested URL responded with {status_code} instead of serving content directly. The audited HTML is from the redirect target.","fix":"Serve 200 content at the canonical URL. Reserve redirects for URLs that genuinely moved.","impact":"Redirect latency + potential signal dilution."})
+        score -= 8
+
+    # 0b. HTTPS scheme
+    if parsed.scheme != 'https':
+        findings.append({"severity":"critical","module":"technical","title":"Page served over HTTP, not HTTPS","detail":"The URL is not using HTTPS. HTTPS is a confirmed Google ranking signal since 2014 and browsers flag HTTP pages as 'Not Secure', destroying trust and conversions.","fix":"Install a TLS certificate (free via Let's Encrypt / auto on Vercel, Netlify, Cloudflare) and 301-redirect all HTTP URLs to HTTPS.","impact":"Ranking penalty + 'Not Secure' warning shown to every visitor."})
+        score -= 20
+
+    # 0c. Meta robots noindex / nofollow (the single most common catastrophic SEO bug)
+    meta_robots = soup.find('meta', attrs={'name': lambda v: v and v.lower() == 'robots'})
+    meta_robots_content = (meta_robots.get('content','').lower() if meta_robots and meta_robots.get('content') else '')
+    x_robots = headers_lower.get('x-robots-tag', '').lower()
+    if 'noindex' in meta_robots_content or 'noindex' in x_robots:
+        where = 'meta robots tag' if 'noindex' in meta_robots_content else 'X-Robots-Tag HTTP header'
+        findings.append({"severity":"critical","module":"technical","title":f"Page is set to NOINDEX (via {where}) — excluded from Google","detail":f"Found '{meta_robots_content or x_robots}'. This directive tells search engines NOT to index the page. If this is a page you want to rank, it is invisible in search regardless of every other optimization.","fix":"Remove 'noindex' from the robots meta tag and/or the X-Robots-Tag header for pages that should rank. In Next.js check the metadata `robots` field / middleware. Verify with Google Search Console URL Inspection.","impact":"The page cannot appear in Google at all. This overrides every other ranking factor."})
+        score -= 40
+    elif 'nofollow' in meta_robots_content:
+        findings.append({"severity":"medium","module":"technical","title":"Page-level 'nofollow' robots directive","detail":"A page-wide nofollow prevents link equity from flowing through any link on this page, weakening internal linking.","fix":"Remove 'nofollow' from the robots meta tag unless intentionally sculpting crawl on a private page."})
+        score -= 6
+
+    # 0d. Mixed content on HTTPS pages
+    if parsed.scheme == 'https':
+        insecure = re.findall(r'(?:src|href)=["\']http://[^"\']+', html, re.IGNORECASE)
+        insecure = [u for u in insecure if 'http://www.w3.org' not in u and 'http://schema.org' not in u]
+        if len(insecure) >= 3:
+            findings.append({"severity":"medium","module":"technical","title":f"Mixed content: {len(insecure)} insecure http:// resources on an HTTPS page","detail":"Loading http:// assets on an https:// page triggers browser mixed-content blocking and 'Not fully secure' warnings.","fix":"Update all asset URLs (images, scripts, styles) to https:// or protocol-relative. Add a Content-Security-Policy: upgrade-insecure-requests header."})
+            score -= 5
+
+    # 0e. <html lang> attribute
+    html_tag = soup.find('html')
+    if not (html_tag and html_tag.get('lang')):
+        findings.append({"severity":"low","module":"technical","title":"Missing lang attribute on <html>","detail":"The <html> element has no lang attribute. This helps search engines and screen readers determine the page language and is used for correct hreflang handling.","fix":'Add the language to the root element, e.g. <html lang="en"> or <html lang="es">.'})
+
+
+    # ═════════════════════════════════════════════
     # 1. TITLE TAG
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     title_tag = soup.find('title')
     title = title_tag.get_text(strip=True) if title_tag else ''
     title_len = len(title)
@@ -39,22 +86,19 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
     else:
         findings.append({"severity":"pass","module":"technical","title":f"Title tag: {title_len} chars — optimal length","detail":f'"{title}"','fix':None})
 
-    # Check keyword presence in title (generic)
+    # Check title descriptiveness (industry-agnostic — no hardcoded cities/keywords)
     title_lower = title.lower()
-    kw_signals = []
-    # No hardcoded keywords — signal is presence of any meaningful content words
-    if len(title.split()) >= 4: kw_signals.append('descriptive title')
-    if domain.replace('www.','').split('.')[0] in title_lower: kw_signals.append('brand')
-    # Check for location signals (state abbreviations and common city patterns)
-    location_words = ['california', 'los angeles', 'san diego', 'san francisco', 'new york', 'chicago', 'houston', 'miami', 'phoenix', 'dallas']
-    if any(c in title_lower for c in location_words) or re.search(r'\b[A-Z]{2}\b', title): kw_signals.append('location')
-    if len(kw_signals) < 2:
-        findings.append({"severity":"medium","module":"technical","title":f"Title missing key signals: {', '.join(kw_signals or ['none'])}","detail":"An optimal title includes: primary keyword + brand name + location. Your title is missing one or more of these.","fix":"Include: (1) primary service keyword, (2) business name, (3) primary city or state."})
-        score -= 6
+    has_brand = domain.replace('www.','').split('.')[0] in title_lower
+    word_n = len(title.split())
+    if word_n < 3:
+        findings.append({"severity":"medium","module":"technical","title":f"Title not descriptive enough: only {word_n} word(s)","detail":f'Current: "{title}". A strong title communicates the page topic plus the brand. Very short titles waste SERP space and topical relevance.',"fix":"Expand to a descriptive phrase: primary topic/keyword + brand. Add location only if the business is location-based."})
+        score -= 5
+    elif not has_brand:
+        findings.append({"severity":"low","module":"technical","title":"Brand name not detected in title","detail":"Including the brand name in the title reinforces entity recognition and improves branded CTR. (Skip this if you intentionally omit branding.)","fix":"Consider appending the brand: \"[Primary topic] | [Brand]\"."})
 
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     # 2. META DESCRIPTION
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     meta_desc = soup.find('meta', attrs={'name': 'description'})
     desc = meta_desc['content'].strip() if meta_desc and meta_desc.get('content') else ''
     desc_len = len(desc)
@@ -67,12 +111,13 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
         score -= 6
     elif desc_len > 165:
         findings.append({"severity":"low","module":"technical","title":f"Meta description too long: {desc_len} chars — truncated in SERPs","detail":'Google truncates at ~155-160 chars on desktop and ~120 on mobile. Content after the cutoff is invisible.','fix':'Trim to 150-160 chars. Ensure the CTA and key value proposition are in the first 120 characters for mobile visibility.'})
-    if 'call' not in desc.lower() and 'free' not in desc.lower() and 'estimate' not in desc.lower():
-        findings.append({"severity":"low","module":"technical","title":"Meta description lacks call-to-action","detail":"A CTA in the meta description increases CTR by 2-5%. Current description has no action-oriented language.","fix":'Add a clear CTA with phone number or action: "Call us for a free estimate" or "Get your free online estimate today".'})
+    _cta_words = ('call','free','get','buy','shop','book','try','start','learn','discover','contact','order','sign up','signup','request','download','explore','compare','save','find')
+    if desc and not any(w in desc.lower() for w in _cta_words):
+        findings.append({"severity":"low","module":"technical","title":"Meta description lacks a call-to-action","detail":"A CTA in the meta description increases CTR by 2-5%. The current description has no action-oriented language.","fix":'Add a clear CTA appropriate to your business (e.g. "Get started", "Book a demo", "Shop now", "Request a quote").'})
 
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     # 3. CANONICAL
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     canonical = soup.find('link', rel='canonical')
     canonical_url = canonical['href'].strip() if canonical and canonical.get('href') else None
     current_url = url.rstrip('/')
@@ -85,9 +130,9 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
             findings.append({"severity":"critical","module":"technical","title":f"Domain mismatch: canonical uses {urlparse(canonical_url).netloc} but current URL is {parsed.netloc}","detail":f"Canonical: {canonical_url}\nCurrent: {url}\nThis is a conflicting signal. Google must choose which to trust. If the sitemap also uses a different domain, the conflict is severe.","fix":"Align canonical domain with sitemap domain. Choose www or non-www and use it consistently everywhere: canonical tags, sitemap, internal links, robots.txt.","impact":"Severe canonical dilution. Google is receiving contradictory signals from multiple sources."})
             score -= 25
 
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     # 4. H1 / HEADINGS
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     h1_tags = soup.find_all('h1')
     h1_count = len(h1_tags)
     h2_tags = soup.find_all('h2')
@@ -114,9 +159,9 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
         findings.append({"severity":"medium","module":"technical","title":"Heading hierarchy skip: H1 present but no H2s","detail":"Headings should form a logical hierarchy (H1 → H2 → H3). Skipping levels makes content harder to parse for both users and search engines.","fix":"Wrap major content sections in H2 tags. Each H2 should cover a distinct topic (Services, Locations, About, FAQ, etc.)."})
         score -= 5
 
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     # 5. SCHEMA / JSON-LD DEEP VALIDATION
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     schema_scripts = soup.find_all('script', type='application/ld+json')
     schema_types = []
     schema_details = []
@@ -185,7 +230,7 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
             schema_issues.append(f"Block #{i+1}: invalid JSON — {str(e)[:100]}")
 
     if len(schema_scripts) == 0:
-        findings.append({"severity":"critical","module":"technical","title":"ZERO structured data — invisible to rich results & AI","detail":"No JSON-LD schema found. The site cannot appear in: Google Local Pack, rich snippets, Knowledge Panel, AI Overviews citations, or voice search results. For a multi-location business, this is devastating.","fix":"Implement: (1) Organization schema on homepage, (2) LocalBusiness schema for EACH of the 13 locations with full NAP + geo coordinates, (3) Service schema for each service, (4) BreadcrumbList, (5) WebSite schema for Sitelinks Searchbox.","impact":"Estimated traffic loss from rich results: 30-50%. Each location missing LocalBusiness schema is invisible in Google Maps search."})
+        findings.append({"severity":"critical","module":"technical","title":"ZERO structured data — invisible to rich results & AI","detail":"No JSON-LD schema found. The site cannot appear in: Google Local Pack, rich snippets, Knowledge Panel, AI Overviews citations, or voice search results. For a multi-location business, this is devastating.","fix":"Implement: (1) Organization schema on homepage, (2) LocalBusiness schema for EACH location with full NAP + geo coordinates, (3) Service schema for each service, (4) BreadcrumbList, (5) WebSite schema for Sitelinks Searchbox.","impact":"Estimated traffic loss from rich results: 30-50%. Each location missing LocalBusiness schema is invisible in Google Maps search."})
         score -= 30
     else:
         if schema_issues:
@@ -199,9 +244,9 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
         if 'FAQPage' in schema_types:
             findings.append({"severity":"info","module":"technical","title":"FAQPage schema present — note Google restriction","detail":"Since August 2023, Google only shows FAQ rich results for government and healthcare sites. For commercial sites, FAQPage schema will NOT generate rich results.","fix":"Consider removing FAQPage schema. Instead, render FAQ as visible HTML for AI/GEO citation value without the schema."})
 
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     # 6. OPEN GRAPH / SOCIAL CARDS
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     og_tags = {}
     for prop in ['title','description','image','url','type','site_name','locale']:
         tag = soup.find('meta', property=f'og:{prop}') or soup.find('meta', attrs={'name': f'og:{prop}'})
@@ -219,9 +264,9 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
     if not twitter_card:
         findings.append({"severity":"low","module":"technical","title":"Missing Twitter Card tags","detail":"Without twitter:card, shares on X/Twitter won't render a summary card with image.","fix":"Add: <meta name=\"twitter:card\" content=\"summary_large_image\">\n<meta name=\"twitter:title\" content=\"...\">\n<meta name=\"twitter:description\" content=\"...\">\n<meta name=\"twitter:image\" content=\"...\">"})
 
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     # 7. HTML SEMANTICS & RATIO
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     if text_ratio < 5:
         findings.append({"severity":"high","module":"technical","title":f"Severely low text-to-HTML ratio: {text_ratio}%","detail":f"HTML: {html_size/1024:.0f}KB | Visible text: {text_bytes/1024:.1f}KB | Ratio: {text_ratio}%. Google expects 10-25% for a content-rich page. Below 5% triggers thin content filters regardless of actual word count.","fix":"Reduce inline JavaScript (move to external files with defer/async). Remove unnecessary wrapper divs. Increase visible text content by 50-100%.","impact":"Risk of being classified as thin content. Estimated ranking suppression: 5-15% across all terms."})
         score -= 15
@@ -236,9 +281,9 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
     if semantic['article'] == 0:
         findings.append({"severity":"low","module":"technical","title":"No <article> tags — missing content semantics","detail":"<article> tags help search engines and AI models identify self-contained content pieces for citation.","fix":"Use <article> for blog posts, service descriptions, and location content blocks."})
 
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     # 8. IMAGES — DETAILED AUDIT
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     images = soup.find_all('img')
     img_data = []
     total_img_bytes = 0
@@ -278,9 +323,9 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
         findings.append({"severity":"medium","module":"technical","title":f"{len(imgs_no_dims)} images missing explicit width/height — CLS risk","detail":f"Without dimensions: {[i['src'][:50] for i in imgs_no_dims[:5]]}. Images without width/height cause Cumulative Layout Shift as they load and push content around.","fix":"Add width/height attributes. In Next.js, use <Image width={...} height={...}> or fill mode with parent container sizing.","impact":"CLS (Cumulative Layout Shift) penalty. Google penalizes CLS > 0.1 in Core Web Vitals."})
         score -= 7
 
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     # 9. INTERNAL LINKS
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     links = soup.find_all('a', href=True)
     internal = 0
     external = 0
@@ -301,9 +346,9 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
         findings.append({"severity":"medium","module":"technical","title":f"Very few internal links: {internal}","detail":"Internal links distribute PageRank and help Google understand site architecture. Pages with <10 internal links may be orphaned or undervalued.","fix":"Add contextual internal links to key pages: location pages, service pages, about page, contact page. Target 30-50 internal links for a homepage."})
         score -= 6
 
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     # 10. SECURITY & HTTP HEADERS
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     if http_headers:
         headers_lower = {k.lower():v for k,v in http_headers.items()}
         security_checks = {
@@ -331,9 +376,9 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
             findings.append({"severity":"medium","module":"technical","title":"No ETag or Last-Modified — conditional requests disabled","detail":"Without cache validation headers, browsers cannot validate cached copies with a 304 Not Modified response. Every request is a full download.","fix":"Enable ETag headers (Vercel generates these automatically for static files). For dynamic pages, generate ETags from content hash."})
             score -= 5
 
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     # 11. PERFORMANCE INDICATORS
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     inline_scripts = soup.find_all('script')
     external_scripts = [s for s in inline_scripts if s.get('src')]
     inline_js = [s for s in inline_scripts if not s.get('src') and s.string]
@@ -349,9 +394,9 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
             findings.append({"severity":"high","module":"technical","title":f"Massive inline JavaScript: {inline_js_size/1024:.0f}KB in {len(inline_js)} blocks","detail":"This is Next.js RSC (React Server Components) hydration payload. It blocks rendering and increases TBT (Total Blocking Time) significantly.","fix":"Enable Partial Prerendering (PPR) in Next.js 14+. This serves static HTML shells with dynamic 'holes' that hydrate progressively. Lazy-load below-fold components.","impact":"Estimated TBT impact: +500-1500ms. Direct LCP and INP penalty in Core Web Vitals."})
             score -= 10
 
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     # 12. WORD COUNT & CONTENT DEPTH
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     words = len(text.split())
     if words < 500:
         findings.append({"severity":"high","module":"technical","title":f"Severely thin content: {words} words","detail":"Pages with <500 words are considered 'thin content' by Google and struggle to rank. The average top-10 result has 1,500-2,500 words.","fix":"Expand to 1,500+ words. Structure with H2 sections covering: detailed service/product descriptions, FAQ, about/credentials, testimonials, process, and location info if local.","impact":"Cannot compete for mid-to-high difficulty keywords. Estimated ranking ceiling: position 20+."})
@@ -360,9 +405,9 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
         findings.append({"severity":"medium","module":"technical","title":f"Below-competitive word count: {words}","detail":f"Top-ranking pages average 1,500-2,500 words. At {words}, you are below the competitive threshold.","fix":"Add 500-1,000 more words. Best ROI: FAQ section, detailed service/product descriptions, location-specific content, and credentials/certifications."})
         score -= 6
 
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     # 13. MOBILE / VIEWPORT
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     viewport = soup.find('meta', attrs={'name':'viewport'})
     if not viewport:
         findings.append({"severity":"critical","module":"technical","title":"Missing viewport meta tag — not mobile-friendly","detail":"Without a viewport meta tag, mobile browsers render the page at desktop width, forcing users to pinch-zoom. Google uses mobile-first indexing — this directly hurts rankings.","fix":'Add to <head>: <meta name="viewport" content="width=device-width, initial-scale=1.0">'})
@@ -377,15 +422,28 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
         findings.append({"severity":"medium","module":"technical","title":"Missing charset declaration","detail":"Explicit charset prevents encoding-related rendering issues.","fix":'Add as first element in <head>: <meta charset="UTF-8">'})
         score -= 3
 
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     # 14. STRUCTURED LISTS
-    # ═══════════════════════════════════════════
+    # ═════════════════════════════════════════════
     ul_count = len(soup.find_all('ul'))
     ol_count = len(soup.find_all('ol'))
     li_count = len(soup.find_all('li'))
     if li_count == 0:
         findings.append({"severity":"high","module":"technical","title":"Zero HTML list elements (ul/ol) — poor scannability","detail":"Structured lists improve readability and are one of the most commonly cited formats in Google AI Overviews. 0 list items = near-zero chance of appearing in featured snippets or AI Overviews for list-type queries.","fix":"Add structured lists: (1) services/products with short descriptions, (2) locations if multi-site, (3) certifications/credentials, (4) process steps in <ol>, (5) key differentiators.","impact":"Missed opportunity for featured snippets. Estimated traffic loss from quick-answer queries: 10-20%."})
         score -= 12
+
+    # ═════════════════════════════════════════════
+    # 15. CLIENT-SIDE RENDERING (SPA) DETECTION
+    #     Warn when the audited HTML is a pre-hydration shell: content injected
+    #     by JS won't be in this HTML, so content/schema/heading checks above may
+    #     produce false negatives. This makes the report honest about its input.
+    # ═════════════════════════════════════════════
+    _spa_markers = ('__NEXT_DATA__', 'id="__next"', 'data-reactroot', 'ng-version=',
+                    'data-server-rendered', 'window.__NUXT__', 'id="app"')
+    _is_spa = any(m in html for m in _spa_markers)
+    if _is_spa and words < 300 and text_ratio < 8:
+        findings.append({"severity":"high","module":"technical","title":"Content appears to be client-side rendered (JS) — audit sees a near-empty shell","detail":f"Framework markers detected with very little text in the initial HTML ({words} words, {text_ratio}% text ratio). Search engines render JS, but many AI crawlers and social scrapers do NOT. Critically, on-page checks above (content, schema, headings) may report false negatives because the real content is injected after load.","fix":"Serve meaningful HTML on first response: use SSR/SSG/ISR (Next.js) or prerendering so title, headings, primary copy and JSON-LD exist in the raw HTML. Re-run this audit with JS rendering enabled (DENZO_RENDER_JS) for an accurate content picture.","impact":"AI/GEO invisibility for non-rendering crawlers and unreliable audit signals until fixed."})
+        score -= 8
 
     return {
         "score": max(0, score),
@@ -407,4 +465,6 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
         "internal_links": internal, "external_links": external,
         "inline_scripts": len(inline_js), "external_scripts": len(external_scripts),
         "has_viewport": bool(viewport),
+        "client_rendered": _is_spa,
+        "http_status": status_code,
     }
