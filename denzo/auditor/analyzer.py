@@ -24,7 +24,6 @@ from denzo.auditor.geo_visibility import analyze_geo_visibility
 from denzo.auditor.llms_generator import generate_llms_txt
 from denzo.auditor.image_auditor import deep_image_audit
 from denzo.auditor.performance_estimator import estimate_performance
-from denzo.auditor.authority import analyze_authority
 
 
 # Weight distribution for overall score
@@ -120,13 +119,12 @@ class SiteAnalyzer:
             'geo': lambda: analyze_geo_visibility(self.url, html, self.domain, industry),
             'images': lambda: deep_image_audit(self.url, html, self.domain, base_page_url=self.url),
             'performance': lambda: estimate_performance(self.url, html, self.domain, redirect_chain, 0),
-            'authority': lambda: analyze_authority(self.url, html, self.domain),
         }
 
         results = {'_industry': industry_profile}
         completed = 0
 
-        with ThreadPoolExecutor(max_workers=8) as executor:
+        with ThreadPoolExecutor(max_workers=7) as executor:
             futures = {executor.submit(fn): name for name, fn in modules.items()}
 
             for future in as_completed(futures):
@@ -167,7 +165,7 @@ class SiteAnalyzer:
 
         # Phase 4: Collect all findings
         all_findings = []
-        for module_name in ['sitemap', 'robots', 'llms', 'technical', 'geo', 'images', 'performance', 'authority']:
+        for module_name in ['sitemap', 'robots', 'llms', 'technical', 'geo', 'images', 'performance']:
             if module_name in results:
                 for f in results[module_name].get('findings', []):
                     f['module'] = module_name
