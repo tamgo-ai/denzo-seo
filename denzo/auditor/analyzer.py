@@ -24,17 +24,18 @@ from denzo.auditor.geo_visibility import analyze_geo_visibility
 from denzo.auditor.llms_generator import generate_llms_txt
 from denzo.auditor.image_auditor import deep_image_audit
 from denzo.auditor.performance_estimator import estimate_performance
+from denzo.auditor.authority import analyze_authority
 
 
 # Weight distribution for overall score
 MODULE_WEIGHTS = {
-    'geo': 25,
-    'technical': 20,
-    'images': 15,
-    'performance': 15,
-    'llms': 10,
-    'sitemap': 10,
-    'robots': 5,
+    'technical': 24,   # factual on-page + indexability signals
+    'geo': 22,         # AI / GEO citation readiness
+    'images': 14,      # image SEO + CLS/LCP contributors
+    'sitemap': 12,     # crawl/discovery (factual)
+    'performance': 12, # CWV are ESTIMATED heuristically -> weighted below factual signals
+    'robots': 8,       # crawlability + AI crawler access (factual)
+    'llms': 8,         # emerging/optional standard -> low weight
 }
 
 assert sum(MODULE_WEIGHTS.values()) == 100, f"MODULE_WEIGHTS must sum to 100, got {sum(MODULE_WEIGHTS.values())}"
@@ -57,14 +58,19 @@ class SiteAnalyzer:
         html = None
         fetch_method = 'unknown'
         http_headers = {}
+        redirect_chain = []
+        final_url = self.url
         page_status = 0
 
         try:
-            result = fetch_html(self.url)
+            result = fetch_html(self.url, capture_meta=True)
             if result and result.get('ok') and result.get('html') and len(result['html']) > 500:
                 html = result['html']
                 fetch_method = result.get('method', 'curl')
                 page_status = result.get('status', 200)
+                http_headers = result.get('headers', {}) or {}
+                redirect_chain = result.get('redirect_chain', []) or []
+                final_url = result.get('final_url', self.url) or self.url
         except Exception as e:
             import logging
             logging.getLogger(__name__).warning(f"fetch_html failed for {self.url}: {e}")
@@ -78,8 +84,7 @@ class SiteAnalyzer:
             }
 
         html_size_kb = round(len(html) / 1024)
-
-        # HTTP headers are optional — not fetched separately for speed
+        # HTTP headers, redirect chain and real status are captured by fetch_html(capture_meta=True)
 
         # Extract page title
         title_match = re.search(r'<title>(.*?)</title>', html, re.IGNORECASE | re.DOTALL)
@@ -111,16 +116,17 @@ class SiteAnalyzer:
             'sitemap': lambda: analyze_sitemap(self.url, html, self.domain),
             'robots': lambda: analyze_robots(self.url, html, self.domain),
             'llms': lambda: analyze_llms(self.url, html, self.domain),
-            'technical': lambda: scan_technical(self.url, html, self.domain, http_headers),
+            'technical': lambda: scan_technical(self.url, html, self.domain, http_headers, page_status, redirect_chain),
             'geo': lambda: analyze_geo_visibility(self.url, html, self.domain, industry),
             'images': lambda: deep_image_audit(self.url, html, self.domain, base_page_url=self.url),
-            'performance': lambda: estimate_performance(self.url, html, self.domain, None, 0),
+            'performance': lambda: estimate_performance(self.url, html, self.domain, redirect_chain, 0),
+            'authority': lambda: analyze_authority(self.url, html, self.domain),
         }
 
         results = {'_industry': industry_profile}
         completed = 0
 
-        with ThreadPoolExecutor(max_workers=7) as executor:
+        with ThreadPoolExecutor(max_workers=8) as executor:
             futures = {executor.submit(fn): name for name, fn in modules.items()}
 
             for future in as_completed(futures):
@@ -139,7 +145,7 @@ class SiteAnalyzer:
                     }]}
 
                 completed += 1
-                progress_pct = 15 + (completed * 11)  # 7 modules, 15 to 92
+                progress_pct = min(92, 15 + int(completed * (77 / max(1, len(modules)))))
                 self.progress(progress_pct, f'Analyzing {name}...')
 
         # Phase 3: Generate optimized llms.txt from site content
@@ -161,7 +167,7 @@ class SiteAnalyzer:
 
         # Phase 4: Collect all findings
         all_findings = []
-        for module_name in ['sitemap', 'robots', 'llms', 'technical', 'geo', 'images', 'performance']:
+        for module_name in ['sitemap', 'robots', 'llms', 'technical', 'geo', 'images', 'performance', 'authority']:
             if module_name in results:
                 for f in results[module_name].get('findings', []):
                     f['module'] = module_name
@@ -184,6 +190,10 @@ class SiteAnalyzer:
             "fetch_method": fetch_method,
             "page_title": page_title,
             "page_status": page_status,
+            "http_status": page_status,
+            "redirect_count": max(0, len(redirect_chain) - 1) if redirect_chain else 0,
+            "final_url": final_url,
+            "rendered": fetch_method == "playwright",
             "html_size_kb": html_size_kb,
             "word_count": results.get('technical', {}).get('word_count', 0),
             "text_html_ratio": results.get('technical', {}).get('text_html_ratio', 0),
