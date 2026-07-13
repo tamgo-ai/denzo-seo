@@ -114,7 +114,9 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
         score -= 6
     elif desc_len > 165:
         findings.append({"severity":"low","module":"technical","title":f"Meta description too long: {desc_len} chars — truncated in SERPs","detail":'Google truncates at ~155-160 chars on desktop and ~120 on mobile. Content after the cutoff is invisible.','fix':'Trim to 150-160 chars. Ensure the CTA and key value proposition are in the first 120 characters for mobile visibility.'})
-    _cta_words = ('call','free','get','buy','shop','book','try','start','learn','discover','contact','order','sign up','signup','request','download','explore','compare','save','find')
+    _cta_words = ('call','free','get','buy','shop','book','try','start','learn','discover','contact','order','sign up','signup','request','download','explore','compare','save','find',
+                  # Spanish CTAs
+                  'agendá','agenda','llama','whatsapp','gratis','cotización','presupuesto','reserva','cita','consulta','pedir','solicitar','comprar','probar','contacto','descargar')
     if desc and not any(w in desc.lower() for w in _cta_words):
         findings.append({"severity":"low","module":"technical","title":"Meta description lacks a call-to-action","detail":"A CTA in the meta description increases CTR by 2-5%. The current description has no action-oriented language.","fix":'Add a clear CTA appropriate to your business (e.g. "Get started", "Book a demo", "Shop now", "Request a quote").'})
 
@@ -243,9 +245,14 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
         else:
             findings.append({"severity":"pass","module":"technical","title":f"Schema valid: {len(schema_scripts)} blocks, {len(set(schema_types))} unique types","detail":f"Types: {', '.join(sorted(set(schema_types)))}. Well-structured for rich results.","fix":None})
 
-        # Check FAQPage deprecation warning
+        # Check FAQPage deprecation warning (does NOT apply to healthcare/government sites)
         if 'FAQPage' in schema_types:
-            findings.append({"severity":"info","module":"technical","title":"FAQPage schema present — note Google restriction","detail":"Since August 2023, Google only shows FAQ rich results for government and healthcare sites. For commercial sites, FAQPage schema will NOT generate rich results.","fix":"Consider removing FAQPage schema. Instead, render FAQ as visible HTML for AI/GEO citation value without the schema."})
+            is_healthcare = any(t in schema_types for t in ['MedicalBusiness','DiagnosticLab','MedicalClinic','Hospital','Physician','Dentist','HealthAndBeautyBusiness','MedicalOrganization'])
+            is_government = any(t in schema_types for t in ['GovernmentOrganization','GovernmentOffice','PoliceStation','CityHall'])
+            if is_healthcare or is_government:
+                findings.append({"severity":"pass","module":"technical","title":"FAQPage schema present — eligible for rich results (healthcare/government site)","detail":"Since August 2023, Google reserves FAQ rich results for government and healthcare sites. This site qualifies because it has healthcare/government schema types. FAQ schema is beneficial here.","fix":None})
+            else:
+                findings.append({"severity":"info","module":"technical","title":"FAQPage schema present — note Google restriction","detail":"Since August 2023, Google only shows FAQ rich results for government and healthcare sites. This site appears to be commercial, so FAQPage schema will NOT generate rich results.","fix":"Consider removing FAQPage schema. Instead, render FAQ as visible HTML for AI/GEO citation value without the schema."})
 
     # ═════════════════════════════════════════════
     # 6. OPEN GRAPH / SOCIAL CARDS
@@ -319,8 +326,8 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
         findings.append({"severity":"medium","module":"technical","title":f"{len(imgs_png)} images still in PNG format — convert to WebP","detail":f"PNG images: {[i['src'][:50] for i in imgs_png[:5]]}. WebP is 30-50% smaller than PNG with equivalent quality. Large PNGs are the #1 cause of excessive page weight.","fix":"Convert PNG images to WebP/AVIF. In Next.js, the <Image> component auto-converts. For static images, use tools like cwebp or Sharp. Serve responsive sizes via srcSet.","impact":"Estimated page weight savings: 40-60% on image payload. Direct LCP improvement."})
         score -= 8
 
-    if len(images) > 0 and len(imgs_lazy) / len(images) < 0.6:
-        findings.append({"severity":"low","module":"technical","title":f"Only {len(imgs_lazy)}/{len(images)} images lazy-loaded","detail":"Lazy loading defers off-screen images, reducing initial page weight and improving LCP.","fix":"Add loading=\"lazy\" to below-fold <img> tags. In Next.js: <Image loading=\"lazy\" .../>."})
+    if len(images) >= 3 and len(imgs_lazy) / len(images) < 0.6:
+        findings.append({"severity":"low","module":"technical","title":f"Only {len(imgs_lazy)}/{len(images)} images lazy-loaded","detail":"Lazy loading defers off-screen images, reducing initial page weight and improving LCP.","fix":"Add loading=\"lazy\" to below-fold <img> tags. In Next.js: <Image loading=\"lazy\" .../>. Above-fold and logo images should NOT be lazy-loaded (harms LCP)."})
 
     if len(imgs_no_dims) > 5:
         findings.append({"severity":"medium","module":"technical","title":f"{len(imgs_no_dims)} images missing explicit width/height — CLS risk","detail":f"Without dimensions: {[i['src'][:50] for i in imgs_no_dims[:5]]}. Images without width/height cause Cumulative Layout Shift as they load and push content around.","fix":"Add width/height attributes. In Next.js, use <Image width={...} height={...}> or fill mode with parent container sizing.","impact":"CLS (Cumulative Layout Shift) penalty. Google penalizes CLS > 0.1 in Core Web Vitals."})

@@ -73,10 +73,18 @@ def analyze_keyword_targeting(url: str, html: str, domain: str) -> dict:
 
     # ── Search Intent Classification ──
     intent_signals = {
-        'transactional': ['buy', 'price', 'cost', 'quote', 'estimate', 'order', 'purchase', 'hire', 'book', 'schedule', 'appointment', 'free consultation', 'get started', 'sign up'],
-        'commercial': ['best', 'top', 'review', 'compare', 'vs', 'versus', 'comparison', 'rating', 'rated', 'recommended', 'guide', 'how to choose'],
-        'informational': ['what is', 'how to', 'guide', 'learn', 'why', 'when', 'tutorial', 'tips', 'resources', 'blog', 'article', 'definition', 'meaning', 'examples'],
-        'navigational': ['login', 'contact', 'about', 'location', 'directions', 'hours', 'phone', 'address'],
+        'transactional': ['buy', 'price', 'cost', 'quote', 'estimate', 'order', 'purchase', 'hire', 'book', 'schedule', 'appointment', 'free consultation', 'get started', 'sign up',
+                          # Spanish
+                          'agendá', 'agenda', 'cita', 'cotización', 'presupuesto', 'precio', 'comprar', 'contratar', 'reserva', 'whatsapp', 'llama', 'llamar', 'pedir cita', 'solicitar', 'consulta'],
+        'commercial': ['best', 'top', 'review', 'compare', 'vs', 'versus', 'comparison', 'rating', 'rated', 'recommended', 'guide', 'how to choose',
+                       # Spanish
+                       'mejor', 'mejores', 'comparar', 'comparativa', 'reseña', 'valoración', 'recomendado', 'guía', 'cómo elegir', 'opiniones'],
+        'informational': ['what is', 'how to', 'guide', 'learn', 'why', 'when', 'tutorial', 'tips', 'resources', 'blog', 'article', 'definition', 'meaning', 'examples',
+                          # Spanish
+                          'qué es', 'cómo', 'guía', 'aprender', 'por qué', 'cuándo', 'tutorial', 'consejos', 'recursos', 'blog', 'artículo', 'definición', 'ejemplos', 'preguntas frecuentes', 'faq'],
+        'navigational': ['login', 'contact', 'about', 'location', 'directions', 'hours', 'phone', 'address',
+                         # Spanish
+                         'contacto', 'ubicación', 'dirección', 'horario', 'teléfono', 'direcciones', 'inicio', 'sesión'],
     }
 
     combined_text = f"{title} {h1} {meta_desc} {' '.join(text.split()[:500])}".lower()
