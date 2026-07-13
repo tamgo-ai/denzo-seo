@@ -184,8 +184,7 @@ def analyze_sitemap(url: str, html: str, domain: str) -> dict:
         if hreflang_count > 0:
             findings.append({"severity":"pass","module":"sitemap","title":f"Hreflang annotations found: {hreflang_count}","detail":"Well-implemented. Hreflang in sitemaps helps Google serve the right language version in SERPs.","fix":None})
         else:
-            findings.append({"severity":"medium","module":"sitemap","title":"No hreflang annotations in sitemap URLs","detail":"For multi-language sites, hreflang in sitemaps is the most reliable delivery method (better than HTML tags or HTTP headers).","fix":"Add <xhtml:link rel=\"alternate\" hreflang=\"es\" href=\"...\"/> to each URL entry for the Spanish version."})
-            score -= 8
+            findings.append({"severity":"info","module":"sitemap","title":"No hreflang annotations in sitemap URLs","detail":"No hreflang found. This is only relevant if the site serves multiple languages/regions. For a single-language site it is expected and not an issue.","fix":"ONLY if you serve multiple languages: add <xhtml:link rel=\"alternate\" hreflang=\"...\" href=\"...\"/> to each URL entry. Otherwise ignore."})
 
         # Coverage assessment
         img_pct = round(coverage["images"]/total_sampled*100) if total_sampled else 0
