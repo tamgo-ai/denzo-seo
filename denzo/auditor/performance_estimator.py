@@ -16,7 +16,64 @@ from bs4 import BeautifulSoup
 
 
 def estimate_performance(url: str, html: str, domain: str, redirect_chain: list = None, fetch_time_ms: int = None) -> dict:
-    """Estimate Core Web Vitals and analyze loading performance."""
+    """Estimate Core Web Vitals. Uses real PSI data when available, falls back to heuristics."""
+
+    # ── Try REAL PageSpeed Insights API first ──
+    try:
+        from denzo.auditor.pagespeed_real import get_real_performance
+        real_perf = get_real_performance(url)
+        if real_perf and real_perf.get('score', 0) > 0:
+            # We got real data — use it!
+            findings = []
+            score = real_perf['score']
+
+            cwv = real_perf.get('cwv', {})
+            field_data = real_perf.get('field_data', {})
+            lab_data = real_perf.get('lab_data', {})
+
+            # Report real metrics
+            lcp_ms = field_data.get('largest_contentful_paint_MS', lab_data.get('lcp', {}).get('numeric_value', 0))
+            cls_val = field_data.get('cumulative_layout_shift_score', lab_data.get('cls', {}).get('numeric_value', 0))
+            tbt_val = lab_data.get('tbt', {}).get('numeric_value', 0)
+
+            if score < 50:
+                findings.append({"severity":"critical","module":"performance","title":f"PageSpeed score: {score}/100 — POOR (real Lighthouse data)","detail":f"Google's PageSpeed Insights API measured real performance. LCP: {lcp_ms/1000:.1f}s, CLS: {cls_val:.3f}, TBT: {tbt_val:.0f}ms. This is real data, not estimates.","fix":"See detailed opportunities in the report for specific actions based on Lighthouse audits.","impact":"Pages with poor CWV lose 5-15% mobile rankings vs 'good' CWV pages."})
+                score_cwv = max(0, score - 30)
+            elif score < 90:
+                findings.append({"severity":"medium","module":"performance","title":f"PageSpeed score: {score}/100 — NEEDS WORK (real Lighthouse data)","detail":f"Real Lighthouse measurement. LCP: {lcp_ms/1000:.1f}s, CLS: {cls_val:.3f}, TBT: {tbt_val:.0f}ms.","fix":"Focus on the top opportunities identified by Lighthouse."})
+                score_cwv = max(0, score - 10)
+            else:
+                findings.append({"severity":"pass","module":"performance","title":f"PageSpeed score: {score}/100 — GOOD (real Lighthouse data)","detail":"Real measurement from Google PageSpeed Insights API.","fix":None})
+                score_cwv = score
+
+            # Add PSI opportunities as findings
+            for opp in real_perf.get('opportunities', [])[:5]:
+                findings.append({"severity":"medium","module":"performance","title":opp.get('title',''),"detail":opp.get('description',''),"fix":"See Lighthouse report for specific files and savings.","impact":f"Potential savings: {opp.get('display_value', 'unknown')}"})
+
+            return {
+                "score": max(0, score_cwv), "findings": findings,
+                "html_kb": round(len(html)/1024), "source": "pagespeed_insights_api",
+                "cwv": {
+                    "estimated_lcp": round(lcp_ms/1000, 1) if lcp_ms else 0,
+                    "estimated_cls": cls_val if cls_val else 0,
+                    "estimated_tbt": round(tbt_val) if tbt_val else 0,
+                    "lcp_grade": field_data.get('largest_contentful_paint_MS', {}).get('category', 'unknown'),
+                    "cls_grade": field_data.get('cumulative_layout_shift_score', {}).get('category', 'unknown'),
+                    "tbt_grade": 'good' if (tbt_val or 999) < 200 else 'needs_improvement' if (tbt_val or 999) < 600 else 'poor',
+                    "source": "Google PageSpeed Insights API (real data)",
+                },
+                "real_perf": real_perf,
+                "external_scripts": 0, "inline_js_kb": 0, "external_styles": 0,
+                "third_party_domains": [], "redirect_count": 0, "redirect_cost_ms": 0,
+                "fetch_time_ms": fetch_time_ms or 0,
+            }
+    except ImportError:
+        pass  # PSI module not available, fall back to heuristics
+    except Exception:
+        import logging
+        logging.getLogger(__name__).warning("PageSpeed Insights failed, falling back to heuristics")
+
+    # ── FALLBACK: Heuristic estimates (clearly labeled) ──
     findings = []
     score = 100
     soup = BeautifulSoup(html, 'html.parser')

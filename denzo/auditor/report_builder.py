@@ -48,7 +48,7 @@ def build_report_html(result: dict, audit_id: str) -> str:
     fixed=[f for f in findings if f['severity']=='fixed']
 
     # ── Module score bars ──
-    mods=[('technical','Technical SEO',24,tech.get('score',0)),('geo','GEO / AI Visibility',22,geo_r.get('score',0)),('images','Image Optimization',14,images_r.get('score',0)),('sitemap','Sitemap',12,sitemap_r.get('score',0)),('performance','Core Web Vitals (estimated)',12,perf_r.get('score',0)),('robots','Robots.txt',8,robots_r.get('score',0)),('llms','llms.txt & AI Crawlers',8,llms_r.get('score',0))]
+    mods=[('technical','Technical SEO',MODULE_WEIGHTS.get('technical',30),tech.get('score',0)),('geo','Content & Authority',MODULE_WEIGHTS.get('geo',22),geo_r.get('score',0)),('content','Content Quality',MODULE_WEIGHTS.get('content',10),results.get('content',{}).get('score',0)),('performance','Core Web Vitals',MODULE_WEIGHTS.get('performance',15),perf_r.get('score',0)),('images','Image Optimization',MODULE_WEIGHTS.get('images',8),images_r.get('score',0)),('local_seo','Local SEO & GBP',MODULE_WEIGHTS.get('local_seo',0),results.get('local_seo',{}).get('score',0)),('sitemap','Sitemap',MODULE_WEIGHTS.get('sitemap',8),sitemap_r.get('score',0)),('robots','Robots.txt',MODULE_WEIGHTS.get('robots',7),robots_r.get('score',0)),('llms','AI Crawlers',MODULE_WEIGHTS.get('llms',0),llms_r.get('score',0))]
     bars=''
     for mod,label,w,s in mods:
         bc='#16a34a' if s>=70 else '#d97706' if s>=40 else '#dc2626'
@@ -129,6 +129,55 @@ def build_report_html(result: dict, audit_id: str) -> str:
 <p class="llms-deploy">Deploy: drop in <code>/public/</code> (Next.js) or webroot. Add <code>&lt;link rel="llms.txt" href="/llms.txt"&gt;</code> to &lt;head&gt;.</p>
 </div></section>'''
 
+    # ── Keywords & Search Intent section ──
+    kw = results.get('keywords', {}) or results.get('content', {})
+    kw_section = ''
+    if kw:
+        primary_kw = kw.get('primary_keyword', '')
+        intent = kw.get('dominant_intent', '')
+        intent_label = {'transactional': '🛒 Transactional', 'commercial': '🔍 Commercial',
+                       'informational': '📚 Informational', 'navigational': '🏢 Navigational'}.get(intent, intent)
+        kw_section = f'''<section id="keywords"><div class="section-header"><h2>🎯 Keyword & Search Intent</h2></div>
+    <table class="metric-table"><tbody>
+    <tr><td>Primary Keyword</td><td><strong>{html.escape(primary_kw or 'Not detected')}</strong></td></tr>
+    <tr><td>Search Intent</td><td>{intent_label}</td></tr>
+    <tr><td>Keyword in H1</td><td><span class="{'pass' if kw.get('kw_in_h1') else 'fail'}">{'Yes' if kw.get('kw_in_h1') else 'No'}</span></td></tr>
+    <tr><td>Keyword in URL</td><td><span class="{'pass' if kw.get('kw_in_url') else 'fail'}">{'Yes' if kw.get('kw_in_url') else 'No'}</span></td></tr>
+    <tr><td>Keyword Density</td><td>{kw.get('kw_density', 0)}%</td></tr>
+    <tr><td>Top Content Terms</td><td>{', '.join(kw.get('word_frequency_top', [])[:8])}</td></tr>
+    </tbody></table></section>'''
+
+    # ── Content Quality section ──
+    cq = results.get('content', {}) or {}
+    cq_section = ''
+    if cq and cq.get('word_count', 0) > 0:
+        orig = cq.get('originality_signals', {})
+        cq_section = f'''<section id="content-quality"><div class="section-header"><h2>📝 Content Quality</h2></div>
+    <table class="metric-table"><tbody>
+    <tr><td>Word Count</td><td><strong>{cq.get('word_count', 0):,}</strong></td></tr>
+    <tr><td>Readability (Flesch-Kincaid)</td><td>Grade {cq.get('flesch_kincaid_grade', 'N/A')} {"(broadly accessible)" if cq.get('flesch_kincaid_grade', 99) <= 10 else "(complex)"}</td></tr>
+    <tr><td>Avg Words per Sentence</td><td>{cq.get('avg_words_per_sentence', 'N/A')}</td></tr>
+    <tr><td>Avg Paragraph Length</td><td>{cq.get('avg_para_length', 'N/A')} words</td></tr>
+    <tr><td>Originality Score</td><td><span class="{'pass' if cq.get('originality_score', 0) >= 15 else 'warn' if cq.get('originality_score', 0) >= 5 else 'fail'}">{cq.get('originality_score', 0)} data points</span></td></tr>
+    <tr><td>Statistics & Numbers</td><td>{orig.get('statistics', 0)} stats, {orig.get('specific_numbers', 0)} specific references</td></tr>
+    <tr><td>Rich Elements</td><td>{cq.get('rich_elements', 0)} (images, videos, tables, quotes)</td></tr>
+    </tbody></table></section>'''
+
+    # ── Local Business section ──
+    lb = results.get('local_seo', {}) or {}
+    lb_section = ''
+    if lb and lb.get('is_local'):
+        lb_section = f'''<section id="local-seo"><div class="section-header"><h2>📍 Local SEO & Google Business Profile</h2></div>
+    <table class="metric-table"><tbody>
+    <tr><td>Business Name</td><td><strong>{html.escape(lb.get('business_name', 'N/A'))}</strong></td></tr>
+    <tr><td>NAP Score</td><td><span class="{'pass' if lb.get('nap_score', 0) == 3 else 'fail'}">{lb.get('nap_score', 0)}/3</span></td></tr>
+    <tr><td>Phone Numbers Found</td><td>{', '.join(lb.get('phones_found', [])[:3]) or 'None'}</td></tr>
+    <tr><td>Addresses Found</td><td>{', '.join(lb.get('addresses_found', [])[:2]) or 'None'}</td></tr>
+    <tr><td>Review Signals</td><td><span class="{'pass' if lb.get('has_review_signals') else 'fail'}">{'Present' if lb.get('has_review_signals') else 'Missing'}</span></td></tr>
+    <tr><td>LocalBusiness Schema</td><td><span class="{'pass' if lb.get('has_local_schema') else 'fail'}">{'Present' if lb.get('has_local_schema') else 'Missing'}</span></td></tr>
+    <tr><td>Service Cities Detected</td><td>{', '.join(lb.get('service_cities', [])[:8]) or 'None detected'}</td></tr>
+    </tbody></table></section>'''
+
     # GEO benchmarks
     benchmarks=geo_r.get('benchmarks',{})
     bench_section=''
@@ -159,6 +208,16 @@ def build_report_html(result: dict, audit_id: str) -> str:
 <tr><td>PNG (unoptimized)</td><td>{png}</td><td class="{"pass" if png==0 else "fail" if png>total*0.3 else "warn"}">{'✓' if png==0 else '✗' if png>total*0.3 else '⚠'}</td></tr>
 <tr><td>LCP Image</td><td>{lcp[:80] if lcp else 'N/A'}</td><td class="{"pass" if lcp_ok else "warn"}">{'✓ optimized' if lcp_ok else '⚠ needs priority' if lcp else '—'}</td></tr>
 </tbody></table></section>'''
+
+    # ── Real Performance section (PSI API) ──
+    perf = results.get('performance', {}) or {}
+    psi_section = ''
+    real_perf = perf.get('real_perf') or {}
+    if real_perf and real_perf.get('score', 0) > 0:
+        psi_section = f'''<section id="psi"><div class="section-header"><h2>⚡ Real Performance Data (PageSpeed Insights)</h2><span style="font-size:0.7rem;color:#64748b;">Google PSI API — real measurements, not estimates</span></div>
+    <div class="llms-banner" style="background:linear-gradient(135deg,#14532d,#052e16);">
+    <p style="color:#86efac;"><strong>PageSpeed Score: {real_perf.get('score', 'N/A')}/100</strong> (measured by Google Lighthouse)</p>
+    </div></section>'''
 
     return f'''<!DOCTYPE html>
 <html lang="en">
@@ -288,6 +347,10 @@ pre{{font-family:'SF Mono','Fira Code','JetBrains Mono',monospace;font-size:0.8r
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.5rem;">{qs}</div>
 </section>
 
+{psi_section}
+{kw_section}
+{cq_section}
+{lb_section}
 {bench_section}
 {img_section}
 

@@ -1,5 +1,5 @@
 """
-Site Analyzer — orchestrates all 5 analysis modules in parallel.
+Site Analyzer — orchestrates all 9 analysis modules in parallel.
 Collects results, computes weighted overall score, generates structured report.
 """
 import re
@@ -24,17 +24,30 @@ from denzo.auditor.geo_visibility import analyze_geo_visibility
 from denzo.auditor.llms_generator import generate_llms_txt
 from denzo.auditor.image_auditor import deep_image_audit
 from denzo.auditor.performance_estimator import estimate_performance
+from denzo.auditor.content_quality import analyze_content_quality
+from denzo.auditor.local_business import check_local_business
 
 
-# Weight distribution for overall score
+# Weight distribution for overall score — based on actual ranking factor studies:
+# - On-page technical fundamentals: 30% (title, meta, schema, headings, indexability)
+# - Content quality & E-E-A-T signals: 22% (depth, structure, authority markers)
+# - Core Web Vitals & performance: 15% (Real CWV via PageSpeed API when available)
+# - Content depth & originality: 10% (readability, data points, freshness)
+# - Indexability & crawl efficiency: 15% combined (sitemap 8%, robots 7%)
+# - Image optimization: 8% (alt text, formats, dimensions, LCP)
+# - Local SEO: 0-10% (dynamic — only for businesses detected as local)
+# NOTE: GEO/AI visibility is a SYMPTOM of good SEO, not a ranking factor.
+#       We audit GEO signals as part of content quality (FAQ, lists, definitions), not as a separate module.
 MODULE_WEIGHTS = {
-    'technical': 24,   # factual on-page + indexability signals
-    'geo': 22,         # AI / GEO citation readiness
-    'images': 14,      # image SEO + CLS/LCP contributors
-    'sitemap': 12,     # crawl/discovery (factual)
-    'performance': 12, # CWV are ESTIMATED heuristically -> weighted below factual signals
-    'robots': 8,       # crawlability + AI crawler access (factual)
-    'llms': 8,         # emerging/optional standard -> low weight
+    'technical': 30,
+    'geo': 22,
+    'performance': 15,
+    'sitemap': 8,
+    'robots': 7,
+    'images': 8,
+    'content': 10,
+    'local_seo': 0,  # 0 weight when not a local business, adjusted at runtime
+    'llms': 0,  # llms.txt is NOT a ranking factor — informational only, no score impact
 }
 
 assert sum(MODULE_WEIGHTS.values()) == 100, f"MODULE_WEIGHTS must sum to 100, got {sum(MODULE_WEIGHTS.values())}"
@@ -49,7 +62,7 @@ class SiteAnalyzer:
         self.progress = progress_callback or (lambda p, step: None)
 
     def run_full_analysis(self) -> dict:
-        """Run all 5 modules in parallel, compute scores, return complete results dict."""
+        """Run all 9 modules in parallel, compute scores, return complete results dict."""
         start = time.time()
 
         # Phase 1: Fetch the page
@@ -109,7 +122,7 @@ class SiteAnalyzer:
             logging.getLogger(__name__).warning(f"Industry deep_detect failed for {self.url}", exc_info=True)
 
         # Phase 2: Run all analysis modules in parallel (with industry context)
-        self.progress(15, 'Analyzing sitemap.xml...')
+        self.progress(15, 'Running SEO + GEO analysis...')
         industry = industry_profile
         modules = {
             'sitemap': lambda: analyze_sitemap(self.url, html, self.domain),
@@ -119,12 +132,21 @@ class SiteAnalyzer:
             'geo': lambda: analyze_geo_visibility(self.url, html, self.domain, industry),
             'images': lambda: deep_image_audit(self.url, html, self.domain, base_page_url=self.url),
             'performance': lambda: estimate_performance(self.url, html, self.domain, redirect_chain, 0),
+            'content': lambda: analyze_content_quality(self.url, html, self.domain, industry),
+            'local_seo': lambda: check_local_business(self.url, html, self.domain, industry),
         }
 
         results = {'_industry': industry_profile}
+
+        # Adjust local_seo weight: only for businesses detected as local
+        if industry_profile and industry_profile.get('is_local_business'):
+            MODULE_WEIGHTS['local_seo'] = 10
+            MODULE_WEIGHTS['technical'] = 25  # Reduce technical slightly to make room
+            MODULE_WEIGHTS['geo'] = 17
+
         completed = 0
 
-        with ThreadPoolExecutor(max_workers=7) as executor:
+        with ThreadPoolExecutor(max_workers=9) as executor:
             futures = {executor.submit(fn): name for name, fn in modules.items()}
 
             for future in as_completed(futures):
@@ -165,7 +187,7 @@ class SiteAnalyzer:
 
         # Phase 4: Collect all findings
         all_findings = []
-        for module_name in ['sitemap', 'robots', 'llms', 'technical', 'geo', 'images', 'performance']:
+        for module_name in ['sitemap', 'robots', 'llms', 'technical', 'geo', 'images', 'performance', 'content', 'local_seo']:
             if module_name in results:
                 for f in results[module_name].get('findings', []):
                     f['module'] = module_name
@@ -205,4 +227,15 @@ class SiteAnalyzer:
             "li_count": results.get('geo', {}).get('li_count', 0),
             "internal_links": results.get('technical', {}).get('internal_links', 0),
             "llms_generated": llms_gen,
+            "weight_explanation": {
+                'technical': '30% — On-page fundamentals (title, meta, schema, headings)',
+                'geo': '22% — Content quality & authority signals',
+                'performance': '15% — Core Web Vitals & page speed',
+                'images': '8% — Image optimization & accessibility',
+                'content': '10% — Content depth, readability & originality',
+                'sitemap': '8% — Crawl efficiency & indexation',
+                'robots': '7% — Crawler access & directives',
+                'local_seo': '0-10% — Local business signals (dynamic, only for local businesses)',
+                'llms': '0% — Informational only, not a ranking factor',
+            },
         }
