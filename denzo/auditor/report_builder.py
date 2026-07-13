@@ -6,6 +6,7 @@ fix boxes with code, impact boxes, metric tables with status colors.
 import html
 import json
 from datetime import datetime, timezone
+from denzo.auditor.analyzer import MODULE_WEIGHTS
 
 
 def build_report_html(result: dict, audit_id: str) -> str:
