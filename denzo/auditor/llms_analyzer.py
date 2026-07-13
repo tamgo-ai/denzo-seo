@@ -78,22 +78,22 @@ def analyze_llms(url: str, html: str, domain: str) -> dict:
             score -= 5
     elif llms_status == 'error':
         findings.append({
-            "severity": "critical",
+            "severity": "low",
             "module": "llms",
-            "title": "llms.txt returns an error (500/404/connection refused)",
-            "detail": "ChatGPT, Claude, Perplexity, and Gemini use llms.txt to discover site structure. An error blocks ALL AI crawler discovery.",
-            "fix": "Create /public/llms.txt (Next.js) or add it at the webroot. Include: identity, key pages, services, FAQs, and sitemap references."
+            "title": "llms.txt returns an error (500/404) — optional, emerging standard",
+            "detail": "llms.txt is a proposed convention for guiding AI crawlers. It is NOT yet used as a ranking or crawl directive by Google, OpenAI or Anthropic, so a missing/erroring file does not hurt SEO today. Adding it is low-cost future-proofing.",
+            "fix": "Optional: create /public/llms.txt (Next.js) or at webroot with identity, key pages, services, FAQs and sitemap references."
         })
-        score -= 40
+        score -= 8
     else:
         findings.append({
-            "severity": "critical",
+            "severity": "low",
             "module": "llms",
-            "title": "No llms.txt found",
-            "detail": "AI platforms use llms.txt (like robots.txt but for LLMs) to understand site structure. Without it, AI discovery relies on web crawl alone.",
-            "fix": "Create /public/llms.txt (Next.js) or at webroot. Example: seo.tamgo.ai/static/llms-acg-example.txt"
+            "title": "No llms.txt found — optional, emerging standard",
+            "detail": "llms.txt is a proposed convention (like robots.txt but for LLMs). Adoption is early and it is NOT currently a confirmed ranking or crawl signal for Google, OpenAI or Anthropic — its absence does not hurt SEO today. It is low-cost future-proofing worth adding.",
+            "fix": "Optional: create /public/llms.txt (Next.js) or at webroot. Example: seo.tamgo.ai/static/llms-acg-example.txt"
         })
-        score -= 35
+        score -= 8
 
     # 4. Analyze llms-full.txt
     if llms_full_status == 'present':
@@ -112,10 +112,9 @@ def analyze_llms(url: str, html: str, domain: str) -> dict:
             "severity": "medium",
             "module": "llms",
             "title": "llms-full.txt returns an error",
-            "detail": "While optional, this file gives AI models comprehensive context for accurate citations.",
-            "fix": "Create /public/llms-full.txt with full page content in markdown format."
+            "detail": "Optional companion file that gives AI models comprehensive context. Not a ranking signal; nice-to-have.",
+            "fix": "Optional: create /public/llms-full.txt with full page content in markdown format."
         })
-        score -= 10
     # llms-full.txt missing entirely = medium, not critical
 
     # 5. Check HTML for AI crawler hints
