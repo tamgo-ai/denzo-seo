@@ -39,13 +39,29 @@ def check_local_business(url: str, html: str, domain: str, industry_profile: dic
     phones_found = list(set(p.strip() for p in phone_pattern if len(re.sub(r'\D', '', p)) >= 7))
 
     # Address: supports Spanish and English formats
-    address_pattern_en = re.findall(r'\d{1,5}\s+\w+(?:\s+\w+){1,4}(?:,\s*\w+(?:\s+\w+)?,\s*[A-Z]{2}\s*\d{5})', text)
-    address_pattern_es = re.findall(
-        r'(?:calle|av\.?|avenida|col\.?|colonia|blvd\.?|paseo|calzada|urb\.?|urbanización|'
-        r'residencial|edificio|local|n[°º]|#)\s+\w+(?:\s+\w+){1,8}',
+    # US format: supports abbreviations with periods (Rd., St., Blvd., Ave., Dr., Ct., Ln., Pkwy.)
+    # and multi-word city names (Santa Fe Springs, Rancho Cucamonga, San Fernando Valley)
+    address_pattern_en = re.findall(
+        r'\d{1,5}\s+[\w.]+(?:\s+[\w.]+){1,6}(?:,\s*[\w.\s]+?,\s*[A-Z]{2}\s*\d{5})',
+        text
+    )
+    # Suite/Ste/Unit/Apt pattern: "123 Main St., Suite 100, City, ST 12345"
+    address_pattern_suite = re.findall(
+        r'\d{1,5}\s+[\w.]+(?:\s+[\w.]+){1,8}(?:,\s*(?:Suite|Ste|Unit|Apt)\.?\s*\d+)?'
+        r'(?:,\s*[\w.\s]+?,\s*[A-Z]{2}\s*\d{5})',
         text, re.IGNORECASE
     )
-    addresses_found = list(set(address_pattern_en + address_pattern_es))
+    address_pattern_es = re.findall(
+        r'(?:calle|av\.?|avenida|col\.?|colonia|blvd\.?|paseo|calzada|urb\.?|urbanización|'
+        r'residencial|edificio|local|n[°º]|#)\s+[\w.]+(?:\s+[\w.]+){1,8}',
+        text, re.IGNORECASE
+    )
+    # Broad fallback: any line with a street number near a ZIP code
+    address_pattern_loose = re.findall(
+        r'\d{1,6}\s+[\w.\-\']+(?:\s+[\w.\-\']+){2,8}\s*,?\s*\w+(?:\s+\w+){0,2}\s*,?\s*(?:CA|California|TX|Texas|NY|FL|AZ|NV|CO|OR|WA|IL|PA|OH|GA|NC|MI|NJ|VA|MD|MA|TN|IN|MO|WI|MN|SC|AL|LA|KY|OK|CT|IA|MS|AR|KS|UT|NM|WV|NE|ID|ME|NH|HI|RI|MT|DE|SD|AK|ND|VT|WY)\s*\d{4,5}',
+        text
+    )
+    addresses_found = list(set(address_pattern_en + address_pattern_suite + address_pattern_es + address_pattern_loose))
 
     # Extract business name from title or profile
     business_name = profile.get('business_name', '')

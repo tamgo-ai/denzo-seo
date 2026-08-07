@@ -88,11 +88,20 @@ def check_ai_citations(url: str, html: str, domain: str, industry_profile: dict 
     total = len(queries)
 
     if citations_found == 0:
+        # Severity depends on query coverage: 1 query is low confidence, 3+ is high confidence
+        if total >= 3:
+            severity = "high"
+            score_penalty = 20
+            detail = f"Your site is not being cited by Perplexity AI for any of {total} test queries related to your business. As ~30% of searches now go through AI platforms first, this is a significant visibility gap."
+        else:
+            severity = "medium"
+            score_penalty = 10
+            detail = f"Your site was not cited for {total} test quer{'y' if total == 1 else 'ies'}. This is a limited sample — re-run with more business data (locations + services) for a comprehensive AI visibility assessment."
         findings.append({
-            "severity": "high",
+            "severity": severity,
             "module": "ai_citations",
             "title": f"Zero AI citations: {citations_found}/{total} queries — invisible to AI search",
-            "detail": f"Your site is not being cited by Perplexity AI for any of {total} test queries related to your business. As ~30% of searches now go through AI platforms first, this is a significant visibility gap.",
+            "detail": detail,
             "fix": "To get cited by AI platforms:\n"
                    "1. Build brand mentions on Wikipedia, Crunchbase, BBB, and industry directories\n"
                    "2. Create authoritative content with unique data and statistics\n"
@@ -101,7 +110,7 @@ def check_ai_citations(url: str, html: str, domain: str, industry_profile: dict 
                    "5. Build a strong backlink profile from .edu, .gov, and news domains",
             "impact": "Estimated missed traffic: 15-30% of potential visitors discover businesses through AI search first."
         })
-        score -= 20
+        score -= score_penalty
     elif citations_found < len(queries):
         findings.append({
             "severity": "medium",

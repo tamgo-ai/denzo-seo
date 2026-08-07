@@ -394,9 +394,8 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
     inline_js = [s for s in inline_scripts if not s.get('src') and s.string]
     inline_css = soup.find_all('style')
 
-    if len(external_scripts) > 8:
-        findings.append({"severity":"medium","module":"technical","title":f"{len(external_scripts)} external script files — excessive HTTP requests","detail":f"Each external JS file requires a separate HTTP request. While HTTP/2 multiplexes, too many bundles increase parse time and main-thread blocking.","fix":"Bundle JavaScript into fewer files. Use code splitting per-route in Next.js. Remove unused dependencies. Enable Turbopack."})
-        score -= 6
+    # NOTE: "excessive external scripts" finding is handled by performance_estimator.py
+    # to avoid duplicate findings across modules.
 
     if len(inline_js) > 5:
         inline_js_size = sum(len(s.string or '') for s in inline_js)

@@ -201,7 +201,23 @@ def estimate_performance(url: str, html: str, domain: str, redirect_chain: list 
     }
 
     if estimated_lcp > 4.0:
-        findings.append({"severity":"critical","module":"performance","title":f"Estimated LCP: {estimated_lcp}s — POOR (target: <2.5s)","detail":f"Based on page composition: {html_kb}KB HTML + {round(inline_js_bytes/1024)}KB inline JS + {len(external_js)} external scripts + {redirect_count} redirects. Google's LCP threshold is 2.5s for 'good'. At {estimated_lcp}s, the page is in the worst-performing quartile.","fix":"Priority order for LCP reduction:\n1. Eliminate redirect chain (-{redirect_cost_ms/1000}s)\n2. Reduce inline JS (-{round(inline_js_bytes/1024)}KB → target <50KB)\n3. Enable static generation / ISR for homepage\n4. Optimize LCP image with preload + fetchpriority='high'\n5. Enable CDN caching (currently Cache-Control: no-store)","impact":"LCP is a direct Google ranking signal. Pages with 'poor' LCP lose 5-15% of mobile rankings vs 'good' LCP pages."})
+        # Build dynamic fix text based on actual page characteristics
+        fix_steps = []
+        step_num = 1
+        if redirect_count > 0:
+            fix_steps.append(f"{step_num}. Eliminate redirect chain (-{redirect_cost_ms/1000:.0f}s)")
+            step_num += 1
+        if inline_js_bytes > 50000:
+            fix_steps.append(f"{step_num}. Reduce inline JS ({round(inline_js_bytes/1024)}KB → target <50KB)")
+            step_num += 1
+        fix_steps.append(f"{step_num}. Enable static generation / ISR for homepage")
+        step_num += 1
+        fix_steps.append(f"{step_num}. Optimize LCP image with preload + fetchpriority='high'")
+        step_num += 1
+        fix_steps.append(f"{step_num}. Enable CDN caching with ETag headers (currently max-age=0 with no cache validation)")
+        fix_text = "Priority order for LCP reduction:\n" + "\n".join(fix_steps)
+
+        findings.append({"severity":"critical","module":"performance","title":f"Estimated LCP: {estimated_lcp}s — POOR (target: <2.5s)","detail":f"Based on page composition: {html_kb}KB HTML + {round(inline_js_bytes/1024)}KB inline JS + {len(external_js)} external scripts + {redirect_count} redirects. Google's LCP threshold is 2.5s for 'good'. At {estimated_lcp}s, the page is in the worst-performing quartile.","fix":fix_text,"impact":"LCP is a direct Google ranking signal. Pages with 'poor' LCP lose 5-15% of mobile rankings vs 'good' LCP pages."})
         score -= 20
     elif estimated_lcp > 2.5:
         findings.append({"severity":"medium","module":"performance","title":f"Estimated LCP: {estimated_lcp}s — NEEDS IMPROVEMENT (target: <2.5s)","detail":f"Contributing factors: {html_kb}KB HTML, {len(external_js)} external scripts, {redirect_count} redirects.","fix":"Reduce page weight and inline JS. Enable CDN caching. Eliminate redirects."})
