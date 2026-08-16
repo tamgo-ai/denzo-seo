@@ -302,6 +302,16 @@ function listenProgress(auditId) {
 
   evtSource.onerror = () => { evtSource.close(); setTimeout(() => listenProgress(auditId), 1500); };
 }
+
+// Auto-start if ?url= is present (e.g. from a postcard QR code).
+(function() {
+  const u = new URLSearchParams(location.search).get('url');
+  if (u) {
+    const input = document.getElementById('url-input');
+    if (input) input.value = u;
+    startAnalysis({ preventDefault: function(){} });
+  }
+})();
 </script>
 </body>
 </html>

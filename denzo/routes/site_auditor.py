@@ -9,7 +9,7 @@ import re
 import threading
 from datetime import datetime
 from urllib.parse import urlparse
-from flask import Blueprint, request, jsonify, render_template, Response, send_file
+from flask import Blueprint, request, jsonify, render_template, Response, send_file, redirect
 from denzo.db import get_db
 
 bp = Blueprint('site_auditor', __name__, url_prefix='/auditor')
@@ -17,6 +17,32 @@ bp = Blueprint('site_auditor', __name__, url_prefix='/auditor')
 # In-memory progress store for running analyses (SSE pushes from here)
 _progress_store: dict[str, dict] = {}
 _progress_lock = threading.Lock()
+
+# Standalone "still running" page with auto-refresh. Used by /auditor/report/<id>
+# while an analysis is pending/running, so a postcard QR can land straight on it.
+_PROCESSING_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="3">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analyzing… · DENZO Site Auditor</title>
+<style>
+  body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+       background:#08090b;color:#edf0f5;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;}
+  .spinner{width:44px;height:44px;border:3px solid rgba(255,255,255,.12);border-top-color:#6366f1;
+           border-radius:50%;animation:spin 0.9s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .step{margin-top:1.4rem;color:#7b8290;font-size:0.95rem;}
+  .pct{margin-top:0.4rem;color:#a78bfa;font-size:0.8rem;font-weight:600;}
+</style>
+</head>
+<body>
+  <div class="spinner"></div>
+  <p class="step">__STEP__</p>
+  <p class="pct">__PROGRESS__%</p>
+</body>
+</html>"""
 
 
 def _new_audit_id() -> str:
@@ -78,8 +104,12 @@ def report(audit_id: str):
     audit = db.execute("SELECT * FROM site_audits WHERE audit_id=?", (audit_id,)).fetchone()
     if not audit:
         return render_template('site_auditor/index.html', error="Audit not found"), 404
+    if audit['status'] == 'error':
+        return render_template('site_auditor/index.html', error=audit['error_message'] or 'Analysis failed'), 500
     if audit['status'] != 'completed':
-        return render_template('site_auditor/index.html', error="Audit still running"), 202
+        step = audit['current_step'] or 'Analyzing your site...'
+        progress = audit['progress'] if audit['progress'] is not None else 0
+        return _PROCESSING_HTML.replace('__STEP__', step).replace('__PROGRESS__', str(progress))
 
     previous_audits = db.execute(
         "SELECT audit_id, created_at, overall_score FROM site_audits WHERE url=? AND audit_id!=? AND status='completed' ORDER BY created_at DESC LIMIT 5",
@@ -87,6 +117,27 @@ def report(audit_id: str):
     ).fetchall()
 
     return render_template('site_auditor/report.html', audit=audit, previous_audits=previous_audits)
+
+
+@bp.route('/report/<audit_id>/json')
+def report_json(audit_id: str):
+    """Machine-readable audit result — used by the Droppin outreach pipeline."""
+    db = get_db()
+    audit = db.execute("SELECT * FROM site_audits WHERE audit_id=?", (audit_id,)).fetchone()
+    if not audit:
+        return jsonify({'error': 'Audit not found'}), 404
+
+    payload = {
+        'audit_id': audit['audit_id'],
+        'url': audit['url'],
+        'domain': audit['domain'],
+        'status': audit['status'],
+        'progress': audit['progress'],
+        'overall_score': audit['overall_score'],
+        'module_scores': json.loads(audit['module_scores']) if audit['module_scores'] else {},
+        'report': json.loads(audit['report_json']) if audit['report_json'] else {},
+    }
+    return jsonify(payload)
 
 
 @bp.route('/report/<audit_id>/download')
@@ -183,32 +234,21 @@ def progress(audit_id: str):
                     headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
 
 
-@bp.route('/analyze', methods=['POST'])
-def analyze():
-    """Start a new site analysis. Returns audit_id for progress tracking."""
-    # Rate limit: 10 analyses per hour per IP
-    from flask import current_app
-    try:
-        from flask_limiter import Limiter
-    except ImportError:
-        pass
-
-    data = request.get_json() or {}
-    url = (data.get('url') or '').strip()
-
+def _normalize_and_enqueue(url: str, client_ip: str):
+    """Validate, rate-limit, and enqueue an analysis. Returns (audit_id, error, status_code)."""
+    url = (url or '').strip()
     if not url:
-        return jsonify({'error': 'URL is required'}), 400
+        return None, 'URL is required', 400
 
     # Basic URL validation
     if len(url) > 500 or '<' in url or '>' in url:
-        return jsonify({'error': 'Invalid URL'}), 400
+        return None, 'Invalid URL', 400
 
     # Normalize URL
     if not url.startswith('http'):
         url = 'https://' + url
 
     # Basic rate limiting: max 10 per hour per IP
-    client_ip = request.remote_addr or 'unknown'
     now = time.time()
     with _progress_lock:
         # Clean old entries (older than 1 hour)
@@ -219,7 +259,7 @@ def analyze():
         rate_key = f'rate:{client_ip}'
         count = _progress_store.get(rate_key, 0)
         if count >= 10:
-            return jsonify({'error': 'Rate limit exceeded. Max 10 analyses per hour.'}), 429
+            return None, 'Rate limit exceeded. Max 10 analyses per hour.', 429
         _progress_store[rate_key] = count + 1
 
     audit_id = _new_audit_id()
@@ -241,7 +281,35 @@ def analyze():
     thread = threading.Thread(target=_run_analysis, args=(audit_id, url, domain), daemon=True)
     thread.start()
 
+    return audit_id, None, None
+
+
+@bp.route('/analyze', methods=['POST'])
+def analyze():
+    """Start a new site analysis. Returns audit_id for progress tracking."""
+    data = request.get_json() or {}
+    url = (data.get('url') or '').strip()
+    client_ip = request.remote_addr or 'unknown'
+
+    audit_id, error, code = _normalize_and_enqueue(url, client_ip)
+    if error:
+        return jsonify({'error': error}), code
+
     return jsonify({'audit_id': audit_id, 'progress_url': f'/auditor/progress/{audit_id}'})
+
+
+@bp.route('/go')
+def go():
+    """One-click entry: enqueue an analysis for ?url= and redirect to its report.
+    Ideal for postcard QR codes — e.g. /auditor/go?url=https://example.com."""
+    url = request.args.get('url', '')
+    client_ip = request.remote_addr or 'unknown'
+
+    audit_id, error, code = _normalize_and_enqueue(url, client_ip)
+    if error:
+        return render_template('site_auditor/index.html', error=error), code
+
+    return redirect(f'/auditor/report/{audit_id}')
 
 
 def _run_analysis(audit_id: str, url: str, domain: str):
