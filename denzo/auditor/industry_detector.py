@@ -107,6 +107,58 @@ def _detect_from_schema(html: str) -> dict:
     }
 
 
+# ── Deterministic local-business classification ──────────────────────────────
+
+# Verticals that are inherently physical / "near me" businesses.
+LOCAL_INDUSTRIES = {
+    'auto_body_shop', 'automotive_dealership', 'restaurant', 'healthcare',
+    'construction', 'legal', 'real_estate', 'local_service', 'home_services',
+    'fitness', 'spa', 'salon', 'dental', 'veterinary', 'storage',
+}
+
+# Presence of any of these schema types is definitive proof of a local business.
+LOCAL_SCHEMA_TYPES = (
+    'LocalBusiness', 'AutoBodyShop', 'AutoRepair', 'AutomotiveBusiness', 'AutoDealer',
+    'Restaurant', 'FoodEstablishment', 'MedicalBusiness', 'MedicalClinic',
+    'DiagnosticLab', 'Hospital', 'Physician', 'Dentist', 'RealEstateAgent',
+    'LegalService', 'Attorney', 'Store', 'HomeAndConstructionBusiness',
+    'HealthAndBeautyBusiness', 'ProfessionalService', 'EmergencyService',
+    'InsuranceAgency', 'FinancialService', 'SportsActivityLocation',
+    'EntertainmentBusiness', 'LodgingBusiness', 'ChildCare', 'PlaceOfWorship',
+)
+
+
+def determine_is_local(industry: str, schema_types: list, html: str = '') -> bool:
+    """Deterministic local classification — no LLM.
+
+    Overrides Claude's non-deterministic `is_local_business` so the same site
+    always scores the same. A business is "local" if it competes for "near me" /
+    Google Maps visibility:
+      1. it declares LocalBusiness (or a subtype) schema, OR
+      2. its vertical is an inherently local service, OR
+      3. it shows NAP (phone AND physical address) in visible text.
+    """
+    for st in (schema_types or []):
+        if any(lt in (st or '') for lt in LOCAL_SCHEMA_TYPES):
+            return True
+
+    if (industry or '') in LOCAL_INDUSTRIES:
+        return True
+
+    if html:
+        text = _extract_text_content(html)
+        phones = re.findall(r'(?:\+?\d{1,3}[-.\s]?)?\d{3,4}[-.\s]?\d{3,4}[-.\s]?\d{3,4}', text)
+        has_phone = any(len(re.sub(r'\D', '', p)) >= 7 for p in phones)
+        has_address = bool(re.search(
+            r'\d{1,5}\s+[\w.]+\s+(?:st\.?|street|ave\.?|avenue|blvd\.?|boulevard|rd\.?|road|dr\.?|drive|ln\.?|lane|way|hwy|highway|calle|avenida|paseo)\b',
+            text, re.IGNORECASE
+        ))
+        if has_phone and has_address:
+            return True
+
+    return False
+
+
 def quick_detect(html: str) -> dict:
     """
     Fast keyword-based industry detection. Returns a preliminary profile

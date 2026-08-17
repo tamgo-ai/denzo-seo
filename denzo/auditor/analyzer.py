@@ -13,7 +13,7 @@ from typing import Callable
 from denzo.agents.utils.stealth_fetch import fetch_html
 
 # Import industry detector
-from denzo.auditor.industry_detector import quick_detect, deep_detect
+from denzo.auditor.industry_detector import quick_detect, deep_detect, determine_is_local
 
 # Import analysis modules
 from denzo.auditor.sitemap_analyzer import analyze_sitemap
@@ -128,6 +128,19 @@ class SiteAnalyzer:
         except Exception:
             import logging
             logging.getLogger(__name__).warning(f"Industry deep_detect failed for {self.url}", exc_info=True)
+
+        # Deterministic local-business override. Claude's `is_local_business` is
+        # non-deterministic (the same site flips between local/not-local across
+        # runs), so recompute it from concrete signals: schema + vertical + NAP.
+        _det = quick_detect(html)
+        _quick_ind = _det.get('primary_industry', '')
+        _claude_ind = industry_profile.get('industry', '') or ''
+        _local_ind = _quick_ind if (_quick_ind and _quick_ind != 'general_business') else _claude_ind
+        industry_profile['is_local_business'] = determine_is_local(
+            _local_ind,
+            _det.get('schema_info', {}).get('schema_types', []),
+            html,
+        )
 
         # Phase 2: Run all analysis modules in parallel (with industry context)
         self.progress(15, 'Running SEO + GEO analysis...')
