@@ -38,6 +38,21 @@ def analyze_content_quality(url: str, html: str, domain: str, industry_profile: 
     word_count = len(words)
     paragraphs = [p.get_text(strip=True) for p in soup.find_all('p') if len(p.get_text(strip=True)) > 50]
 
+    # ── 0. Content Depth (word count) ──
+    # Thin content cannot rank for competitive queries, regardless of how many
+    # phone numbers or images are on the page. This is the single most common
+    # reason a local-business page fails to rank — and it was previously NOT
+    # scored here, which let 339-word pages earn a perfect 100/100.
+    if word_count < 400:
+        findings.append({"severity":"high","module":"content","title":f"Severely thin content: {word_count} words","detail":f"At {word_count} words, this page cannot cover the topic in enough depth to compete. Top-10 pages for commercial queries typically exceed 1,000 words. Google's Helpful Content System favors comprehensive, original, useful content.","fix":"Expand to 1,000+ words. Structure with H2/H3 sections: detailed service descriptions, process, FAQ, about/credentials, testimonials, and location-specific content. Add original data points only this business can provide (years in business, certifications, before/after results).","impact":"Cannot compete for mid-to-high difficulty keywords. Estimated ranking ceiling: position 20+."})
+        score -= 20
+    elif word_count < 800:
+        findings.append({"severity":"medium","module":"content","title":f"Thin content: {word_count} words","detail":f"Below the depth expected for competitive ranking. Most top-10 pages for commercial queries exceed 1,000 words.","fix":"Expand to 1,000+ words with additional sections: FAQ, detailed service descriptions, case studies, and location-specific content.","impact":"Limited ability to rank for competitive terms."})
+        score -= 10
+    elif word_count < 1200:
+        findings.append({"severity":"low","module":"content","title":f"Below recommended depth: {word_count} words","detail":"Adequate, but adding more depth would strengthen competitiveness for harder queries.","fix":"Add an FAQ section, more service detail, or customer testimonials to reach 1,200+ words."})
+        score -= 3
+
     # ── 1. Readability (language-aware) ──
     sentences = re.split(r'[.!?]+', text)
     sentences = [s.strip() for s in sentences if len(s.strip().split()) > 3]

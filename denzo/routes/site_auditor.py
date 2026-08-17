@@ -97,6 +97,11 @@ def history():
     return render_template('site_auditor/history.html', audits=rows, filter_url=domain_filter)
 
 
+def _report_mode(host: str) -> str:
+    """droppin = lead-gen locked report; full = internal technical report."""
+    return 'droppin' if 'droppin' in (host or '').lower() else 'full'
+
+
 @bp.route('/report/<audit_id>')
 def report(audit_id: str):
     """View a completed audit report."""
@@ -111,12 +116,11 @@ def report(audit_id: str):
         progress = audit['progress'] if audit['progress'] is not None else 0
         return _PROCESSING_HTML.replace('__STEP__', step).replace('__PROGRESS__', str(progress))
 
-    previous_audits = db.execute(
-        "SELECT audit_id, created_at, overall_score FROM site_audits WHERE url=? AND audit_id!=? AND status='completed' ORDER BY created_at DESC LIMIT 5",
-        (audit['url'], audit_id)
-    ).fetchall()
-
-    return render_template('site_auditor/report.html', audit=audit, previous_audits=previous_audits)
+    result = json.loads(audit['report_json']) if audit['report_json'] else {}
+    mode = _report_mode(request.host)
+    from denzo.auditor.report_builder import build_report_html
+    report_html = build_report_html(result, audit_id, mode)
+    return Response(report_html, mimetype='text/html')
 
 
 @bp.route('/report/<audit_id>/json')
@@ -145,13 +149,16 @@ def download(audit_id: str):
     """Download standalone HTML report."""
     db = get_db()
     audit = db.execute("SELECT * FROM site_audits WHERE audit_id=?", (audit_id,)).fetchone()
-    if not audit or not audit['report_html']:
+    if not audit:
         return "Not found", 404
 
+    result = json.loads(audit['report_json']) if audit['report_json'] else {}
     domain = audit['domain'] or 'site'
     filename = f"audit-{domain}-{audit['created_at'][:10]}.html"
+    from denzo.auditor.report_builder import build_report_html
+    report_html = build_report_html(result, audit_id, 'full', inline_assets=True)
     return Response(
-        audit['report_html'],
+        report_html,
         mimetype='text/html',
         headers={'Content-Disposition': f'attachment; filename="{filename}"'}
     )
@@ -336,16 +343,12 @@ def _run_analysis(audit_id: str, url: str, domain: str):
         module_scores = json.dumps(result.get('module_scores', {}))
         report_json = json.dumps(result, ensure_ascii=False)
 
-        # Generate HTML report
-        from denzo.auditor.report_builder import build_report_html
-        report_html = build_report_html(result, audit_id)
-
         db.execute("""UPDATE site_audits SET status='completed', progress=100,
-            report_json=?, report_html=?, overall_score=?, module_scores=?,
+            report_json=?, overall_score=?, module_scores=?,
             fetch_method=?, page_title=?, page_status=?, html_size_kb=?, analysis_time_ms=?,
             updated_at=CURRENT_TIMESTAMP
             WHERE audit_id=?""",
-            (report_json, report_html, overall, module_scores,
+            (report_json, overall, module_scores,
              result.get('fetch_method', ''), result.get('page_title', ''),
              result.get('page_status', 0), result.get('html_size_kb', 0),
              elapsed_ms, audit_id))
