@@ -29,6 +29,7 @@ from denzo.auditor.keyword_analyzer import analyze_keyword_targeting
 from denzo.auditor.local_business import check_local_business
 from denzo.auditor.ai_citations import check_ai_citations
 from denzo.auditor.keyword_research import research_keywords
+from denzo.auditor.indexation_check import analyze_indexation
 
 
 # Weight distribution for overall score — based on actual ranking factor studies:
@@ -54,6 +55,7 @@ MODULE_WEIGHTS = {
     'llms': 0,  # llms.txt is NOT a ranking factor — informational only, no score impact
     'ai_citations': 0,  # Informational — AI citation visibility check
     'keyword_research': 0,  # Informational — keyword suggestions, not a score
+    'indexation': 0,  # Informational — Google index status (verified domains only)
 }
 
 assert sum(MODULE_WEIGHTS.values()) == 100, f"MODULE_WEIGHTS must sum to 100, got {sum(MODULE_WEIGHTS.values())}"
@@ -143,6 +145,7 @@ class SiteAnalyzer:
             'local_seo': lambda: check_local_business(self.url, html, self.domain, industry),
             'ai_citations': lambda: check_ai_citations(self.url, html, self.domain, industry),
             'keyword_research': lambda: research_keywords(self.url, html, self.domain, industry),
+            'indexation': lambda: analyze_indexation(self.url, self.domain),
         }
 
         results = {'_industry': industry_profile}
@@ -196,7 +199,7 @@ class SiteAnalyzer:
 
         # Phase 4: Collect all findings
         all_findings = []
-        for module_name in ['sitemap', 'robots', 'llms', 'technical', 'geo', 'images', 'performance', 'content', 'keywords', 'local_seo', 'ai_citations', 'keyword_research']:
+        for module_name in ['sitemap', 'robots', 'llms', 'technical', 'geo', 'images', 'performance', 'content', 'keywords', 'local_seo', 'ai_citations', 'keyword_research', 'indexation']:
             if module_name in results:
                 for f in results[module_name].get('findings', []):
                     f['module'] = module_name
