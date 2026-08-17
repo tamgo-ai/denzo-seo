@@ -44,6 +44,8 @@ def check_ai_citations(url: str, html: str, domain: str, industry_profile: dict 
         queries = [('generic', f'servicios en {domain}')]
 
     citations_found = 0
+    checked = 0
+    errors = 0
     results = []
 
     for qtype, query in queries[:3]:
@@ -63,14 +65,14 @@ def check_ai_citations(url: str, html: str, domain: str, industry_profile: dict 
                     'Authorization': f'Bearer {api_key}',
                     'Accept': 'application/json',
                 },
-                timeout=30.0
             )
-            resp = json.loads(urllib.request.urlopen(req).read())
+            resp = json.loads(urllib.request.urlopen(req, timeout=30.0).read())
             answer = resp['choices'][0]['message']['content'] if resp.get('choices') else ''
 
             cited = 'CITED' in answer.upper() and domain.lower() in answer.lower()
             if cited:
                 citations_found += 1
+            checked += 1
 
             results.append({
                 'query': query,
@@ -78,6 +80,7 @@ def check_ai_citations(url: str, html: str, domain: str, industry_profile: dict 
                 'cited': cited,
             })
         except Exception as e:
+            errors += 1
             results.append({
                 'query': query,
                 'type': qtype,
@@ -87,45 +90,50 @@ def check_ai_citations(url: str, html: str, domain: str, industry_profile: dict 
 
     total = len(queries)
 
+    # If every query errored, we did not actually check anything — do NOT
+    # report a false "invisible to AI search" finding.
+    if checked == 0:
+        return {
+            "score": 100,
+            "findings": [],
+            "citations_found": 0,
+            "queries_checked": 0,
+            "results": results,
+            "note": "AI citation check skipped — Perplexity API unavailable",
+        }
+
+    # Informational module (0 weight in the overall score). Severity kept at
+    # "low" so a high overall SEO score isn't contradicted by a scary finding.
     if citations_found == 0:
-        # Severity depends on query coverage: 1 query is low confidence, 3+ is high confidence
-        if total >= 3:
-            severity = "high"
-            score_penalty = 20
-            detail = f"Your site is not being cited by Perplexity AI for any of {total} test queries related to your business. As ~30% of searches now go through AI platforms first, this is a significant visibility gap."
-        else:
-            severity = "medium"
-            score_penalty = 10
-            detail = f"Your site was not cited for {total} test quer{'y' if total == 1 else 'ies'}. This is a limited sample — re-run with more business data (locations + services) for a comprehensive AI visibility assessment."
+        score -= 20
         findings.append({
-            "severity": severity,
+            "severity": "low",
             "module": "ai_citations",
-            "title": f"Zero AI citations: {citations_found}/{total} queries — invisible to AI search",
-            "detail": detail,
+            "title": f"Zero AI citations: 0/{checked} queries — not yet visible in AI search",
+            "detail": f"Your site was not cited by Perplexity AI for any of {checked} checked quer{'y' if checked == 1 else 'ies'}. AI visibility is tracked separately from the SEO score — it reflects mentions and citations outside your own site.",
             "fix": "To get cited by AI platforms:\n"
                    "1. Build brand mentions on Wikipedia, Crunchbase, BBB, and industry directories\n"
                    "2. Create authoritative content with unique data and statistics\n"
                    "3. Get cited by journalists and bloggers in your industry\n"
                    "4. Ensure your llms.txt and llms-full.txt are deployed\n"
                    "5. Build a strong backlink profile from .edu, .gov, and news domains",
-            "impact": "Estimated missed traffic: 15-30% of potential visitors discover businesses through AI search first."
+            "impact": "AI search is a growing channel — but this is informational and does not affect your SEO score."
         })
-        score -= score_penalty
-    elif citations_found < len(queries):
-        findings.append({
-            "severity": "medium",
-            "module": "ai_citations",
-            "title": f"Partial AI visibility: {citations_found}/{total} queries cited",
-            "detail": f"Cited for: {', '.join(r['query'] for r in results if r['cited'])}. Not cited for: {', '.join(r['query'] for r in results if not r['cited'])}.",
-            "fix": "Strengthen content and authority for the queries where you're not being cited. Each uncited query represents a visibility gap in AI search."
-        })
+    elif citations_found < checked:
         score -= 10
+        findings.append({
+            "severity": "low",
+            "module": "ai_citations",
+            "title": f"Partial AI visibility: {citations_found}/{checked} queries cited",
+            "detail": f"Cited for: {', '.join(r['query'] for r in results if r['cited'])}. Not cited for: {', '.join(r['query'] for r in results if r['cited'] is False)}.",
+            "fix": "Strengthen content and authority for the queries where you're not being cited."
+        })
     else:
         findings.append({
             "severity": "pass",
             "module": "ai_citations",
-            "title": f"Strong AI visibility: {citations_found}/{total} queries cited by Perplexity",
-            "detail": f"Your site appears in AI-generated answers for relevant business queries. This is excellent for AI-driven search traffic.",
+            "title": f"Strong AI visibility: {citations_found}/{checked} queries cited by Perplexity",
+            "detail": f"Your site appears in AI-generated answers for relevant business queries.",
             "fix": None
         })
 
