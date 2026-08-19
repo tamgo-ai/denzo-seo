@@ -48,6 +48,7 @@ def analyze_llms(url: str, html: str, domain: str) -> dict:
         sections = re.findall(r'^#{1,4}\s+(.+)$', llms_text, re.MULTILINE)
         link_count = len(re.findall(r'^-\s+\[.+\]\(https?://', llms_text, re.MULTILINE))
         link_count += len(re.findall(r'^-\s+https?://', llms_text, re.MULTILINE))
+        link_count += len(re.findall(r'^-\s+.+?:\s*https?://', llms_text, re.MULTILINE))  # "- Label: URL" format
 
         findings.insert(0, {
             "severity": "pass",

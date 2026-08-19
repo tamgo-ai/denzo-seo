@@ -117,10 +117,34 @@ def check_local_business(url: str, html: str, domain: str, industry_profile: dic
         score -= 8
 
     # ── 4. Local Schema Needs ──
+    # schema.org LocalBusiness subtypes — sites rarely use the base "LocalBusiness"
+    # type directly; they use a subtype (AutoRepair, Restaurant, MedicalClinic, …).
+    # Match any known subtype so valid local schema isn't reported as missing.
+    _local_types = {
+        'localbusiness', 'autorepair', 'autobody', 'autobodyrepair', 'automotivebusiness',
+        'autodealer', 'autopartsstore', 'autorental', 'autowash', 'gasstation',
+        'motorcycledealer', 'motorcyclerepair', 'restaurant', 'foodestablishment',
+        'fastfoodrestaurant', 'bakery', 'cafeorcoffeehouse', 'barorpub',
+        'dentist', 'medicalclinic', 'medicalbusiness', 'physician', 'veterinarycare',
+        'healthandbeautybusiness', 'beautysalon', 'hairsalon', 'dayspa', 'nailsalon',
+        'store', 'clothingstore', 'electronicsstore', 'furniturestore', 'grocerystore',
+        'hardwarestore', 'jewelrystore', 'petstore', 'sportinggoodsstore', 'tirestore',
+        'homeandconstructionbusiness', 'electrician', 'generalcontractor', 'hvacbusiness',
+        'housepainter', 'locksmith', 'movingcompany', 'plumber', 'roofingcontractor',
+        'professionalservice', 'accountingservice', 'insuranceagency', 'legalservice',
+        'notary', 'realestateagent', 'travelagency', 'lodgingbusiness', 'hotel', 'motel',
+        'bedandbreakfast', 'gym', 'amusementpark', 'bowlingalley', 'emergencyservice',
+        'fireservice', 'hospital', 'policestation', 'childcare', 'preschool', 'library',
+        'postoffice', 'selfstorage', 'shoppingcenter', 'sportsactivitylocation',
+    }
     schema_scripts = soup.find_all('script', type='application/ld+json')
     has_local_schema = False
     for s in schema_scripts:
-        if s.string and ('LocalBusiness' in s.string or 'localBusiness' in s.string):
+        if not s.string:
+            continue
+        low = s.string.lower()
+        types = re.findall(r'"@type"\s*:\s*"([^"]+)"', s.string, re.IGNORECASE)
+        if 'localbusiness' in low or any(t.strip().lower() in _local_types for t in types):
             has_local_schema = True
             break
 
