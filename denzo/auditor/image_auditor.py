@@ -16,9 +16,10 @@ Google's image best practices (2024-2026):
 import re, time
 from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
+from denzo.auditor.framework_detector import is_framework_image
 
 
-def deep_image_audit(url: str, html: str, domain: str, base_page_url: str = None) -> dict:
+def deep_image_audit(url: str, html: str, domain: str, base_page_url: str = None, framework: dict = None) -> dict:
     """Deep image optimization audit. Returns 30+ metrics."""
     findings = []
     score = 100
@@ -74,12 +75,13 @@ def deep_image_audit(url: str, html: str, domain: str, base_page_url: str = None
             'fmt': fmt, 'has_dims': bool(w and h), 'lazy': loading == 'lazy',
             'fetchpriority': fetchpriority, 'has_srcset': bool(srcset), 'has_sizes': bool(sizes),
             'is_lcp_candidate': is_lcp_candidate, 'w': w, 'h': h,
+            'fw_managed': is_framework_image(img),
         })
 
     # ── Aggregate analysis ──
     alt_missing = [m for m in img_metrics if m['alt_quality'] == 'missing']
     alt_generic = [m for m in img_metrics if m['alt_quality'] in ('generic','too_short','minimal')]
-    no_dims = [m for m in img_metrics if not m['has_dims']]
+    no_dims = [m for m in img_metrics if not m['has_dims'] and not m.get('fw_managed')]
     lazy_imgs = [m for m in img_metrics if m['lazy']]
     webp_avif = [m for m in img_metrics if m['fmt'] in ('webp','avif')]
     png_imgs = [m for m in img_metrics if m['fmt'] == 'png']
@@ -106,8 +108,10 @@ def deep_image_audit(url: str, html: str, domain: str, base_page_url: str = None
     if no_dims:
         pct = round(len(no_dims)/total*100)
         examples = [m['src'].split('/')[-1][:40] for m in no_dims[:3]]
-        findings.append({"severity":"high","module":"images","title":f"{len(no_dims)}/{total} images ({pct}%) missing explicit width/height — CLS risk","detail":f"Examples: {examples}. Images without dimensions are the #1 cause of Cumulative Layout Shift (CLS). Google penalizes CLS > 0.1 in Core Web Vitals. Every image without dimensions pushes content around as it loads.","fix":"Add width/height to every <img>. In Next.js, use <Image width={800} height={600} src=\"...\" alt=\"...\"/> or <Image fill sizes=\"...\" /> with a positioned parent. For HTML: <img width=\"800\" height=\"600\" ...>. This reserves space before the image loads.","impact":"CLS penalty in Core Web Vitals. Estimated ranking impact: 3-8% for mobile searches."})
-        score -= 12
+        sev = 'high' if pct >= 15 else 'low'
+        pen = 12 if pct >= 15 else 3
+        findings.append({"severity":sev,"module":"images","title":f"{len(no_dims)}/{total} images ({pct}%) missing explicit width/height — CLS risk","detail":f"Examples: {examples}. Images without dimensions are the #1 cause of Cumulative Layout Shift (CLS). Google penalizes CLS > 0.1 in Core Web Vitals. Every image without dimensions pushes content around as it loads.","fix":"Add width/height to every <img>. In Next.js, use <Image width={800} height={600} src=\"...\" alt=\"...\"/> or <Image fill sizes=\"...\" /> with a positioned parent. For HTML: <img width=\"800\" height=\"600\" ...>. This reserves space before the image loads.","impact":"CLS penalty in Core Web Vitals. Estimated ranking impact: 3-8% for mobile searches."})
+        score -= pen
 
     # 3. Format optimization
     if png_imgs and len(png_imgs) > total * 0.2:

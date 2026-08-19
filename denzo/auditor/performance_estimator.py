@@ -13,9 +13,10 @@ Based on Google's Web Almanac and CrUX research:
 """
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
+from denzo.auditor.framework_detector import is_framework_image
 
 
-def estimate_performance(url: str, html: str, domain: str, redirect_chain: list = None, fetch_time_ms: int = None) -> dict:
+def estimate_performance(url: str, html: str, domain: str, redirect_chain: list = None, fetch_time_ms: int = None, framework: dict = None) -> dict:
     """Estimate Core Web Vitals. Uses real PSI data when available, falls back to heuristics."""
 
     # ── Try REAL PageSpeed Insights API first ──
@@ -79,6 +80,7 @@ def estimate_performance(url: str, html: str, domain: str, redirect_chain: list 
     soup = BeautifulSoup(html, 'html.parser')
     html_bytes = len(html)
     html_kb = round(html_bytes / 1024)
+    _is_js_fw = bool((framework or {}).get('is_js_framework'))
 
     # Parse redirect chain
     parsed = urlparse(url)
@@ -115,9 +117,11 @@ def estimate_performance(url: str, html: str, domain: str, redirect_chain: list 
         findings.append({"severity":"medium","module":"performance","title":f"Significant inline JS: {round(inline_js_bytes/1024)}KB","detail":"Inline JS blocks rendering. Consider reducing the JS payload.","fix":"Enable PPR, code-split, reduce client bundle size."})
         score -= 8
 
-    if len(external_js) > 10:
+    if len(external_js) > 10 and not _is_js_fw:
         findings.append({"severity":"medium","module":"performance","title":f"{len(external_js)} external JS files — excessive HTTP requests","detail":"Each external JS file requires a separate HTTP request + parse/compile step. While HTTP/2 multiplexes, too many bundles increase total parse time.","fix":"Bundle JS into fewer files. Remove unused third-party scripts. Audit each external script for necessity."})
         score -= 6
+    elif len(external_js) > 10 and _is_js_fw:
+        findings.append({"severity":"info","module":"performance","title":f"{len(external_js)} external JS files — normal for a code-split framework","detail":"JS frameworks (Next.js, Nuxt, …) split code into per-route chunks, so multiple small bundles are expected and not a defect.","fix":None})
 
     # ── 4. CSS DELIVERY ──
     styles = soup.find_all('link', rel='stylesheet')
@@ -182,7 +186,7 @@ def estimate_performance(url: str, html: str, domain: str, redirect_chain: list 
     estimated_cls = 0.01  # base
     # Each image without dimensions adds ~0.005 CLS
     imgs = soup.find_all('img')
-    imgs_no_dims = sum(1 for img in imgs if not (img.get('width') and img.get('height')))
+    imgs_no_dims = sum(1 for img in imgs if not (img.get('width') and img.get('height')) and not is_framework_image(img))
     estimated_cls += imgs_no_dims * 0.05  # More realistic: each dimensionless image shifts layout significantly
     estimated_cls = round(min(estimated_cls, 2.0), 3)
 

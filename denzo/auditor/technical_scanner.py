@@ -7,9 +7,10 @@ import re, json
 from collections import Counter
 from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
+from denzo.auditor.framework_detector import is_framework_image
 
 
-def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, status_code: int = None, redirect_chain: list = None) -> dict:
+def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, status_code: int = None, redirect_chain: list = None, framework: dict = None) -> dict:
     findings = []
     score = 100
     soup = BeautifulSoup(html, 'html.parser')
@@ -21,6 +22,16 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
     text_ratio = round(text_bytes / html_size * 100, 1) if html_size > 0 else 0
 
     headers_lower = {k.lower(): v for k, v in (http_headers or {}).items()}
+
+    _fw = framework or {}
+    _is_js_fw = bool(_fw.get('is_js_framework'))
+    if _fw.get('framework') not in (None, 'static'):
+        findings.append({
+            "severity": "info", "module": "technical",
+            "title": f"Detected framework: {_fw.get('label', _fw.get('framework'))}",
+            "detail": "Framework-aware audit enabled: framework Image-component dimensions, hydration-inflated text ratio, and code-split JS are not treated as static-HTML defects.",
+            "fix": None,
+        })
 
     # ═════════════════════════════════════════════
     # 0. INDEXABILITY — the checks that override everything else
@@ -277,12 +288,19 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
     # ═════════════════════════════════════════════
     # 7. HTML SEMANTICS & RATIO
     # ═════════════════════════════════════════════
-    if text_ratio < 5:
-        findings.append({"severity":"high","module":"technical","title":f"Severely low text-to-HTML ratio: {text_ratio}%","detail":f"HTML: {html_size/1024:.0f}KB | Visible text: {text_bytes/1024:.1f}KB | Ratio: {text_ratio}%. Google expects 10-25% for a content-rich page. Below 5% triggers thin content filters regardless of actual word count.","fix":"Reduce inline JavaScript (move to external files with defer/async). Remove unnecessary wrapper divs. Increase visible text content by 50-100%.","impact":"Risk of being classified as thin content. Estimated ranking suppression: 5-15% across all terms."})
-        score -= 15
-    elif text_ratio < 10:
-        findings.append({"severity":"medium","module":"technical","title":f"Below-average text-to-HTML ratio: {text_ratio}%","detail":f"Target 10-25%. At {text_ratio}%, the page is markup-heavy. This is common in React/Next.js SPAs due to hydration payloads.","fix":"Enable code splitting in Next.js. Use Partial Prerendering (PPR). Reduce RSC payload size. Increase text content."})
-        score -= 6
+    if _is_js_fw:
+        # Text-to-HTML ratio is unreliable for JS frameworks: SSR hydration payload
+        # and framework markup inflate HTML size without adding content. Word count
+        # (below) is the honest thin-content signal for these stacks.
+        if text_ratio < 10:
+            findings.append({"severity":"info","module":"technical","title":f"Text-to-HTML ratio {text_ratio}% — typical of {_fw.get('label','a JS framework')} hydration/markup","detail":f"HTML: {html_size/1024:.0f}KB | Visible text: {text_bytes/1024:.1f}KB. The ratio includes framework hydration payload and generated markup, so it is not treated as a thin-content signal here. Word count is used instead.","fix":None})
+    else:
+        if text_ratio < 5:
+            findings.append({"severity":"high","module":"technical","title":f"Severely low text-to-HTML ratio: {text_ratio}%","detail":f"HTML: {html_size/1024:.0f}KB | Visible text: {text_bytes/1024:.1f}KB | Ratio: {text_ratio}%. Google expects 10-25% for a content-rich page. Below 5% triggers thin content filters regardless of actual word count.","fix":"Reduce inline JavaScript (move to external files with defer/async). Remove unnecessary wrapper divs. Increase visible text content by 50-100%.","impact":"Risk of being classified as thin content. Estimated ranking suppression: 5-15% across all terms."})
+            score -= 15
+        elif text_ratio < 10:
+            findings.append({"severity":"medium","module":"technical","title":f"Below-average text-to-HTML ratio: {text_ratio}%","detail":f"Target 10-25%. At {text_ratio}%, the page is markup-heavy. This is common in React/Next.js SPAs due to hydration payloads.","fix":"Enable code splitting in Next.js. Use Partial Prerendering (PPR). Reduce RSC payload size. Increase text content."})
+            score -= 6
 
     # Semantic tags
     semantic = {t:len(soup.find_all(t)) for t in ['main','article','section','nav','header','footer','aside']}
@@ -308,10 +326,10 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
         fmt_map = {'.webp': 'webp', '.avif': 'avif', '.png': 'png', '.jpg': 'jpg', '.jpeg': 'jpg', '.svg': 'svg', '.gif': 'gif'}
         fmt = fmt_map.get(_ext, 'other')
         # Try to get file size from next/image or srcset
-        img_data.append({'src':src[:120],'alt':alt,'w':w,'h':h,'lazy':loading=='lazy','fmt':fmt,'has_dims':bool(w and h)})
+        img_data.append({'src':src[:120],'alt':alt,'w':w,'h':h,'lazy':loading=='lazy','fmt':fmt,'has_dims':bool(w and h),'fw_managed':is_framework_image(img)})
 
     imgs_no_alt = [i for i in img_data if not i['alt']]
-    imgs_no_dims = [i for i in img_data if not i['has_dims']]
+    imgs_no_dims = [i for i in img_data if not i['has_dims'] and not i['fw_managed']]
     imgs_lazy = [i for i in img_data if i['lazy']]
     imgs_webp = [i for i in img_data if i['fmt'] in ('webp','avif')]
     imgs_png = [i for i in img_data if i['fmt'] == 'png']

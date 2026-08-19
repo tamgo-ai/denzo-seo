@@ -14,6 +14,8 @@ from denzo.agents.utils.stealth_fetch import fetch_html
 
 # Import industry detector
 from denzo.auditor.industry_detector import quick_detect, deep_detect, determine_is_local
+# Import framework detector
+from denzo.auditor.framework_detector import detect_framework
 
 # Import analysis modules
 from denzo.auditor.sitemap_analyzer import analyze_sitemap
@@ -106,6 +108,10 @@ class SiteAnalyzer:
         html_size_kb = round(len(html) / 1024)
         # HTTP headers, redirect chain and real status are captured by fetch_html(capture_meta=True)
 
+        # Detect framework/stack (Next.js, WordPress, Wix, …) so analyzers can
+        # skip static-HTML false positives (hydration payload, next/image, code-splitting).
+        framework = detect_framework(html, http_headers)
+
         # Extract page title
         title_match = re.search(r'<title>(.*?)</title>', html, re.IGNORECASE | re.DOTALL)
         page_title = title_match.group(1).strip()[:200] if title_match else ''
@@ -149,10 +155,10 @@ class SiteAnalyzer:
             'sitemap': lambda: analyze_sitemap(self.url, html, self.domain),
             'robots': lambda: analyze_robots(self.url, html, self.domain),
             'llms': lambda: analyze_llms(self.url, html, self.domain),
-            'technical': lambda: scan_technical(self.url, html, self.domain, http_headers, page_status, redirect_chain),
+            'technical': lambda: scan_technical(self.url, html, self.domain, http_headers, page_status, redirect_chain, framework),
             'geo': lambda: analyze_geo_visibility(self.url, html, self.domain, industry),
-            'images': lambda: deep_image_audit(self.url, html, self.domain, base_page_url=self.url),
-            'performance': lambda: estimate_performance(self.url, html, self.domain, redirect_chain, 0),
+            'images': lambda: deep_image_audit(self.url, html, self.domain, base_page_url=self.url, framework=framework),
+            'performance': lambda: estimate_performance(self.url, html, self.domain, redirect_chain, 0, framework=framework),
             'content': lambda: analyze_content_quality(self.url, html, self.domain, industry),
             'keywords': lambda: analyze_keyword_targeting(self.url, html, self.domain),
             'local_seo': lambda: check_local_business(self.url, html, self.domain, industry),
@@ -233,6 +239,8 @@ class SiteAnalyzer:
             "results": results,
             "findings": all_findings,
             "fetch_method": fetch_method,
+            "framework": framework.get('framework'),
+            "framework_label": framework.get('label'),
             "page_title": page_title,
             "page_status": page_status,
             "http_status": page_status,
