@@ -12,7 +12,8 @@ from denzo.agents.utils.stealth_fetch import fetch_html
 
 def _fetch(url: str) -> str:
     try:
-        res = fetch_html(url)
+        # Raw XML/plain-text — never Jina, which can't return raw XML.
+        res = fetch_html(url, allow_jina=False)
         return res.get('html','') if res and res.get('ok') else None
     except: return None
 

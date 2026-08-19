@@ -21,7 +21,7 @@ def analyze_llms(url: str, html: str, domain: str) -> dict:
     llms_text = None
     llms_status = None
     try:
-        res = fetch_html(llms_url)
+        res = fetch_html(llms_url, allow_jina=False)
         llms_text = res.get('html', '') if res and res.get('ok') else None
         if llms_text and len(llms_text) > 50:
             llms_status = 'present'
@@ -34,7 +34,7 @@ def analyze_llms(url: str, html: str, domain: str) -> dict:
     llms_full_text = None
     llms_full_status = None
     try:
-        res = fetch_html(llms_full_url)
+        res = fetch_html(llms_full_url, allow_jina=False)
         llms_full_text = res.get('html', '') if res and res.get('ok') else None
         if llms_full_text and len(llms_full_text) > 200:
             llms_full_status = 'present'

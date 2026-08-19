@@ -36,10 +36,16 @@ def analyze_robots(url: str, html: str, domain: str) -> dict:
     # 1. Fetch robots.txt
     robots_text = None
     try:
-        res = fetch_html(robots_url)
+        # Raw plain-text — never Jina, which rewraps it in <pre> HTML.
+        res = fetch_html(robots_url, allow_jina=False)
         robots_text = res.get('html', '') if res and res.get('ok') else None
     except Exception:
         robots_text = None
+
+    # Defense-in-depth: strip any HTML wrapping (e.g. a proxy/renderer wrapping
+    # the plain text in <pre>…</pre>) so a Sitemap: URL is never corrupted.
+    if robots_text:
+        robots_text = re.sub(r'<[^>]+>', '', robots_text)
 
     if not robots_text:
         findings.append({

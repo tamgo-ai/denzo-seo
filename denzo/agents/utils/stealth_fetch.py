@@ -156,11 +156,59 @@ def _curl_fetch(url: str, timeout: int = 20) -> Optional[str]:
             text=True,
             timeout=timeout + 5,
         )
-        if result.returncode == 0 and len(result.stdout) > 200:
+        # Accept any non-empty response. robots.txt, sitemap.xml and other raw
+        # files are often legitimately under 200 bytes; a size floor here falsely
+        # classifies them as "network block" and pushes the whole domain onto the
+        # Jina fallback (which can't return raw XML/plain-text anyway).
+        if result.returncode == 0 and result.stdout.strip():
             return result.stdout
         return None
     except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
         return None
+
+
+# ── Jina Reader fallback ────────────────────────────────────────────
+# Sites hosted on Lovable / behind Cloudflare often drop or refuse connections
+# from datacenter IPs (timeout / ECONNREFUSED), so curl/requests/playwright all
+# fail at the network layer. Jina Reader (r.jina.ai) fetches from a
+# residential-grade network and returns the rendered HTML, bypassing the block.
+_JINA_READER = "https://r.jina.ai/"
+
+
+def _jina_fetch(url: str, timeout: int = 25) -> Optional[str]:
+    """Fetch raw HTML via Jina Reader. Returns HTML string or None on failure."""
+    try:
+        import requests
+        r = requests.get(
+            _JINA_READER + url,
+            headers={
+                # Jina blocks browser-style UAs (datacenter fingerprint) with 403;
+                # a minimal UA is required for it to serve the rendered HTML.
+                "X-Return-Format": "html",
+                "User-Agent": "Mozilla/5.0",
+            },
+            timeout=timeout,
+            allow_redirects=True,
+        )
+        if r.status_code == 200 and len(r.text) > 50:
+            return r.text
+        return None
+    except Exception:
+        return None
+
+
+# ── Datacenter-block cache ──────────────────────────────────────────
+# Domain -> expiry timestamp. Once the primary fetch detects a domain drops
+# datacenter connections (curl got nothing, Jina worked), remember it so
+# sub-fetches (sitemap/robots/llms.txt) skip the ~20s curl timeout and go
+# straight to Jina during the same analysis run.
+_jina_domains: dict[str, float] = {}
+_JINA_DOMAIN_TTL = 600  # seconds
+
+
+def _domain_of(url: str) -> str:
+    from urllib.parse import urlparse
+    return (urlparse(url).netloc or '').lower()
 
 
 def _requests_meta(url: str, timeout: int = 15) -> Optional[dict]:
@@ -190,22 +238,43 @@ def _requests_meta(url: str, timeout: int = 15) -> Optional[dict]:
         return None
 
 
-def fetch_html(url: str, timeout: int = 25, log_fn=None, capture_meta: bool = False) -> dict:
+def fetch_html(url: str, timeout: int = 25, log_fn=None, capture_meta: bool = False, allow_jina: bool = True) -> dict:
     """
     Fetch URL with progressive fallback for Cloudflare-protected sites.
+
+    allow_jina=False disables the Jina Reader fallback (and the datacenter-block
+    fast-path). Use it for raw files (robots.txt, sitemap.xml, llms.txt): Jina
+    renders/rewraps content and cannot return raw XML or plain text, so it must
+    never be used for those.
 
     Returns:
         {
             "ok": bool,
             "html": str,
             "status": int,
-            "method": "curl" | "requests" | "cloudscraper" | "playwright",
+            "method": "curl" | "requests" | "cloudscraper" | "playwright" | "jina",
             "error": str (if not ok)
         }
     """
     def log(msg):
         if log_fn:
             log_fn(msg)
+
+    domain = _domain_of(url)
+
+    # ── Fast-path: domain already known to block this datacenter IP ─────────
+    # Skip the ~20s curl/requests timeouts and fetch straight from Jina. Only
+    # the primary page goes through metadata capture; sub-fetches get {} here.
+    if allow_jina and domain and _jina_domains.get(domain, 0) > time.time():
+        log("[stealth_fetch] domain cached as datacenter-blocked — going straight to Jina Reader")
+        jina_html = _jina_fetch(url, timeout=min(timeout, 25))
+        if jina_html and not _is_cloudflare_block(200, jina_html):
+            log("[stealth_fetch] Jina Reader OK (cached block)")
+            return {"ok": True, "html": jina_html, "status": 200, "method": "jina", "headers": {}, "redirect_chain": [], "final_url": url}
+        # Domain is network-blocked; direct passes would only time out (~95s).
+        # Bail fast instead of burning time on curl/requests/cloudscraper/playwright.
+        log("[stealth_fetch] Jina also failed for blocked domain — bailing fast")
+        return {"ok": False, "html": "", "status": 0, "method": "jina", "error": "Datacenter-blocked domain — Jina could not retrieve this resource"}
 
     # ── Response metadata (headers, redirect chain, real status) ────────────
     # Captured once for the primary page fetch so downstream analyzers can
@@ -224,6 +293,18 @@ def fetch_html(url: str, timeout: int = 25, log_fn=None, capture_meta: bool = Fa
         return {"ok": True, "html": html0, "status": _meta.get("status", 200) or 200, "method": "curl", "headers": _meta["headers"], "redirect_chain": _meta["redirect_chain"], "final_url": _meta["final_url"]}
     if html0:
         log("[stealth_fetch] Pass 0 (curl) blocked by CF — trying requests…")
+
+    # ─── Fallback: Jina Reader (residential proxy) ──────────────────────────
+    # curl returned nothing → likely a network-level block on this datacenter IP,
+    # not a Cloudflare challenge page. Jina fetches from a residential network.
+    if allow_jina and not html0:
+        log("[stealth_fetch] curl returned nothing (datacenter block?) — trying Jina Reader…")
+        jina_html = _jina_fetch(url, timeout=min(timeout, 25))
+        if jina_html and not _is_cloudflare_block(200, jina_html):
+            log("[stealth_fetch] Jina Reader OK")
+            _jina_domains[domain] = time.time() + _JINA_DOMAIN_TTL
+            return {"ok": True, "html": jina_html, "status": 200, "method": "jina", "headers": _meta["headers"], "redirect_chain": _meta["redirect_chain"], "final_url": _meta["final_url"]}
+        log("[stealth_fetch] Jina Reader failed — falling through to requests/cloudscraper/playwright…")
 
     # ─── Pass 1: requests with randomized headers ────────────────────────
     try:
