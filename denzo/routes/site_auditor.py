@@ -2,6 +2,7 @@
 Site Auditor — public SEO+GEO analysis tool.
 No login required. Paste a URL, get a comprehensive audit report.
 """
+import os
 import uuid
 import json
 import time
@@ -255,7 +256,8 @@ def _normalize_and_enqueue(url: str, client_ip: str):
     if not url.startswith('http'):
         url = 'https://' + url
 
-    # Basic rate limiting: max 10 per hour per IP
+    # Rate limiting: max per hour per IP (configurable; raised for Droppin batch).
+    max_per_hour = int(os.environ.get('AUDIT_RATE_LIMIT_PER_HOUR', '120'))
     now = time.time()
     with _progress_lock:
         # Clean old entries (older than 1 hour)
@@ -265,8 +267,8 @@ def _normalize_and_enqueue(url: str, client_ip: str):
                     del _progress_store[ip]
         rate_key = f'rate:{client_ip}'
         count = _progress_store.get(rate_key, 0)
-        if count >= 10:
-            return None, 'Rate limit exceeded. Max 10 analyses per hour.', 429
+        if count >= max_per_hour:
+            return None, f'Rate limit exceeded. Max {max_per_hour} analyses per hour.', 429
         _progress_store[rate_key] = count + 1
 
     audit_id = _new_audit_id()
