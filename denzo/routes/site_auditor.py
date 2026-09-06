@@ -6,6 +6,7 @@ import uuid
 import json
 import time
 import re
+import math
 import threading
 from datetime import datetime
 from urllib.parse import urlparse
@@ -87,6 +88,45 @@ def report(audit_id: str):
     ).fetchall()
 
     return render_template('site_auditor/report.html', audit=audit, previous_audits=previous_audits)
+
+
+@bp.route('/report/<audit_id>/json')
+def report_json(audit_id: str):
+    """Machine-readable status and evidence used by the Droppin sales pipeline."""
+    db = get_db()
+    try:
+        audit = db.execute(
+            "SELECT audit_id, url, status, overall_score, report_json FROM site_audits WHERE audit_id=?",
+            (audit_id,),
+        ).fetchone()
+    finally:
+        db.close()
+    if not audit:
+        return jsonify({'error': 'Audit not found'}), 404
+
+    try:
+        details = json.loads(audit['report_json']) if audit['report_json'] else {}
+    except (TypeError, ValueError):
+        details = {'error': 'Audit report could not be read'}
+    if not isinstance(details, dict):
+        details = {'error': 'Invalid audit report'}
+
+    status = audit['status']
+    score = audit['overall_score'] if status == 'completed' else None
+    valid_score = isinstance(score, (int, float)) and not isinstance(score, bool) and math.isfinite(score) and 0 <= score <= 100
+    page_status = details.get('page_status')
+    inaccessible = isinstance(page_status, (int, float)) and not 200 <= page_status < 400
+    if status == 'error' or (status == 'completed' and (details.get('error') or inaccessible or not valid_score)):
+        status = 'failed'
+        score = None
+        details.setdefault('error', 'The page could not be reliably audited')
+
+    response = jsonify({
+        'audit_id': audit['audit_id'], 'url': audit['url'], 'status': status,
+        'overall_score': score, 'report': details,
+    })
+    response.headers['Cache-Control'] = 'no-store'
+    return response
 
 
 @bp.route('/report/<audit_id>/download')
