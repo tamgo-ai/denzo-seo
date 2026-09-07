@@ -7,6 +7,7 @@ import uuid
 import json
 import time
 import re
+import math
 import threading
 from datetime import datetime
 from urllib.parse import urlparse
@@ -126,23 +127,50 @@ def report(audit_id: str):
 
 @bp.route('/report/<audit_id>/json')
 def report_json(audit_id: str):
-    """Machine-readable audit result — used by the Droppin outreach pipeline."""
+    """Machine-readable audit result — used by the Droppin outreach pipeline.
+
+    The status is validated before it is returned: an inaccessible page, an
+    invalid score, or a report that could not be read all surface as
+    ``failed`` so the pipeline never turns them into a sales score.
+    """
     db = get_db()
-    audit = db.execute("SELECT * FROM site_audits WHERE audit_id=?", (audit_id,)).fetchone()
+    try:
+        audit = db.execute("SELECT * FROM site_audits WHERE audit_id=?", (audit_id,)).fetchone()
+    finally:
+        db.close()
     if not audit:
         return jsonify({'error': 'Audit not found'}), 404
+
+    try:
+        details = json.loads(audit['report_json']) if audit['report_json'] else {}
+    except (TypeError, ValueError):
+        details = {'error': 'Audit report could not be read'}
+    if not isinstance(details, dict):
+        details = {'error': 'Invalid audit report'}
+
+    status = audit['status']
+    score = audit['overall_score'] if status == 'completed' else None
+    valid_score = isinstance(score, (int, float)) and not isinstance(score, bool) and math.isfinite(score) and 0 <= score <= 100
+    page_status = details.get('page_status')
+    inaccessible = isinstance(page_status, (int, float)) and not 200 <= page_status < 400
+    if status == 'error' or (status == 'completed' and (details.get('error') or inaccessible or not valid_score)):
+        status = 'failed'
+        score = None
+        details.setdefault('error', 'The page could not be reliably audited')
 
     payload = {
         'audit_id': audit['audit_id'],
         'url': audit['url'],
         'domain': audit['domain'],
-        'status': audit['status'],
+        'status': status,
         'progress': audit['progress'],
-        'overall_score': audit['overall_score'],
+        'overall_score': score,
         'module_scores': json.loads(audit['module_scores']) if audit['module_scores'] else {},
-        'report': json.loads(audit['report_json']) if audit['report_json'] else {},
+        'report': details,
     }
-    return jsonify(payload)
+    response = jsonify(payload)
+    response.headers['Cache-Control'] = 'no-store'
+    return response
 
 
 @bp.route('/report/<audit_id>/download')
