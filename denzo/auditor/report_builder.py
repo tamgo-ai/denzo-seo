@@ -2,8 +2,8 @@
 Report Builder v4 — dual-mode standalone reports.
 
 Two modes, chosen by request host:
-  * 'droppin' — lead-gen: verdict, top-3 teasers, then a locked/blurred findings
-    wall behind a "contact us" CTA. The full fix detail is withheld.
+  * 'droppin' — acquisition: verdict, measured findings and full fix detail,
+    with an optional contact CTA. Incomplete measurements do not show a score.
   * 'full'    — internal technical tool: every finding + fix, filterable, plus a
     "copy the full technical brief" button for handing to an AI.
 
@@ -236,11 +236,7 @@ def _bar_color(score):
 
 
 def _verdict_line(score, n_crit, n_high):
-    if score < 60:
-        return f"Your website is <b>leaking customers</b>. <span class=\"hot\">{n_crit + n_high}+ issues</span> are quietly turning away people who search for you."
-    if score < 80:
-        return f"Your website has a <b>solid foundation</b>, but {n_crit + n_high} urgent issues are costing you customers."
-    return f"Your website is <b>in good shape</b> — with a few fixes it could outrank your competition."
+    return f"This automated homepage screening found {n_crit + n_high} priority observations. Review the evidence and recommendations below; rankings and business impact require further analysis."
 
 
 def _build_body(result, audit_id, mode, inline_assets):
@@ -250,9 +246,10 @@ def _build_body(result, audit_id, mode, inline_assets):
     findings = result.get('findings', [])
     page_title = result.get('page_title', '') or domain
     module_scores = result.get('module_scores', {})
+    weights = result.get('scoring_weights') or MODULE_WEIGHTS
     results = result.get('results', {})
 
-    now = datetime.now(timezone.utc).strftime('%B %d, %Y')
+    now = html.escape(str(result.get('checked_at') or 'Date unavailable')[:10])
 
     critical = [f for f in findings if f.get('severity') == 'critical']
     high = [f for f in findings if f.get('severity') == 'high']
@@ -322,27 +319,30 @@ def _build_body(result, audit_id, mode, inline_assets):
   {impact_html}{fix_html}
 </div>'''
 
-    priorities = f'<section><div class="sec-head"><span class="kicker">A taste of the damage</span><h2>{"3 problems already costing you money" if mode == "droppin" else "Top 3 priorities"}</h2></div><div class="priorities">{prio_cards}</div></section>'
+    priorities = f'<section><div class="sec-head"><span class="kicker">Measured observations</span><h2>{"Priority observations" if mode == "droppin" else "Top 3 priorities"}</h2></div><div class="priorities">{prio_cards}</div></section>'
 
     # ── scorecard ──
     mods = [
-        ('technical', 'Technical foundations', MODULE_WEIGHTS.get('technical', 30), module_scores.get('technical', 0)),
-        ('geo', 'Content & authority', MODULE_WEIGHTS.get('geo', 22), module_scores.get('geo', 0)),
-        ('performance', 'Page speed', MODULE_WEIGHTS.get('performance', 15), module_scores.get('performance', 0)),
-        ('content', 'Content quality', MODULE_WEIGHTS.get('content', 10), module_scores.get('content', 0)),
-        ('images', 'Images', MODULE_WEIGHTS.get('images', 8), module_scores.get('images', 0)),
-        ('sitemap', 'Sitemap', MODULE_WEIGHTS.get('sitemap', 8), module_scores.get('sitemap', 0)),
-        ('robots', 'Crawler access', MODULE_WEIGHTS.get('robots', 7), module_scores.get('robots', 0)),
+        ('technical', 'Technical foundations', weights.get('technical', 30), module_scores.get('technical', 0)),
+        ('geo', 'Structured content', weights.get('geo', 22), module_scores.get('geo', 0)),
+        ('performance', 'Page speed', weights.get('performance', 15), module_scores.get('performance', 0)),
+        ('content', 'Content quality', weights.get('content', 10), module_scores.get('content', 0)),
+        ('images', 'Images', weights.get('images', 8), module_scores.get('images', 0)),
+        ('sitemap', 'Sitemap', weights.get('sitemap', 8), module_scores.get('sitemap', 0)),
+        ('robots', 'Crawler access', weights.get('robots', 7), module_scores.get('robots', 0)),
     ]
-    if module_scores.get('local_seo'):
+    if weights.get('local_seo', 0) > 0:
         mods.append(('local_seo', 'Local SEO', 10, module_scores.get('local_seo', 0)))
     bar_rows = ''
     for _, label, wt, s in mods:
         if wt == 0 and s == 0:
             continue
+        if s is None:
+            bar_rows += f'<div class="bar-row"><span>{html.escape(label)}</span><span>Not measured</span></div>'
+            continue
         c = _bar_color(s)
         bar_rows += f'<div class="bar-row"><span class="bar-label">{label}<span class="wt">{wt}%</span></span><div class="bar-track"><div class="bar-fill" style="width:{min(100, s)}%;background:{c}"></div></div><span class="bar-val" style="color:{c}">{s}</span></div>'
-    scorecard = f'<section><div class="sec-head"><span class="kicker">Scorecard</span><h2>How your site scores</h2></div><div class="bars">{bar_rows}</div></section>'
+    scorecard = f'<section><div class="sec-head"><span class="kicker">Scorecard</span><h2>Automated website health · not a Google ranking score</h2></div><div class="bars">{bar_rows}</div></section>'
 
     # ── findings: locked (droppin) vs full ──
     if mode == 'droppin':
@@ -406,7 +406,7 @@ def _build_body(result, audit_id, mode, inline_assets):
 <section id="cta">
   <div class="cta">
     <h2>Droppin fixes this for you.</h2>
-    <p>We audit, fix, and monitor your website so you show up when customers search. Our clients see on average <b style="color:var(--text)">2–3× more leads within 90 days</b>.</p>
+    <p>We audit, fix, and monitor your website so you show up when customers search. We explain the measured findings and help you decide what to improve.</p>
     <div class="btns">
       <a class="btn btn-p" href="https://getdroppin.ai/contact">Get your free fix plan →</a>
       <a class="btn btn-s" href="https://getdroppin.ai/contact">Book a free call</a>
@@ -469,8 +469,11 @@ def _build_body(result, audit_id, mode, inline_assets):
 
 def build_report_html(result: dict, audit_id: str, mode: str = 'full', inline_assets: bool = False) -> str:
     """Render a standalone report. mode: 'droppin' | 'full'."""
-    overall = int(result.get('overall_score', 0))
-    body = _build_body(result, audit_id, mode, inline_assets)
+    if result.get('overall_score') is None or (str(result.get('methodology_version', '')).startswith('droppin-audit-') and not result.get('commercial_ready')):
+        reason = html.escape(str(result.get('error') or 'Some checks could not be completed. No reliable overall grade is available.'))
+        return '<!doctype html><html lang="en"><meta name="viewport" content="width=device-width"><title>Audit incomplete</title><body><h1>Audit incomplete</h1><p>' + reason + '</p><p>This does not imply that the website is poor. Please retry the analysis.</p></body></html>'
+    overall = int(result['overall_score'])
+    body = _build_body(result, audit_id, 'full', inline_assets)
     js = _REPORT_JS.replace('__SCORE__', str(overall))
     title = html.escape(result.get('domain', 'site'))
     return f'''<!DOCTYPE html>

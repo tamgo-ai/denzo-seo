@@ -4,7 +4,7 @@ and content readiness for LLM citation.
 """
 import re
 from urllib.parse import urljoin, urlparse
-from denzo.agents.utils.stealth_fetch import fetch_html
+from denzo.auditor.safe_fetch import fetch_html
 
 
 def analyze_llms(url: str, html: str, domain: str) -> dict:
@@ -137,3 +137,4 @@ def analyze_llms(url: str, html: str, domain: str) -> dict:
         "llms_full_status": llms_full_status,
         "llms_full_url": llms_full_url,
     }
+
