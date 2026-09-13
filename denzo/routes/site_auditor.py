@@ -3,6 +3,7 @@ Site Auditor — public SEO+GEO analysis tool.
 No login required. Paste a URL, get a comprehensive audit report.
 """
 import os
+import hmac
 import uuid
 import json
 import time
@@ -12,9 +13,32 @@ import threading
 from datetime import datetime
 from urllib.parse import urlparse
 from flask import Blueprint, request, jsonify, render_template, Response, send_file, redirect
+from functools import wraps
 from denzo.db import get_db
 
 bp = Blueprint('site_auditor', __name__, url_prefix='/auditor')
+
+# ── Machine endpoint auth ─────────────────────────────────────────────
+# /analyze and /report/<id>/json are consumed by the Droppin pipeline and must
+# present the shared service token. Human endpoints (/report/<id> HTML, /go)
+# stay open for postcard QR codes.
+def _service_token_ok() -> bool:
+    expected = os.environ.get('AUDIT_SERVICE_TOKEN')
+    if not expected:
+        return False  # fail closed if the auditor is not configured
+    auth = request.headers.get('Authorization', '')
+    if not auth.startswith('Bearer '):
+        return False
+    supplied = auth[len('Bearer '):].strip()
+    return hmac.compare_digest(supplied, expected)
+
+def service_token_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not _service_token_ok():
+            return jsonify({'error': 'Unauthorized'}), 401
+        return fn(*args, **kwargs)
+    return wrapper
 
 # In-memory progress store for running analyses (SSE pushes from here)
 _progress_store: dict[str, dict] = {}
@@ -126,6 +150,7 @@ def report(audit_id: str):
 
 
 @bp.route('/report/<audit_id>/json')
+@service_token_required
 def report_json(audit_id: str):
     """Machine-readable audit result — used by the Droppin outreach pipeline.
 
@@ -322,6 +347,7 @@ def _normalize_and_enqueue(url: str, client_ip: str):
 
 
 @bp.route('/analyze', methods=['POST'])
+@service_token_required
 def analyze():
     """Start a new site analysis. Returns audit_id for progress tracking."""
     data = request.get_json() or {}
