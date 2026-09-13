@@ -1,9 +1,9 @@
 """Versioned screening rubric, not a Google ranking or traffic prediction."""
 import math
 
-METHODOLOGY_VERSION = 'droppin-audit-v2'
-BASE_WEIGHTS = {'technical': 30, 'geo': 22, 'performance': 15, 'sitemap': 8,
-                'robots': 7, 'images': 8, 'content': 10, 'local_seo': 0,
+METHODOLOGY_VERSION = 'droppin-audit-v3'
+BASE_WEIGHTS = {'technical': 40, 'geo': 0, 'performance': 35, 'sitemap': 5,
+                'robots': 10, 'images': 5, 'content': 5, 'local_seo': 0,
                 'keywords': 0, 'llms': 0, 'ai_citations': 0, 'keyword_research': 0, 'indexation': 0}
 
 
@@ -13,8 +13,6 @@ def valid_score(value):
 
 def score_results(results, is_local=False):
     weights = dict(BASE_WEIGHTS)
-    if is_local:
-        weights.update(local_seo=10, technical=25, geo=17)
     scores, statuses = {}, {}
     for name in weights:
         module = results.get(name) or {}

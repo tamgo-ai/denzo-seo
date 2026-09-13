@@ -35,7 +35,7 @@ def test_unavailable_is_never_a_bad_score():
     result = scoring.score_results(data)
     assert result['overall_score'] == 95
     assert result['module_scores']['technical'] is None
-    assert result['coverage'] == 70
+    assert result['coverage'] == 60
     assert not result['commercial_ready']
 
 
@@ -43,7 +43,7 @@ def test_concurrent_local_weights_do_not_leak():
     with ThreadPoolExecutor(max_workers=8) as pool:
         results = list(pool.map(lambda local: scoring.score_results(modules(), local), [True,False]*50))
     for n, result in enumerate(results):
-        assert result['scoring_weights']['technical'] == (25 if n%2==0 else 30)
+        assert result['scoring_weights']['technical'] == 40
         assert result['commercial_ready']
     assert scoring.BASE_WEIGHTS['local_seo'] == 0
 

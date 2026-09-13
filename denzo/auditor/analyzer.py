@@ -1,235 +1,93 @@
-"""
-Site Analyzer — orchestrates all 9 analysis modules in parallel.
-Collects results, computes weighted overall score, generates structured report.
-"""
-import re
-import os
+"""Versioned homepage screening from observable HTML and measured PageSpeed data."""
+import logging
 import time
-import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from denzo.auditor.scoring import score_results, METHODOLOGY_VERSION, BASE_WEIGHTS
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from urllib.parse import urlparse
-from typing import Callable
-
-# Import the shared HTTP fetcher
+from urllib.parse import urlsplit
+from bs4 import BeautifulSoup
 from denzo.auditor.safe_fetch import fetch_html
-
-# Import industry detector
-from denzo.auditor.industry_detector import quick_detect, deep_detect, determine_is_local
-# Import framework detector
+from denzo.auditor.scoring import score_results, METHODOLOGY_VERSION, BASE_WEIGHTS
 from denzo.auditor.framework_detector import detect_framework
-
-# Import analysis modules
-from denzo.auditor.sitemap_analyzer import analyze_sitemap
+from denzo.auditor.industry_detector import quick_detect, determine_is_local
+from denzo.auditor.onpage_evidence import analyze_onpage
 from denzo.auditor.robots_analyzer import analyze_robots
-from denzo.auditor.llms_analyzer import analyze_llms
-from denzo.auditor.technical_scanner import scan_technical
-from denzo.auditor.geo_visibility import analyze_geo_visibility
-from denzo.auditor.llms_generator import generate_llms_txt
-from denzo.auditor.image_auditor import deep_image_audit
+from denzo.auditor.sitemap_analyzer import analyze_sitemap
 from denzo.auditor.performance_estimator import estimate_performance
-from denzo.auditor.content_quality import analyze_content_quality
-from denzo.auditor.keyword_analyzer import analyze_keyword_targeting
-from denzo.auditor.local_business import check_local_business
-from denzo.auditor.ai_citations import check_ai_citations
-from denzo.auditor.keyword_research import research_keywords
-from denzo.auditor.indexation_check import analyze_indexation
 
-
-# Versioned screening weights are copied per analysis, never mutated globally.
 MODULE_WEIGHTS = dict(BASE_WEIGHTS)
 
 
 class SiteAnalyzer:
-    """Orchestrates parallel SEO+GEO analysis of a single URL."""
+    def __init__(self, url, domain, progress_callback=None):
+        self.url, self.domain = url, domain
+        self.progress = progress_callback or (lambda _p, _s: None)
 
-    def __init__(self, url: str, domain: str, progress_callback: Callable = None):
-        self.url = url
-        self.domain = domain
-        self.progress = progress_callback or (lambda p, step: None)
-
-    def run_full_analysis(self) -> dict:
-        """Run all 9 modules in parallel, compute scores, return complete results dict."""
-        start = time.time()
-
-        # Phase 1: Fetch the page
-        self.progress(5, 'Fetching page HTML...')
-        html = None
-        fetch_method = 'unknown'
-        http_headers = {}
-        redirect_chain = []
-        final_url = self.url
-        page_status = 0
-
+    def run_full_analysis(self):
+        started = time.monotonic()
+        self.progress(5, 'Fetching page HTML')
         try:
-            result = fetch_html(self.url, capture_meta=True)
-            if result and result.get('ok') and result.get('html') and 200 <= result.get('status', 0) < 400:
-                html = result['html']
-                fetch_method = result.get('method', 'curl')
-                page_status = result.get('status', 200)
-                http_headers = result.get('headers', {}) or {}
-                redirect_chain = result.get('redirect_chain', []) or []
-                final_url = result.get('final_url', self.url) or self.url
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning(f"fetch_html failed for {self.url}: {e}")
-
-        if not html:
-            return {
-                "error": "Could not fetch page HTML after multiple attempts",
-                "overall_score": None, "status": "failed", "commercial_ready": False,
-                "methodology_version": METHODOLOGY_VERSION, "coverage": 0,
-                "module_scores": {},
-                "findings": [],
-            }
-
-        html_size_kb = round(len(html) / 1024)
-        # HTTP headers, redirect chain and real status are captured by fetch_html(capture_meta=True)
-
-        # Detect framework/stack (Next.js, WordPress, Wix, …) so analyzers can
-        # skip static-HTML false positives (hydration payload, next/image, code-splitting).
-        framework = detect_framework(html, http_headers)
-
-        # Extract page title
-        title_match = re.search(r'<title>(.*?)</title>', html, re.IGNORECASE | re.DOTALL)
-        page_title = title_match.group(1).strip()[:200] if title_match else ''
-
-        # Phase 1.5: Detect industry (fast keyword-based first, then Claude deep detection)
-        self.progress(12, 'Detecting industry...')
-        industry_profile = quick_detect(html) or {}
-        enable_ai = os.environ.get('AUDIT_ENABLE_AI_ENRICHMENT') == 'true'
-        if enable_ai:
-            try:
-                import asyncio
-                try:
-                    loop = asyncio.get_running_loop()
-                except RuntimeError:
-                    loop = None
-                if loop is not None:
-                    import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                        industry_profile = pool.submit(lambda: asyncio.run(deep_detect(html, self.url))).result(timeout=30)
-                else:
-                    industry_profile = asyncio.run(deep_detect(html, self.url))
-            except Exception:
-                import logging
-                logging.getLogger(__name__).warning(f"Industry deep_detect failed for {self.url}", exc_info=True)
-
-        # Deterministic local-business override. Claude's `is_local_business` is
-        # non-deterministic (the same site flips between local/not-local across
-        # runs), so recompute it from concrete signals: schema + vertical + NAP.
-        _det = quick_detect(html)
-        _quick_ind = _det.get('primary_industry', '')
-        _claude_ind = industry_profile.get('industry', '') or ''
-        _local_ind = _quick_ind if (_quick_ind and _quick_ind != 'general_business') else _claude_ind
-        industry_profile['is_local_business'] = determine_is_local(
-            _local_ind,
-            _det.get('schema_info', {}).get('schema_types', []),
-            html,
-        )
-
-        # Phase 2: Run all analysis modules in parallel (with industry context)
-        self.progress(15, 'Running SEO + GEO analysis...')
-        industry = industry_profile
-        modules = {
-            'sitemap': lambda: analyze_sitemap(self.url, html, self.domain),
-            'robots': lambda: analyze_robots(self.url, html, self.domain),
-            'llms': lambda: analyze_llms(self.url, html, self.domain),
-            'technical': lambda: scan_technical(self.url, html, self.domain, http_headers, page_status, redirect_chain, framework),
-            'geo': lambda: analyze_geo_visibility(self.url, html, self.domain, industry),
-            'images': lambda: deep_image_audit(self.url, html, self.domain, base_page_url=self.url, framework=framework),
-            'performance': lambda: estimate_performance(self.url, html, self.domain, redirect_chain, 0, framework=framework),
-            'content': lambda: analyze_content_quality(self.url, html, self.domain, industry),
-            'keywords': lambda: analyze_keyword_targeting(self.url, html, self.domain),
-            'local_seo': lambda: check_local_business(self.url, html, self.domain, industry),
-            'ai_citations': lambda: check_ai_citations(self.url, html, self.domain, industry),
-            'keyword_research': lambda: research_keywords(self.url, html, self.domain, industry),
-            'indexation': lambda: analyze_indexation(self.url, self.domain),
-        }
-
-        if not enable_ai:
-            for optional in ('ai_citations', 'keyword_research', 'indexation'):
-                modules.pop(optional, None)
-        results = {'_industry': industry_profile}
-
-        completed = 0
-
-        with ThreadPoolExecutor(max_workers=12) as executor:
-            futures = {executor.submit(fn): name for name, fn in modules.items()}
-
-            for future in as_completed(futures):
-                name = futures[future]
-                try:
-                    results[name] = future.result()
-                except Exception as e:
-                    import logging
-                    logging.getLogger(__name__).error(f"Module '{name}' failed for {self.url}: {e}", exc_info=True)
-                    results[name] = {"score": None, "status": "unavailable", "findings": [],
-                                     "error": f"{name} analysis unavailable; retry required"}
-
-                completed += 1
-                progress_pct = min(92, 15 + int(completed * (77 / max(1, len(modules)))))
-                self.progress(progress_pct, f'Analyzing {name}...')
-
-        # Phase 3: Generate optimized llms.txt from site content
-        self.progress(92, 'Generating llms.txt...')
-        llms_gen = {}
-        try:
-            if enable_ai:
-                llms_gen = generate_llms_txt(self.url, html, self.domain, {'results': results}, industry_profile)
-        except Exception:
-            pass
-
-        if framework.get('is_js_framework') and results.get('technical', {}).get('word_count', 0) < 80:
-            results['technical'] = {'score': None, 'status': 'unavailable', 'findings': [],
-                                    'error': 'Rendered content could not be verified for this JavaScript website'}
-        scoring = score_results(results, bool(industry_profile.get('is_local_business')))
-
-        # Phase 4: Collect all findings
-        all_findings = []
-        for module_name in ['sitemap', 'robots', 'llms', 'technical', 'geo', 'images', 'performance', 'content', 'keywords', 'local_seo', 'ai_citations', 'keyword_research', 'indexation']:
-            if module_name in results and scoring['module_status'].get(module_name) == 'completed':
-                for f in results[module_name].get('findings', []):
-                    f['module'] = module_name
-                    all_findings.append(f)
-
-        # Sort by severity
-        severity_order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3, 'info': 4, 'pass': 5}
-        all_findings.sort(key=lambda f: severity_order.get(f.get('severity', 'info'), 5))
-
-        elapsed = time.time() - start
+            fetched = fetch_html(self.url, capture_meta=True)
+            html = fetched.get('html', '')
+            if not fetched.get('ok') or not html:
+                raise ValueError('Homepage could not be read')
+            content_type = next((v for k,v in fetched.get('headers',{}).items() if k.lower()=='content-type'), '')
+            if content_type and not any(t in content_type.lower() for t in ('text/html','application/xhtml+xml')):
+                raise ValueError('Homepage response was not HTML')
+            lowered = html.lower()
+            if any(marker in lowered for marker in ('id="challenge-form"', '/cdn-cgi/challenge-platform/', 'cf-chl-widget')):
+                raise ValueError('Homepage is an automated-access challenge')
+        except Exception as exc:
+            logging.getLogger(__name__).warning('Homepage fetch unavailable: %s', type(exc).__name__)
+            return dict(url=self.url, error='The homepage could not be reliably read', overall_score=None,
+                        status='failed', commercial_ready=False, methodology_version=METHODOLOGY_VERSION,
+                        coverage=0, module_scores={}, findings=[], checked_at=datetime.now(timezone.utc).isoformat())
+        # All checks describe the final page, including HTTP→HTTPS and www redirects.
+        final_url = fetched.get('final_url') or self.url
+        domain = urlsplit(final_url).hostname or self.domain
+        headers = fetched.get('headers', {})
+        framework = detect_framework(html, headers)
+        industry = quick_detect(html) or {}
+        is_local = determine_is_local(industry.get('primary_industry',''), industry.get('schema_info',{}).get('schema_types',[]), html)
+        industry['is_local_business'] = is_local
+        results = analyze_onpage(final_url, html, headers, is_local)
+        results['_industry'] = industry
+        self.progress(25, 'Checking crawler access, sitemaps and measured mobile performance')
+        def run(name, fn):
+            try: return fn()
+            except Exception as exc:
+                logging.getLogger(__name__).warning('Audit module %s unavailable: %s', name, type(exc).__name__)
+                return dict(score=None, status='unavailable', findings=[], error=f'{name} could not be measured')
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            robots_future = pool.submit(run, 'robots', lambda: analyze_robots(final_url, html, domain))
+            performance_future = pool.submit(run, 'performance', lambda: estimate_performance(final_url, html, domain))
+            results['robots'] = robots_future.result()
+            sitemap_future = pool.submit(run, 'sitemap', lambda: analyze_sitemap(final_url, html, domain, results['robots']))
+            results['performance'] = performance_future.result()
+            results['sitemap'] = sitemap_future.result()
+        self.progress(90, 'Validating measured evidence')
+        technical = results['technical']
+        # Avoid giving a client-rendered shell a content/SEO score.
+        if framework.get('is_js_framework') and technical.get('word_count',0) < 80:
+            results['technical'] = dict(score=None, status='unavailable', findings=[],
+                                       error='Rendered content could not be verified for this JavaScript website')
+        scoring = score_results(results, bool(is_local))
+        findings = [dict(f, module=name) for name,result in results.items() if scoring['module_status'].get(name)=='completed'
+                    and scoring['scoring_weights'].get(name,0)>0 for f in result.get('findings',[])]
+        severity = {'critical':0,'high':1,'medium':2,'low':3,'info':4,'pass':5}
+        findings.sort(key=lambda f: severity.get(f.get('severity'),4))
+        soup = BeautifulSoup(html, 'html.parser')
         self.progress(100, 'Report generated')
-
-        return {
-            "url": self.url,
-            "domain": self.domain,
-            **scoring,
-            "checked_at": datetime.now(timezone.utc).isoformat(),
-            "results": results,
-            "findings": all_findings,
-            "fetch_method": fetch_method,
-            "framework": framework.get('framework'),
-            "framework_label": framework.get('label'),
-            "page_title": page_title,
-            "page_status": page_status,
-            "http_status": page_status,
-            "redirect_count": max(0, len(redirect_chain) - 1) if redirect_chain else 0,
-            "final_url": final_url,
-            "rendered": fetch_method == "playwright",
-            "html_size_kb": html_size_kb,
-            "word_count": results.get('technical', {}).get('word_count', 0),
-            "text_html_ratio": results.get('technical', {}).get('text_html_ratio', 0),
-            "image_count": results.get('technical', {}).get('image_count', 0),
-            "schema_blocks": results.get('technical', {}).get('schema_blocks', 0),
-            "schema_types": results.get('technical', {}).get('schema_types', []),
-            "sitemap_url": results.get('sitemap', {}).get('sitemap_url'),
-            "sitemap_total_urls": results.get('sitemap', {}).get('total_urls', 0),
-            "llms_status": results.get('llms', {}).get('llms_status'),
-            "faq_count": results.get('geo', {}).get('faq_count', 0),
-            "li_count": results.get('geo', {}).get('li_count', 0),
-            "internal_links": results.get('technical', {}).get('internal_links', 0),
-            "llms_generated": llms_gen,
-            "weight_explanation": {name: f"{weight}% of Droppin automated screening rubric"
-                                   for name, weight in scoring['scoring_weights'].items()},
-        }
+        return dict(url=self.url, final_url=final_url, domain=domain, **scoring,
+            checked_at=datetime.now(timezone.utc).isoformat(), results=results, findings=findings,
+            page_status=fetched.get('status'), http_status=fetched.get('status'),
+            fetch_method=fetched.get('method','public_http'), rendered=False,
+            framework=framework.get('framework'), framework_label=framework.get('label'),
+            page_title=soup.title.get_text(' ',strip=True)[:200] if soup.title else '',
+            redirect_count=max(0,len(fetched.get('redirect_chain',[]))-1),
+            duration_seconds=round(time.monotonic()-started,2), html_size_kb=round(len(html.encode())/1024),
+            word_count=technical.get('word_count',0), text_html_ratio=technical.get('text_html_ratio',0),
+            image_count=technical.get('image_count',0), schema_blocks=technical.get('schema_blocks',0),
+            schema_types=technical.get('schema_types',[]), internal_links=technical.get('internal_links',0),
+            sitemap_url=results['sitemap'].get('sitemap_url'), sitemap_total_urls=results['sitemap'].get('total_urls',0),
+            sitemap_is_sample=results['sitemap'].get('is_sample',True), llms_generated={},
+            weight_explanation={n:f'{w}% of the Droppin homepage screening rubric' for n,w in scoring['scoring_weights'].items()})

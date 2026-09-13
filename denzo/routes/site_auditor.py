@@ -144,7 +144,7 @@ def report_json(audit_id: str):
         score = None
         details.setdefault('error', 'The page could not be reliably audited')
 
-    if status == 'completed' and details.get('methodology_version') == 'droppin-audit-v2' and not details.get('commercial_ready'):
+    if status == 'completed' and details.get('methodology_version') == 'droppin-audit-v3' and not details.get('commercial_ready'):
         status = 'partial'
         score = None
 

@@ -2,8 +2,8 @@
 Report Builder v4 — dual-mode standalone reports.
 
 Two modes, chosen by request host:
-  * 'droppin' — lead-gen: verdict, top-3 teasers, then a locked/blurred findings
-    wall behind a "contact us" CTA. The full fix detail is withheld.
+  * 'droppin' — acquisition: verdict, measured findings and full fix detail,
+    with an optional contact CTA. Incomplete measurements do not show a score.
   * 'full'    — internal technical tool: every finding + fix, filterable, plus a
     "copy the full technical brief" button for handing to an AI.
 
@@ -324,7 +324,7 @@ def _build_body(result, audit_id, mode, inline_assets):
     # ── scorecard ──
     mods = [
         ('technical', 'Technical foundations', weights.get('technical', 30), module_scores.get('technical', 0)),
-        ('geo', 'Content & authority', weights.get('geo', 22), module_scores.get('geo', 0)),
+        ('geo', 'Structured content', weights.get('geo', 22), module_scores.get('geo', 0)),
         ('performance', 'Page speed', weights.get('performance', 15), module_scores.get('performance', 0)),
         ('content', 'Content quality', weights.get('content', 10), module_scores.get('content', 0)),
         ('images', 'Images', weights.get('images', 8), module_scores.get('images', 0)),
@@ -469,7 +469,7 @@ def _build_body(result, audit_id, mode, inline_assets):
 
 def build_report_html(result: dict, audit_id: str, mode: str = 'full', inline_assets: bool = False) -> str:
     """Render a standalone report. mode: 'droppin' | 'full'."""
-    if result.get('overall_score') is None or (result.get('methodology_version') == 'droppin-audit-v2' and not result.get('commercial_ready')):
+    if result.get('overall_score') is None or (str(result.get('methodology_version', '')).startswith('droppin-audit-') and not result.get('commercial_ready')):
         reason = html.escape(str(result.get('error') or 'Some checks could not be completed. No reliable overall grade is available.'))
         return '<!doctype html><html lang="en"><meta name="viewport" content="width=device-width"><title>Audit incomplete</title><body><h1>Audit incomplete</h1><p>' + reason + '</p><p>This does not imply that the website is poor. Please retry the analysis.</p></body></html>'
     overall = int(result['overall_score'])
@@ -488,4 +488,3 @@ def build_report_html(result: dict, audit_id: str, mode: str = 'full', inline_as
 <script>{js}</script>
 </body>
 </html>'''
-

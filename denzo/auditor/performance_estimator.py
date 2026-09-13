@@ -1,10 +1,16 @@
 """Measured mobile Lighthouse performance, with CrUX field data kept separate."""
 from denzo.auditor.pagespeed_real import get_real_performance
 from denzo.auditor.scoring import valid_score
+from urllib.parse import urlsplit
 
 
 def estimate_performance(url, html, domain, redirect_chain=None, fetch_time_ms=None, framework=None):
     data = get_real_performance(url)
+    if data and data.get('final_url'):
+        measured = urlsplit(data['final_url'])
+        target = urlsplit(url)
+        if measured.hostname and measured.hostname.removeprefix('www.') != (target.hostname or '').removeprefix('www.'):
+            data = None
     if not data or not valid_score(data.get('score')):
         return {'score': None, 'status': 'unavailable', 'findings': [], 'cwv': {},
                 'source': 'unavailable', 'error': 'Mobile PageSpeed measurement unavailable; retry with a working PAGESPEED_API_KEY.'}
