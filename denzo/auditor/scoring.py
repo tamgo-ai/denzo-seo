@@ -18,7 +18,7 @@ def score_results(results, is_local=False):
         module = results.get(name) or {}
         valid = valid_score(module.get('score')) and not module.get('error') and module.get('status', 'completed') == 'completed'
         if name == 'performance':
-            valid = valid and module.get('source') == 'pagespeed_insights_api'
+            valid = valid and module.get('source') == 'lighthouse_local'
         scores[name] = module.get('score') if valid else None
         statuses[name] = 'completed' if valid else 'unavailable'
     coverage = sum(weight for name, weight in weights.items() if scores[name] is not None)

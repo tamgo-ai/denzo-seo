@@ -54,6 +54,41 @@ def get_real_performance(url: str) -> dict:
         return None
 
 
+def get_lighthouse_performance(url: str) -> dict:
+    """Run local Lighthouse (headless Chrome) for lab performance.
+
+    Replaces the Google PageSpeed Insights API so the auditor does not depend
+    on an enabled GCP project. Returns the same shape as get_real_performance
+    but with lab data only (no CrUX field data)."""
+    try:
+        import subprocess
+        import json
+        import shutil
+        lighthouse_bin = shutil.which('lighthouse')
+        if not lighthouse_bin:
+            logger.warning("lighthouse CLI not available")
+            return None
+        cmd = [
+            lighthouse_bin, url,
+            '--output=json', '--output-path=stdout',
+            '--chrome-flags=--headless --no-sandbox --disable-gpu --disable-dev-shm-usage',
+            '--only-categories=performance',
+            '--quiet',
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        if proc.returncode != 0:
+            logger.warning("lighthouse failed (%s)", proc.returncode)
+            return None
+        data = json.loads(proc.stdout)
+        result = _parse_psi_response({'lighthouseResult': data})
+        if not valid_score(result.get('score')):
+            return None
+        return result
+    except Exception as e:
+        logger.warning("lighthouse unavailable (%s)", type(e).__name__)
+        return None
+
+
 def _parse_psi_response(data: dict) -> dict:
     """Extract key metrics from PSI API response."""
     result = {
