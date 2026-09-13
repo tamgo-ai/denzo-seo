@@ -4,7 +4,7 @@ Checks AI crawler accessibility, sitemap references, and crawl rules.
 """
 import re
 from urllib.parse import urljoin, urlparse
-from denzo.agents.utils.stealth_fetch import fetch_html
+from denzo.auditor.safe_fetch import fetch_html
 
 
 # AI crawlers to check for
@@ -14,7 +14,7 @@ AI_CRAWLERS = {
     'Claude-Web': 'Anthropic Claude',
     'anthropic-ai': 'Anthropic Claude (alt)',
     'PerplexityBot': 'Perplexity AI',
-    'Google-Extended': 'Google Gemini / AI Overviews',
+    'Google-Extended': 'Google model training controls (not Search indexing)',
     'GoogleOther': 'Google research crawler',
     'cohere-ai': 'Cohere AI',
     'meta-externalagent': 'Meta AI',
@@ -40,7 +40,7 @@ def analyze_robots(url: str, html: str, domain: str) -> dict:
         res = fetch_html(robots_url, allow_jina=False)
         robots_text = res.get('html', '') if res and res.get('ok') else None
     except Exception:
-        robots_text = None
+        return {"score": None, "status": "unavailable", "findings": [], "error": "Could not verify robots.txt"}
 
     # Defense-in-depth: strip any HTML wrapping (e.g. a proxy/renderer wrapping
     # the plain text in <pre>…</pre>) so a Sitemap: URL is never corrupted.
@@ -48,16 +48,9 @@ def analyze_robots(url: str, html: str, domain: str) -> dict:
         robots_text = re.sub(r'<[^>]+>', '', robots_text)
 
     if not robots_text:
-        findings.append({
-            "severity": "high",
-            "module": "robots",
-            "title": "No robots.txt found or inaccessible",
-            "detail": f"Could not fetch {robots_url}. Search engines will crawl with no restrictions, which is generally fine but lacks crawl directives.",
-            "fix": "Create a robots.txt at the site root. At minimum, include a sitemap reference."
-        })
-        score -= 25
-        return {"score": max(0, score), "findings": findings, "robots_url": robots_url, "sitemap_refs": [],
-                "ai_crawlers_blocked": [], "ai_crawlers_allowed": [], "total_rules": 0}
+        return {"score": 100, "findings": [{"severity": "info", "title": "No robots.txt directives found",
+                "detail": "A robots.txt file is optional. Its absence does not by itself prevent indexing.", "fix": None}],
+                "robots_url": robots_url, "sitemap_refs": [], "ai_crawlers_blocked": [], "ai_crawlers_allowed": [], "total_rules": 0}
 
     # 2. Parse directives
     lines = robots_text.strip().split('\n')
@@ -98,7 +91,7 @@ def analyze_robots(url: str, html: str, domain: str) -> dict:
             "detail": "Adding a sitemap directive helps search engines discover your sitemap quickly.",
             "fix": "Add: Sitemap: https://" + domain + "/sitemap.xml"
         })
-        score -= 10
+        # Informational crawl configuration; no unsupported search penalty.
 
     # Check if root is blocked
     all_bots = rules_by_ua.get('*', {'disallow': []})
@@ -136,33 +129,10 @@ def analyze_robots(url: str, html: str, domain: str) -> dict:
         else:
             ai_allowed.append(ua_key)
 
-    if len(ai_blocked) >= 8:
-        findings.append({
-            "severity": "high",
-            "module": "robots",
-            "title": f"AI crawlers heavily restricted: {len(ai_blocked)} blocked",
-            "detail": f"Blocked: {', '.join(ai_blocked[:6])}... This prevents LLMs from discovering and citing your content.",
-            "fix": "Consider allowing AI crawlers to improve AI visibility and citation rates."
-        })
-        score -= 20
-    elif len(ai_blocked) >= 3:
-        findings.append({
-            "severity": "medium",
-            "module": "robots",
-            "title": f"{len(ai_blocked)} AI crawlers blocked",
-            "detail": f"Blocked: {', '.join(ai_blocked)}. Some LLMs cannot access your content.",
-            "fix": "Review if intentionally blocking these AI crawlers. For GEO visibility, allowing them is beneficial."
-        })
-        score -= 10
-
-    if len(ai_allowed) >= 8:
-        findings.insert(0, {
-            "severity": "pass",
-            "module": "robots",
-            "title": f"Excellent AI crawler accessibility: {len(ai_allowed)} AI crawlers allowed",
-            "detail": "Your content can be discovered and cited by major AI platforms.",
-            "fix": None
-        })
+    if ai_blocked:
+        findings.append({"severity": "info", "module": "robots", "title": f"AI crawler policy: {len(ai_blocked)} restricted",
+                         "detail": "These directives may intentionally restrict AI training or automated access. They are not evidence of a Google Search ranking problem.",
+                         "fix": "Keep or change these settings according to the website owner's policy."})
 
     if total_rules == 0 and sitemap_refs:
         findings.insert(0, {
@@ -183,3 +153,4 @@ def analyze_robots(url: str, html: str, domain: str) -> dict:
         "total_rules": total_rules,
         "has_wildcard": '*' in rules_by_ua,
     }
+

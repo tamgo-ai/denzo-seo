@@ -7,7 +7,7 @@ from urllib.parse import urljoin, urlparse
 from collections import Counter
 from datetime import datetime, timezone
 from bs4 import BeautifulSoup
-from denzo.agents.utils.stealth_fetch import fetch_html
+from denzo.auditor.safe_fetch import fetch_html
 
 
 def _fetch(url: str) -> str:
@@ -15,7 +15,8 @@ def _fetch(url: str) -> str:
         # Raw XML/plain-text — never Jina, which can't return raw XML.
         res = fetch_html(url, allow_jina=False)
         return res.get('html','') if res and res.get('ok') else None
-    except: return None
+    except Exception:
+        raise
 
 
 def analyze_sitemap(url: str, html: str, domain: str) -> dict:
@@ -197,3 +198,4 @@ def analyze_sitemap(url: str, html: str, domain: str) -> dict:
         findings.insert(0, {"severity":"pass","module":"sitemap","title":f"Sitemap found: {total_urls:,} URLs" + (f" (index of {child_sitemaps} files)" if is_index else ""),"detail":f"URL: {sitemap_url}\nDiscovered via: {tried[0] if tried else 'direct try'}\nTotal URLs: {total_urls:,}\nHreflang entries: {hreflang_count}\nChangefreqs: {dict(changefreqs.most_common(3)) if changefreqs else 'none'}","fix":None})
 
     return {"score":max(0,score),"findings":findings,"total_urls":total_urls,"sitemap_url":sitemap_url,"is_index":is_index,"child_sitemaps":child_sitemaps,"child_sitemap_urls":child_sitemap_urls,"domain_mismatches":domain_mismatches,"hreflang_count":hreflang_count,"lastmod_future":lastmod_future,"lastmod_identical":lastmod_identical,"lastmod_present":lastmod_present,"coverage":coverage,"changefreqs":dict(changefreqs.most_common(5)),"priority_range":[round(min(priorities),1),round(max(priorities),1)] if priorities else None}
+

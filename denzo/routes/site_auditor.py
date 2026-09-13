@@ -1,6 +1,6 @@
 """
-Site Auditor — public SEO+GEO analysis tool.
-No login required. Paste a URL, get a comprehensive audit report.
+Site Auditor — versioned analysis with an authenticated, durable work queue.
+Public analysis is disabled unless explicitly enabled by the operator.
 """
 import os
 import uuid
@@ -8,17 +8,27 @@ import json
 import time
 import re
 import math
-import threading
-from datetime import datetime
+import hmac
+import html
 from urllib.parse import urlparse
-from flask import Blueprint, request, jsonify, render_template, Response, send_file, redirect
-from denzo.db import get_db
+from flask import Blueprint, request, jsonify, render_template, Response, send_file, redirect, session, g
+from denzo.db import get_db as _get_db
 
 bp = Blueprint('site_auditor', __name__, url_prefix='/auditor')
 
-# In-memory progress store for running analyses (SSE pushes from here)
-_progress_store: dict[str, dict] = {}
-_progress_lock = threading.Lock()
+def get_db():
+    db = _get_db()
+    if not hasattr(g, 'audit_connections'):
+        g.audit_connections = []
+    g.audit_connections.append(db)
+    return db
+
+
+@bp.teardown_request
+def close_audit_connections(_error=None):
+    for db in g.pop('audit_connections', []):
+        db.close()
+
 
 # Standalone "still running" page with auto-refresh. Used by /auditor/report/<id>
 # while an analysis is pending/running, so a postcard QR can land straight on it.
@@ -45,30 +55,6 @@ _PROCESSING_HTML = """<!DOCTYPE html>
   <p class="pct">__PROGRESS__%</p>
 </body>
 </html>"""
-
-
-def _new_audit_id() -> str:
-    return str(uuid.uuid4())[:12]
-
-
-def _set_progress(audit_id: str, data: dict):
-    with _progress_lock:
-        # Always store so SSE stream can read it before cleanup
-        _progress_store[audit_id] = data
-        # Mark completed/error for deferred cleanup (SSE needs to read it first)
-        if data.get('event') in ('complete', 'error'):
-            data['_cleanup_after'] = time.time() + 30  # Keep for 30s so SSE can consume
-
-
-def _get_progress(audit_id: str) -> dict:
-    with _progress_lock:
-        # Deferred cleanup: remove entries marked for cleanup after their TTL expires
-        now = time.time()
-        stale_keys = [k for k, v in _progress_store.items()
-                      if not k.startswith('rate:') and v.get('_cleanup_after', float('inf')) < now]
-        for k in stale_keys:
-            _progress_store.pop(k, None)
-        return _progress_store.get(audit_id, {})
 
 
 @bp.route('/')
@@ -116,7 +102,7 @@ def report(audit_id: str):
     if audit['status'] != 'completed':
         step = audit['current_step'] or 'Analyzing your site...'
         progress = audit['progress'] if audit['progress'] is not None else 0
-        return _PROCESSING_HTML.replace('__STEP__', step).replace('__PROGRESS__', str(progress))
+        return _PROCESSING_HTML.replace('__STEP__', html.escape(step)).replace('__PROGRESS__', str(progress))
 
     result = json.loads(audit['report_json']) if audit['report_json'] else {}
     mode = _report_mode(request.host)
@@ -157,6 +143,10 @@ def report_json(audit_id: str):
         status = 'failed'
         score = None
         details.setdefault('error', 'The page could not be reliably audited')
+
+    if status == 'completed' and details.get('methodology_version') == 'droppin-audit-v2' and not details.get('commercial_ready'):
+        status = 'partial'
+        score = None
 
     payload = {
         'audit_id': audit['audit_id'],
@@ -250,7 +240,8 @@ def progress(audit_id: str):
         last_progress = -1
         # 600 iterations × 0.5s max = 300s = 5 minutes
         for _ in range(600):  # max 5 minutes
-            data = _get_progress(audit_id)
+            from denzo.auditor.queue import read_progress
+            data = read_progress(audit_id)
             if not data:
                 yield f"data: {json.dumps({'event': 'waiting', 'progress': 0})}\n\n"
                 time.sleep(0.5)
@@ -271,61 +262,41 @@ def progress(audit_id: str):
 
 
 def _normalize_and_enqueue(url: str, client_ip: str):
-    """Validate, rate-limit, and enqueue an analysis. Returns (audit_id, error, status_code)."""
-    url = (url or '').strip()
-    if not url:
-        return None, 'URL is required', 400
-
-    # Basic URL validation
-    if len(url) > 500 or '<' in url or '>' in url:
-        return None, 'Invalid URL', 400
-
-    # Normalize URL
-    if not url.startswith('http'):
-        url = 'https://' + url
-
-    # Rate limiting: max per hour per IP (configurable; raised for Droppin batch).
-    max_per_hour = int(os.environ.get('AUDIT_RATE_LIMIT_PER_HOUR', '120'))
-    now = time.time()
-    with _progress_lock:
-        # Clean old entries (older than 1 hour)
-        for ip in list(_progress_store.keys()):
-            if ip.startswith('rate:'):
-                if now - _progress_store[ip] > 3600:
-                    del _progress_store[ip]
-        rate_key = f'rate:{client_ip}'
-        count = _progress_store.get(rate_key, 0)
-        if count >= max_per_hour:
-            return None, f'Rate limit exceeded. Max {max_per_hour} analyses per hour.', 429
-        _progress_store[rate_key] = count + 1
-
-    audit_id = _new_audit_id()
-    parsed_url = urlparse(url)
-    domain = re.sub(r'^www\.', '', parsed_url.hostname or 'site')
-
-    # Insert pending record
-    db = get_db()
-    db.execute(
-        """INSERT INTO site_audits (audit_id, url, domain, status, progress, current_step)
-           VALUES (?,?,?,'pending',0,'Queued')""",
-        (audit_id, url, domain)
-    )
-    db.commit()
-
-    # Launch analysis in background thread
-    _set_progress(audit_id, {'event': 'started', 'progress': 0, 'current_step': 'Starting analysis...'})
-
-    thread = threading.Thread(target=_run_analysis, args=(audit_id, url, domain), daemon=True)
-    thread.start()
-
-    return audit_id, None, None
+    from denzo.auditor.safe_fetch import validate_url
+    from denzo.auditor.queue import enqueue
+    token = os.environ.get('AUDIT_SERVICE_TOKEN', '')
+    supplied = request.headers.get('Authorization', '')
+    service = bool(token) and hmac.compare_digest(supplied, 'Bearer ' + token)
+    if supplied and not service:
+        return None, 'Invalid service credentials', 401
+    if not service and not session.get('user_id') and os.environ.get('AUDIT_PUBLIC_ENABLED') != 'true':
+        return None, 'Audit access requires authentication', 401
+    if not service and request.headers.get('Origin') and request.headers['Origin'].rstrip('/') != request.host_url.rstrip('/'):
+        return None, 'Invalid request origin', 403
+    key = request.headers.get('Idempotency-Key', '')
+    if service and not re.fullmatch(r'[A-Za-z0-9_-]{16,80}', key):
+        return None, 'A stable Idempotency-Key is required', 400
+    try:
+        normalized, _ = validate_url(url)
+        limit = int(os.environ.get('AUDIT_SERVICE_LIMIT_PER_HOUR' if service else 'AUDIT_RATE_LIMIT_PER_HOUR', '1200' if service else '10'))
+        audit_id = enqueue(normalized, ('service:' if service else 'public:') + (key or uuid.uuid4().hex),
+                           'service' if service else client_ip, max(1, limit))
+        return audit_id, None, None
+    except OverflowError:
+        return None, 'Hourly audit limit reached; try again later', 429
+    except ValueError as exc:
+        return None, str(exc), 400
+    except OSError:
+        return None, 'Website hostname could not be resolved', 400
 
 
 @bp.route('/analyze', methods=['POST'])
 def analyze():
     """Start a new site analysis. Returns audit_id for progress tracking."""
-    data = request.get_json() or {}
-    url = (data.get('url') or '').strip()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not isinstance(data.get('url'), str):
+        return jsonify({'error': 'A website URL is required'}), 400
+    url = data['url'].strip()
     client_ip = request.remote_addr or 'unknown'
 
     audit_id, error, code = _normalize_and_enqueue(url, client_ip)
@@ -337,69 +308,17 @@ def analyze():
 
 @bp.route('/go')
 def go():
-    """One-click entry: enqueue an analysis for ?url= and redirect to its report.
-    Ideal for postcard QR codes — e.g. /auditor/go?url=https://example.com."""
-    url = request.args.get('url', '')
-    client_ip = request.remote_addr or 'unknown'
-
-    audit_id, error, code = _normalize_and_enqueue(url, client_ip)
-    if error:
-        return render_template('site_auditor/index.html', error=error), code
-
-    return redirect(f'/auditor/report/{audit_id}')
+    # GET must never create work. Printed QRs link to an existing frozen report.
+    return redirect('/auditor/')
 
 
-def _run_analysis(audit_id: str, url: str, domain: str):
-    """Run all 5 analysis modules and save results. Called in background thread."""
-    start_time = time.time()
-
-    try:
-        db = get_db()
-        # Update status
-        db.execute("UPDATE site_audits SET status='running', progress=5, current_step='Fetching page...' WHERE audit_id=?", (audit_id,))
-        db.commit()
-        _set_progress(audit_id, {'event': 'running', 'progress': 5, 'current_step': 'Fetching page...'})
-
-        # Import inside thread to avoid circular imports
-        from denzo.auditor.analyzer import SiteAnalyzer
-        analyzer = SiteAnalyzer(url, domain, progress_callback=lambda p, step: _set_progress(
-            audit_id, {'event': 'running', 'progress': p, 'current_step': step}
-        ))
-
-        result = analyzer.run_full_analysis()
-
-        elapsed_ms = int((time.time() - start_time) * 1000)
-        overall = result.get('overall_score', 0)
-        module_scores = json.dumps(result.get('module_scores', {}))
-        report_json = json.dumps(result, ensure_ascii=False)
-
-        db.execute("""UPDATE site_audits SET status='completed', progress=100,
-            report_json=?, overall_score=?, module_scores=?,
-            fetch_method=?, page_title=?, page_status=?, html_size_kb=?, analysis_time_ms=?,
-            updated_at=CURRENT_TIMESTAMP
-            WHERE audit_id=?""",
-            (report_json, overall, module_scores,
-             result.get('fetch_method', ''), result.get('page_title', ''),
-             result.get('page_status', 0), result.get('html_size_kb', 0),
-             elapsed_ms, audit_id))
-        db.commit()
-
-        _set_progress(audit_id, {
-            'event': 'complete',
-            'progress': 100,
-            'current_step': 'Done',
-            'redirect': f'/auditor/report/{audit_id}',
-            'overall_score': overall,
-            'analysis_time_ms': elapsed_ms
-        })
-
-    except Exception as e:
-        elapsed_ms = int((time.time() - start_time) * 1000)
-        try:
-            db = get_db()
-            db.execute("UPDATE site_audits SET status='error', error_message=?, analysis_time_ms=?, updated_at=CURRENT_TIMESTAMP WHERE audit_id=?",
-                       (str(e), elapsed_ms, audit_id))
-            db.commit()
-        except Exception:
-            pass
-        _set_progress(audit_id, {'event': 'error', 'progress': 0, 'current_step': 'Error', 'error': str(e)})
+@bp.route('/health')
+def health():
+    token = os.environ.get('AUDIT_SERVICE_TOKEN', '')
+    if not token or not hmac.compare_digest(request.headers.get('Authorization', ''), 'Bearer '+token):
+        return jsonify({'error': 'Authentication required'}), 401
+    from denzo.auditor.queue import health as queue_health
+    from denzo.auditor.scoring import METHODOLOGY_VERSION
+    data = queue_health()
+    data.update(methodology_version=METHODOLOGY_VERSION, pagespeed_configured=bool(os.environ.get('PAGESPEED_API_KEY')))
+    return jsonify(data), 200 if data['worker_active'] and data['pagespeed_configured'] else 503

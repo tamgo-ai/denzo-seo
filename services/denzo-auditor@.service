@@ -1,0 +1,18 @@
+[Unit]
+Description=DENZO persistent audit worker %i
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/denzo-seo
+EnvironmentFile=/root/denzo-seo/.env
+ExecStart=/root/denzo-seo/.venv/bin/python -m denzo.auditor.worker
+Restart=always
+RestartSec=5
+KillMode=control-group
+TimeoutStopSec=15
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target

@@ -3,14 +3,17 @@ Site Analyzer — orchestrates all 9 analysis modules in parallel.
 Collects results, computes weighted overall score, generates structured report.
 """
 import re
+import os
 import time
 import json
+from datetime import datetime, timezone
+from denzo.auditor.scoring import score_results, METHODOLOGY_VERSION, BASE_WEIGHTS
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
 from typing import Callable
 
 # Import the shared HTTP fetcher
-from denzo.agents.utils.stealth_fetch import fetch_html
+from denzo.auditor.safe_fetch import fetch_html
 
 # Import industry detector
 from denzo.auditor.industry_detector import quick_detect, deep_detect, determine_is_local
@@ -34,33 +37,8 @@ from denzo.auditor.keyword_research import research_keywords
 from denzo.auditor.indexation_check import analyze_indexation
 
 
-# Weight distribution for overall score — based on actual ranking factor studies:
-# - On-page technical fundamentals: 30% (title, meta, schema, headings, indexability)
-# - Content quality & E-E-A-T signals: 22% (depth, structure, authority markers)
-# - Core Web Vitals & performance: 15% (Real CWV via PageSpeed API when available)
-# - Content depth & originality: 10% (readability, data points, freshness)
-# - Indexability & crawl efficiency: 15% combined (sitemap 8%, robots 7%)
-# - Image optimization: 8% (alt text, formats, dimensions, LCP)
-# - Local SEO: 0-10% (dynamic — only for businesses detected as local)
-# NOTE: GEO/AI visibility is a SYMPTOM of good SEO, not a ranking factor.
-#       We audit GEO signals as part of content quality (FAQ, lists, definitions), not as a separate module.
-MODULE_WEIGHTS = {
-    'technical': 30,
-    'geo': 22,
-    'performance': 15,
-    'sitemap': 8,
-    'robots': 7,
-    'images': 8,
-    'content': 10,
-    'local_seo': 0,  # 0 weight when not a local business, adjusted at runtime
-    'keywords': 0,  # Informational — keyword targeting diagnosis, scored via content quality
-    'llms': 0,  # llms.txt is NOT a ranking factor — informational only, no score impact
-    'ai_citations': 0,  # Informational — AI citation visibility check
-    'keyword_research': 0,  # Informational — keyword suggestions, not a score
-    'indexation': 0,  # Informational — Google index status (verified domains only)
-}
-
-assert sum(MODULE_WEIGHTS.values()) == 100, f"MODULE_WEIGHTS must sum to 100, got {sum(MODULE_WEIGHTS.values())}"
+# Versioned screening weights are copied per analysis, never mutated globally.
+MODULE_WEIGHTS = dict(BASE_WEIGHTS)
 
 
 class SiteAnalyzer:
@@ -86,7 +64,7 @@ class SiteAnalyzer:
 
         try:
             result = fetch_html(self.url, capture_meta=True)
-            if result and result.get('ok') and result.get('html') and len(result['html']) > 500:
+            if result and result.get('ok') and result.get('html') and 200 <= result.get('status', 0) < 400:
                 html = result['html']
                 fetch_method = result.get('method', 'curl')
                 page_status = result.get('status', 200)
@@ -100,7 +78,8 @@ class SiteAnalyzer:
         if not html:
             return {
                 "error": "Could not fetch page HTML after multiple attempts",
-                "overall_score": 0,
+                "overall_score": None, "status": "failed", "commercial_ready": False,
+                "methodology_version": METHODOLOGY_VERSION, "coverage": 0,
                 "module_scores": {},
                 "findings": [],
             }
@@ -119,21 +98,23 @@ class SiteAnalyzer:
         # Phase 1.5: Detect industry (fast keyword-based first, then Claude deep detection)
         self.progress(12, 'Detecting industry...')
         industry_profile = quick_detect(html) or {}
-        try:
-            import asyncio
+        enable_ai = os.environ.get('AUDIT_ENABLE_AI_ENRICHMENT') == 'true'
+        if enable_ai:
             try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = None
-            if loop is not None:
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                    industry_profile = pool.submit(lambda: asyncio.run(deep_detect(html, self.url))).result(timeout=30)
-            else:
-                industry_profile = asyncio.run(deep_detect(html, self.url))
-        except Exception:
-            import logging
-            logging.getLogger(__name__).warning(f"Industry deep_detect failed for {self.url}", exc_info=True)
+                import asyncio
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = None
+                if loop is not None:
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                        industry_profile = pool.submit(lambda: asyncio.run(deep_detect(html, self.url))).result(timeout=30)
+                else:
+                    industry_profile = asyncio.run(deep_detect(html, self.url))
+            except Exception:
+                import logging
+                logging.getLogger(__name__).warning(f"Industry deep_detect failed for {self.url}", exc_info=True)
 
         # Deterministic local-business override. Claude's `is_local_business` is
         # non-deterministic (the same site flips between local/not-local across
@@ -167,13 +148,10 @@ class SiteAnalyzer:
             'indexation': lambda: analyze_indexation(self.url, self.domain),
         }
 
+        if not enable_ai:
+            for optional in ('ai_citations', 'keyword_research', 'indexation'):
+                modules.pop(optional, None)
         results = {'_industry': industry_profile}
-
-        # Adjust local_seo weight: only for businesses detected as local
-        if industry_profile and industry_profile.get('is_local_business'):
-            MODULE_WEIGHTS['local_seo'] = 10
-            MODULE_WEIGHTS['technical'] = 25  # Reduce technical slightly to make room
-            MODULE_WEIGHTS['geo'] = 17
 
         completed = 0
 
@@ -187,13 +165,8 @@ class SiteAnalyzer:
                 except Exception as e:
                     import logging
                     logging.getLogger(__name__).error(f"Module '{name}' failed for {self.url}: {e}", exc_info=True)
-                    results[name] = {"score": 0, "findings": [{
-                        "severity": "critical",
-                        "module": name,
-                        "title": f"Analysis module '{name}' failed",
-                        "detail": str(e),
-                        "fix": "Retry the analysis. If the error persists, the site may be blocking automated analysis."
-                    }]}
+                    results[name] = {"score": None, "status": "unavailable", "findings": [],
+                                     "error": f"{name} analysis unavailable; retry required"}
 
                 completed += 1
                 progress_pct = min(92, 15 + int(completed * (77 / max(1, len(modules)))))
@@ -203,23 +176,20 @@ class SiteAnalyzer:
         self.progress(92, 'Generating llms.txt...')
         llms_gen = {}
         try:
-            llms_gen = generate_llms_txt(self.url, html, self.domain, {'results': results}, industry_profile)
+            if enable_ai:
+                llms_gen = generate_llms_txt(self.url, html, self.domain, {'results': results}, industry_profile)
         except Exception:
             pass
 
-        # Phase 4: Compute overall score
-        overall = 0
-        for module, weight in MODULE_WEIGHTS.items():
-            if module in results:
-                overall += results[module].get('score', 0) * (weight / 100)
-
-        overall = round(overall)
-        module_scores = {m: results[m].get('score', 0) for m in MODULE_WEIGHTS if m in results}
+        if framework.get('is_js_framework') and results.get('technical', {}).get('word_count', 0) < 80:
+            results['technical'] = {'score': None, 'status': 'unavailable', 'findings': [],
+                                    'error': 'Rendered content could not be verified for this JavaScript website'}
+        scoring = score_results(results, bool(industry_profile.get('is_local_business')))
 
         # Phase 4: Collect all findings
         all_findings = []
         for module_name in ['sitemap', 'robots', 'llms', 'technical', 'geo', 'images', 'performance', 'content', 'keywords', 'local_seo', 'ai_citations', 'keyword_research', 'indexation']:
-            if module_name in results:
+            if module_name in results and scoring['module_status'].get(module_name) == 'completed':
                 for f in results[module_name].get('findings', []):
                     f['module'] = module_name
                     all_findings.append(f)
@@ -234,8 +204,8 @@ class SiteAnalyzer:
         return {
             "url": self.url,
             "domain": self.domain,
-            "overall_score": overall,
-            "module_scores": module_scores,
+            **scoring,
+            "checked_at": datetime.now(timezone.utc).isoformat(),
             "results": results,
             "findings": all_findings,
             "fetch_method": fetch_method,
@@ -260,18 +230,6 @@ class SiteAnalyzer:
             "li_count": results.get('geo', {}).get('li_count', 0),
             "internal_links": results.get('technical', {}).get('internal_links', 0),
             "llms_generated": llms_gen,
-            "weight_explanation": {
-                'technical': '30% — On-page fundamentals (title, meta, schema, headings)',
-                'geo': '22% — Content quality & authority signals',
-                'performance': '15% — Core Web Vitals & page speed',
-                'images': '8% — Image optimization & accessibility',
-                'content': '10% — Content depth, readability & originality',
-                'sitemap': '8% — Crawl efficiency & indexation',
-                'robots': '7% — Crawler access & directives',
-                'local_seo': '0-10% — Local business signals (dynamic, only for local businesses)',
-                'keywords': '0% — Keyword targeting diagnosis (informational)',
-                'llms': '0% — Informational only, not a ranking factor',
-                'ai_citations': '0% — AI citation visibility (informational)',
-                'keyword_research': '0% — Keyword suggestions (informational)',
-            },
+            "weight_explanation": {name: f"{weight}% of Droppin automated screening rubric"
+                                   for name, weight in scoring['scoring_weights'].items()},
         }
