@@ -111,8 +111,10 @@ class ClientContext:
     wp_user:            str        = ""
     wp_app_password:    str        = ""
     dont_sell:          List[str]  = field(default_factory=list)
+    target_audience:    str = ""
 
     def to_prompt_block(self) -> str:
+        from denzo.evidence import facts_block
         """Inject this into every agent prompt — replaces NOHO_CONTEXT."""
         cities    = ", ".join(self.service_cities) or self.primary_city
         certs     = ", ".join(self.certifications) or "N/A"
@@ -146,6 +148,8 @@ Industry vertical: {industry}
 Brand tier: {self.brand_tier}
 Tagline: "{self.tagline}"
 Description: {self.description}
+Target audience (client supplied): {self.target_audience}
+{facts_block(self.tenant_id)}
 
 SERVICES OFFERED: {svcs}
 {cert_label}: {certs}
@@ -173,12 +177,10 @@ BRAND VOICE DNA — follow this exactly:
 - Signature phrases to use: {brand_voice.get('phrases_to_use', '')}
 - Phrases to NEVER use: {brand_voice.get('phrases_to_avoid', '')}
 
-AUTHORITY SIGNAL RULES — include at least 2 of these in every piece:
-1. First-person data: "In our experience with [X clients/years]..."
-2. Named framework: Create a named methodology (e.g. "The [Brand] [Method/Framework/Approach]")
-3. Contrarian position: "Most [industry players] will tell you X, but that's wrong because..."
-4. Specific numbers: Use exact figures, percentages, timeframes — never vague estimates
-5. Expert quote: "As {brand_voice.get('founder_name', 'our founder')}, puts it: '...'"
+EVIDENCE RULES:
+Use only client-verified facts. Style preferences do not validate numerical claims.
+Omit missing experience/customer counts. Never fabricate quotes, methods, or outcomes.
+Attribute a quote only when its exact text and speaker were supplied and verified.
 """
 
     @property
@@ -223,16 +225,21 @@ def db_execute(sql: str, params=(), retries=5):
 
 
 def db_write(sql: str, params=()):
-    """Execute a write query. Uses thread-local connection pool."""
+    """One transaction per write; cancelled jobs cannot mutate further content."""
+    token = getattr(_sqlite_local,'job_token',None)
+    if token and token.is_set():
+        from denzo.execution import AgentCancelled
+        raise AgentCancelled()
+    conn = _get_conn()
     for attempt in range(5):
         try:
-            conn = _get_conn()
-            conn.execute(sql, params)
+            conn.execute(sql,params)
             conn.commit()
             return
-        except sqlite3.OperationalError as e:
-            if "locked" in str(e) and attempt < 4:
-                time.sleep(0.3 * (attempt + 1))
+        except sqlite3.Error as exc:
+            conn.rollback()
+            if isinstance(exc,sqlite3.OperationalError) and 'locked' in str(exc) and attempt<4:
+                time.sleep(.3*(attempt+1))
             else:
                 raise
 
@@ -532,17 +539,17 @@ class TenantAwareBaseAgent:
     # ── Tenant-scoped DB helpers ──────────────────────────────────────────────
 
     def add_keyword(self, keyword: str, volume=None, difficulty=None,
-                    intent=None, location=None, category=None, priority="medium"):
+                    intent=None, location=None, category=None, priority="medium", source="ai_estimate", measured_at=None):
         existing = db_execute(
             "SELECT id FROM keywords WHERE tenant_id=? AND keyword=? AND location=?",
             (self.tenant_id, keyword, location or "")
         )
         if not existing:
             db_write(
-                "INSERT INTO keywords (tenant_id,keyword,volume,difficulty,intent,location,category,priority) "
-                "VALUES (?,?,?,?,?,?,?,?)",
+                "INSERT INTO keywords (tenant_id,keyword,volume,difficulty,intent,location,category,priority,source,measured_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (self.tenant_id, keyword, volume, difficulty, intent,
-                 location or "", category, priority)
+                 location or "", category, priority, source, measured_at)
             )
 
     # ── Content hashing (idempotency) ──────────────────────────────────────
@@ -718,6 +725,8 @@ class TenantAwareBaseAgent:
         import anthropic
         if system is None:
             system = SEO_EXPERTISE
+        from denzo.evidence import FACTUAL_RULES
+        system = system + "\n" + FACTUAL_RULES
         global _last_api_call
 
         client = _get_anthropic_client()

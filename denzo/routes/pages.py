@@ -1,8 +1,10 @@
 import csv
 import io
-from flask import Blueprint, render_template, request, abort, Response, redirect, url_for, flash, jsonify
-from denzo.auth import login_required, can_access_tenant
+from flask import session, Blueprint, render_template, request, abort, Response, redirect, url_for, flash, jsonify
+from denzo.auth import tenant_access_required, can_access_tenant
+from denzo.auth import visible_clients
 from denzo.db import get_db
+from denzo.editorial import transition
 
 
 def _is_dark(hex_color: str) -> bool:
@@ -23,24 +25,12 @@ PAGE_SIZE = 50
 
 
 def _get_sidebar_clients():
-    db = get_db()
-    rows = db.execute("""
-        SELECT c.tenant_id, c.name, ag.name AS active_agent_name
-        FROM clients c
-        LEFT JOIN agents ag ON ag.tenant_id = c.tenant_id AND ag.status = 'working'
-        GROUP BY c.tenant_id
-        ORDER BY c.name
-    """).fetchall()
-    clients = [
-        {"tenant_id": r["tenant_id"], "name": r["name"], "active_agent": r["active_agent_name"]}
-        for r in rows
-    ]
-    db.close()
-    return clients
+    from denzo.auth import visible_clients
+    return visible_clients()
 
 
 @bp.route("/pages")
-@login_required
+@tenant_access_required
 def index(tenant_id):
     if not can_access_tenant(tenant_id):
         abort(403)
@@ -117,7 +107,7 @@ def index(tenant_id):
 
 
 @bp.route("/pages/<int:page_id>/preview")
-@login_required
+@tenant_access_required
 def preview(tenant_id, page_id):
     db = get_db()
     page_row = db.execute(
@@ -476,7 +466,7 @@ def preview(tenant_id, page_id):
 
 
 @bp.route("/pages/<int:page_id>/review")
-@login_required
+@tenant_access_required
 def review(tenant_id, page_id):
     db = get_db()
     client = db.execute("SELECT * FROM clients WHERE tenant_id=?", (tenant_id,)).fetchone()
@@ -500,94 +490,49 @@ def review(tenant_id, page_id):
 
 
 @bp.route("/pages/<int:page_id>/approve", methods=["POST"])
-@login_required
+@tenant_access_required
 def approve_page(tenant_id, page_id):
-    db = get_db()
-    page_row = db.execute(
-        "SELECT * FROM pages WHERE id=? AND tenant_id=?", (page_id, tenant_id)
-    ).fetchone()
-    if not page_row:
-        db.close()
-        return jsonify({"error": "Page not found"}), 404
-
-    db.execute(
-        "UPDATE pages SET status='ready', updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
-        (page_id, tenant_id)
-    )
-    db.execute(
-        "INSERT INTO activity (tenant_id, type, message, agent, level) VALUES (?,?,?,?,?)",
-        (tenant_id, "review", f"Page '{page_row['title']}' approved.", "editor", "success")
-    )
-    db.commit()
-    db.close()
-    flash(f"✓ Page approved and marked ready.", "success")
-    return redirect(url_for("pages.index", tenant_id=tenant_id))
+    action = 'approve'
+    try:
+        result = transition(tenant_id, page_id, action, session['user_id'], request.form.get('note',''))
+    except LookupError as exc:
+        return jsonify(error=str(exc)), 404
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 409
+    flash('Page approved.' if action == 'approve' else 'Revision requested; the previous version is preserved.', 'success')
+    return redirect(url_for('pages.index', tenant_id=tenant_id))
 
 
 @bp.route("/pages/<int:page_id>/request-changes", methods=["POST"])
-@login_required
+@tenant_access_required
 def request_changes(tenant_id, page_id):
-    note = request.form.get("note", "").strip()
-    db = get_db()
-    page_row = db.execute(
-        "SELECT * FROM pages WHERE id=? AND tenant_id=?", (page_id, tenant_id)
-    ).fetchone()
-    if not page_row:
-        db.close()
-        return jsonify({"error": "Page not found"}), 404
-
-    existing_notes = page_row["notes"] or ""
-    separator = "\n---\n" if existing_notes else ""
-    new_notes = f"{existing_notes}{separator}{note}" if note else existing_notes
-
-    db.execute(
-        "UPDATE pages SET status='draft', notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
-        (new_notes, page_id, tenant_id)
-    )
-    db.execute(
-        "INSERT INTO activity (tenant_id, type, message, agent, level) VALUES (?,?,?,?,?)",
-        (tenant_id, "review", f"Changes requested for '{page_row['title']}': {note[:80]}", "editor", "warning")
-    )
-    db.commit()
-    db.close()
-    flash("Changes noted. Page returned to draft.", "warning")
-    return redirect(url_for("pages.index", tenant_id=tenant_id))
+    action = 'request_changes'
+    try:
+        result = transition(tenant_id, page_id, action, session['user_id'], request.form.get('note',''))
+    except LookupError as exc:
+        return jsonify(error=str(exc)), 404
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 409
+    flash('Page approved.' if action == 'approve' else 'Revision requested; the previous version is preserved.', 'success')
+    return redirect(url_for('pages.index', tenant_id=tenant_id))
 
 
 @bp.route("/pages/<int:page_id>/regenerate", methods=["POST"])
-@login_required
+@tenant_access_required
 def regenerate_page(tenant_id, page_id):
-    note = request.form.get("note", "").strip()
-    db = get_db()
-    page_row = db.execute(
-        "SELECT * FROM pages WHERE id=? AND tenant_id=?", (page_id, tenant_id)
-    ).fetchone()
-    if not page_row:
-        db.close()
-        return jsonify({"error": "Page not found"}), 404
-
-    # Keep notes so agents know WHY it was regenerated
-    existing_notes = page_row["notes"] or ""
-    separator = "\n---\n" if existing_notes else ""
-    regen_note = f"[REGEN REQUEST] {note}" if note else "[REGEN REQUEST — editor requested new version]"
-    new_notes = f"{existing_notes}{separator}{regen_note}"
-
-    db.execute(
-        "UPDATE pages SET status='pending', content='', quality_score=NULL, notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
-        (new_notes, page_id, tenant_id)
-    )
-    db.execute(
-        "INSERT INTO activity (tenant_id, type, message, agent, level) VALUES (?,?,?,?,?)",
-        (tenant_id, "review", f"Regeneration requested for '{page_row['title']}'.", "editor", "info")
-    )
-    db.commit()
-    db.close()
-    flash("Page queued for regeneration.", "info")
-    return redirect(url_for("pages.index", tenant_id=tenant_id))
+    action = 'regenerate'
+    try:
+        result = transition(tenant_id, page_id, action, session['user_id'], request.form.get('note',''))
+    except LookupError as exc:
+        return jsonify(error=str(exc)), 404
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 409
+    flash('Page approved.' if action == 'approve' else 'Revision requested; the previous version is preserved.', 'success')
+    return redirect(url_for('pages.index', tenant_id=tenant_id))
 
 
 @bp.route("/pages/export.csv")
-@login_required
+@tenant_access_required
 def export_pages_csv(tenant_id):
     db = get_db()
     client = db.execute("SELECT name FROM clients WHERE tenant_id=?", (tenant_id,)).fetchone()

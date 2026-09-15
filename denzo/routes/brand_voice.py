@@ -1,3 +1,4 @@
+from denzo.auth import visible_clients
 """
 Brand Voice DNA — per-client personality system.
 Stores brand voice configuration as JSON in the settings table.
@@ -47,6 +48,16 @@ def index(tenant_id):
             "VALUES (?, 'brand_voice', ?, CURRENT_TIMESTAMP)",
             (tenant_id, json.dumps(brand_voice))
         )
+        audience = request.form.get('target_audience', '').strip()[:3000]
+        db.execute('UPDATE client_context SET target_audience=? WHERE tenant_id=?', (audience,tenant_id))
+        statement = request.form.get('fact_statement','').strip()[:2000]
+        source = request.form.get('fact_source','').strip()[:2000]
+        if statement and source and request.form.get('fact_confirmed') == 'yes':
+            db.execute('INSERT INTO client_facts(tenant_id,statement,source,verified_by) VALUES (?,?,?,?)', (tenant_id,statement,source,session['user_id']))
+        elif statement or source:
+            flash('The fact needs a source and your confirmation before it can be used.', 'warning')
+        for fact_id in request.form.getlist('remove_fact'):
+            db.execute('DELETE FROM client_facts WHERE tenant_id=? AND id=?', (tenant_id,fact_id))
         db.commit()
         saved = True
         flash("Brand Voice DNA saved successfully.", "success")
@@ -65,20 +76,18 @@ def index(tenant_id):
             pass
 
     # Load all clients for sidebar
-    clients = db.execute(
-        "SELECT c.tenant_id, c.name, ag.name AS active_agent "
-        "FROM clients c "
-        "LEFT JOIN agents ag ON ag.tenant_id = c.tenant_id AND ag.status = 'working' "
-        "GROUP BY c.tenant_id ORDER BY c.name"
-    ).fetchall()
+    clients = visible_clients()
 
+    facts = [dict(r) for r in db.execute('SELECT * FROM client_facts WHERE tenant_id=? ORDER BY id DESC', (tenant_id,))]
+    context = db.execute('SELECT target_audience FROM client_context WHERE tenant_id=?', (tenant_id,)).fetchone()
+    target_audience = context['target_audience'] if context else ''
     db.close()
 
     return render_template(
         "brand_voice/index.html",
         client=client,
         tenant_id=tenant_id,
-        brand_voice=brand_voice,
+        brand_voice=brand_voice, facts=facts, target_audience=target_audience,
         saved=saved,
         clients=clients,
         active_tenant=tenant_id,

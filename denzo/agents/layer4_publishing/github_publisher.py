@@ -52,19 +52,15 @@ def _build_html_page(title, meta_description, content, style_guide=None, ctx=Non
     # Phone line in footer
     phone_line = f'<p style="margin-top:.75rem;"><a href="tel:{phone_raw}" style="color:var(--cta);font-weight:600;">{phone}</a></p>' if phone else ""
 
-    # Nav from services
-    services = (ctx.services[:4] if ctx and ctx.services else [])
-    nav_links = "".join(
-        f'<a href="{domain}/services/{s.lower().replace(" ", "-").replace("&", "and")}.html">{s}</a>'
-        for s in services
-    )
-
-    # Footer services column
-    footer_services = "".join(
-        f'<a href="{domain}/services/{s.lower().replace(" ", "-").replace("&", "and")}.html">{s}</a>'
-        for s in (ctx.services[:6] if ctx and ctx.services else [])
-    )
-
+    from html import escape
+    from denzo.urls import public_page_url,site_base_url
+    domain = site_base_url(ctx) if ctx else domain
+    links=[]
+    if ctx:
+        for row in db_execute("SELECT * FROM pages WHERE tenant_id=? AND type='service' AND status IN ('ready','published','live_external') ORDER BY id LIMIT 6",(ctx.tenant_id,)):
+            links.append(f'<a href="{escape(public_page_url(row,ctx),quote=True)}">{escape(row["title"])}</a>')
+    nav_links=''.join(links[:4])
+    footer_services=''.join(links)
     # Certifications line for footer bottom
     certs_line = " · ".join(certifications[:3]) if certifications else ""
 
@@ -143,7 +139,7 @@ def _build_html_page(title, meta_description, content, style_guide=None, ctx=Non
 
 <script>
   // CWV: Apply loading: lazy (loading="lazy") to all content images
-  document.querySelectorAll('main img:not([loading])').forEach(function(img){{img.setAttribute('loading','lazy');}});
+  document.querySelectorAll('main img:not([loading])').forEach(function(img,i){{img.setAttribute('loading',i===0?'eager':'lazy');}});
 </script>
 </body>
 </html>"""
@@ -207,6 +203,9 @@ class GitHubPublisher(TenantAwareBaseAgent):
     def _publish_file(self, session: requests.Session, repo: str, branch: str,
                       path: str, content_b64: str, message: str,
                       content_hash: str = None) -> bool:
+        if any(segment in (".","..") for segment in path.split("/")):
+            raise ValueError("Invalid repository path")
+        content_hash = content_hash or self.compute_content_hash(base64.b64decode(content_b64).decode("utf-8"))
         api_url = f"https://api.github.com/repos/{repo}/contents/{path}"
 
         # ── Rule #1: Never overwrite what we don't own ────────────────────
@@ -217,10 +216,13 @@ class GitHubPublisher(TenantAwareBaseAgent):
 
         try:
             r = session.get(api_url, params={"ref": branch}, timeout=20)
+            if r.status_code not in (200,404):
+                self.log(f"Cannot establish remote file ownership: HTTP {r.status_code}", "error")
+                return False
             sha = r.json().get("sha") if r.status_code == 200 else None
         except Exception as e:
             self.log(f"GitHub GET error for {path}: {e}", "warning")
-            sha = None
+            return False
 
         # ── Rule #2: If file exists on GitHub but NOT in our manifest ─────
         if sha and ownership == 'unknown':
@@ -276,234 +278,88 @@ class GitHubPublisher(TenantAwareBaseAgent):
         return {}
 
     def run(self):
-        self.log("GitHub Publisher starting...")
-        self.set_status("working", "Checking configuration")
-        ctx = self.ctx
-
+        from denzo.urls import site_base_url,public_page_url,page_directory,quality_document,schema_json
+        from denzo.editorial import publishable,revision_hash
+        from denzo.publication import reserve_publication,committed,failed,verify_publication,reconcile_publications
+        from denzo.agents.layer4_publishing.nextjs_renderer import render_nextjs_page
+        from bs4 import BeautifulSoup
+        ctx=self.ctx
         if not ctx.github_repo or not ctx.github_token:
-            # Soft-skip rather than hard-fail. Missing publisher config is a
-            # client-side setup gap, not an agent failure — the Director treats
-            # status='done' as a green-light to move on to Layer 6 instead of
-            # stalling the whole pipeline.
-            self.log(
-                "GitHub repo/token not configured. Skipping publish step. "
-                "Pages remain in 'ready' state. Add github_repo + github_token "
-                "in Settings → Publisher Configuration to enable real publishing.",
-                "warning",
-            )
-            self.set_status("done", "Skipped — no GitHub config")
-            return
-
-        repo   = ctx.github_repo
-        branch = ctx.github_branch or "main"
-        token  = ctx.github_token
-        fmt         = ctx.github_format or "html"
-        path_prefix = getattr(ctx, "github_path_prefix", "") or ""  # e.g. "public/" for Next.js
-        # Resolve base URL: pages_domain wins, fallback to domain, strip trailing slash
-        _base = (ctx.pages_domain or ctx.domain or "").rstrip("/")
-
-        self.log(f"Format: {fmt} → {repo} ({branch})")
-
-        # Load site style guide for brand-aware HTML generation
-        style_guide = {}
-        sg_rows = db_execute(
-            "SELECT value FROM settings WHERE tenant_id=? AND key='site_style_guide'",
-            (ctx.tenant_id,)
-        )
-        if sg_rows:
-            try:
-                style_guide = json.loads(sg_rows[0]["value"])
-            except Exception:
-                pass
-
-        session = requests.Session()
-        session.headers.update({
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28"
-        })
-
-        # Prereq check: need pages with status='ready' AND reviewed
-        ready_check = db_execute(
-            "SELECT COUNT(*) AS n FROM pages WHERE tenant_id=? AND status='ready' AND content IS NOT NULL AND content != '' "
-            "AND (notes IS NULL OR notes NOT LIKE '%[PENDING_REVIEW]%')",
-            (ctx.tenant_id,)
-        )
-        ready_count = ready_check[0]["n"] if ready_check else 0
-        if ready_count == 0:
-            self.log("No reviewed pages to publish. Review pages in the dashboard first.", "warning")
-            self.set_status("idle", "No reviewed pages — review them first")
-            return
-
-        pages = db_execute(
-            "SELECT id, title, slug, type, meta_title, meta_description, content, schema_markup FROM pages "
-            "WHERE tenant_id=? AND status='ready' AND content IS NOT NULL AND content != '' "
-            "AND (notes IS NULL OR notes NOT LIKE '%[PENDING_REVIEW]%') "
-            "ORDER BY id",
-            (ctx.tenant_id,)
-        )
-
-        if not pages:
-            self.log("No ready pages to publish. Run content agents first.", "warning")
-            self.set_status("idle", "No ready pages")
-            return
-
+            self.set_status('skipped','GitHub repository/token not configured');return
+        self.set_status('working','Checking approved revisions')
+        repo,branch=ctx.github_repo,ctx.github_branch or 'main'
+        fmt=ctx.github_format or 'html'
+        if fmt not in ('html','nextjs'):
+            self.set_status('error',f'Unsupported publisher format: {fmt}');return
+        prefix=(ctx.github_path_prefix or '').strip('/')
+        if prefix: prefix+='/'
+        base=site_base_url(ctx)
+        session=requests.Session()
+        session.headers.update({'Authorization':f'Bearer {ctx.github_token}','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
+        if fmt=='nextjs':
+            check=session.get(f'https://api.github.com/repos/{repo}/contents/{prefix}app',params={'ref':branch},timeout=20)
+            if check.status_code!=200:
+                self.set_status('error','Configured Next.js app directory was not found; check path prefix');return
+        reconcile_publications(ctx.tenant_id)
         self._load_velocity_settings()
-        self.log(f"Publishing {len(pages)} pages ({fmt} format)...")
-        self.log(
-            f"Velocity control: max {self.MAX_PAGES_PER_DAY}/day, "
-            f"{self.MIN_DELAY_SECONDS}-{self.MAX_DELAY_SECONDS}s between pages",
-            "info"
-        )
-
-        # Load Next.js assets once if needed
-        nextjs_assets = self._load_nextjs_assets() if fmt == "nextjs" else {}
-        if fmt == "nextjs":
-            # Resolve primary_color: nextjs_assets → site_style_guide → #e40014 (ACG red default)
-            if not nextjs_assets.get("primary_color") and style_guide.get("primary_colors"):
-                nextjs_assets["primary_color"] = style_guide["primary_colors"][0]
-            from denzo.agents.layer4_publishing.nextjs_renderer import render_nextjs_page
-
-        published = 0
-        failed    = 0
-        today_count = self._pages_published_today()
-
+        styles=self.load_output('site_style_guide') or {}
+        assets=self._load_nextjs_assets() if fmt=='nextjs' else {}
+        pages=[dict(r) for r in db_execute("SELECT * FROM pages WHERE tenant_id=? AND status='ready' ORDER BY id",(ctx.tenant_id,)) if publishable(r)]
+        processed=errors=0
         for page in pages:
-            if self.should_stop():
-                break
-
-            if today_count + published >= self.MAX_PAGES_PER_DAY:
-                remaining = len(pages) - published - failed
-                self.log(
-                    f"Daily publishing limit reached ({self.MAX_PAGES_PER_DAY}/day). "
-                    f"{remaining} pages remain in 'ready' state for next cycle.",
-                    "warning"
-                )
-                break
-
-            page_dict = dict(page)
-            title     = page_dict.get("title", "Untitled")
-            ptype     = page_dict.get("type", "page")
-            slug      = page_dict.get("slug", "page").lstrip("/")
-            meta_desc = page_dict.get("meta_description", title)
-            content   = page_dict.get("content", "")
-            schema    = page_dict.get("schema_markup", "")
-
-            if fmt == "nextjs":
-                file_content = render_nextjs_page(page_dict, ctx, nextjs_assets)
-                ptype_plural = f"{ptype}s" if not ptype.endswith('s') else ptype
-                file_path    = f"app/[locale]/{ptype_plural}/{slug}/page.jsx"
-                public_url   = f"{_base}/en/{ptype_plural}/{slug}" if _base else f"/en/{ptype_plural}/{slug}"
-            else:
-                file_path  = f"{path_prefix}{ptype}s/{slug}.html"
-                public_url = f"{_base}/{ptype}s/{slug}.html" if _base else file_path
-                file_content = _build_html_page(
-                    title=title,
-                    meta_description=meta_desc,
-                    content=content,
-                    style_guide=style_guide,
-                    ctx=ctx,
-                    canonical_url=public_url,
-                )
-                # Inject schema_markup into final HTML if available (before </head>)
-                if schema and schema.strip():
-                    # Wrap raw JSON in script tag if not already wrapped
-                    schema_block = schema.strip()
-                    if not schema_block.startswith('<script'):
-                        schema_block = f'<script type="application/ld+json">\n{schema_block}\n</script>'
-                    file_content = file_content.replace(
-                        "</head>", f"{schema_block}\n</head>"
-                    )
+            if self.should_stop():break
+            try:
+                url=public_page_url(page,ctx)
+                folder=page_directory(page.get('type'))
+                slug=page['slug'].strip('/')
+                if fmt=='nextjs':
+                    path=f'{prefix}app/[locale]/{folder}/{slug}/page.jsx'
+                    rendered=render_nextjs_page(page,ctx,assets)
+                    quality_html=quality_document(page['content'],page,ctx)
                 else:
-                    pass  # schema_markup column may be NULL or empty — skip injection
-
-            # ── Quality gate (on FINAL HTML, not raw fragment) ──
-            if fmt == "nextjs":
-                # Build a minimal full HTML document for the quality gate validator.
-                # The technical scanner expects <title>, <meta>, canonical, OG tags,
-                # and <script type="application/ld+json"> — none of which exist in a
-                # raw content fragment. Wrap everything so structural checks pass and
-                # the validator focuses on actual content quality issues.
-                schema_block = ""
-                if schema and schema.strip():
-                    s = schema.strip()
-                    if s.startswith("<script"):
-                        schema_block = s
-                    else:
-                        schema_block = f'<script type="application/ld+json">\n{s}\n</script>'
-
-                _domain_for_qc = ctx.pages_domain or ctx.domain or ""
-                _domain_clean = _domain_for_qc.replace("https://", "").replace("http://", "").rstrip("/")
-                raw_content_for_qc = (
-                    '<!DOCTYPE html>\n<html lang="en">\n<head>\n'
-                    f'  <meta charset="UTF-8">\n'
-                    f'  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
-                    f'  <title>{title} | {ctx.client_name}</title>\n'
-                    f'  <meta name="description" content="{meta_desc or title}">\n'
-                    + (f'  <link rel="canonical" href="{public_url}">\n' if public_url else '')
-                    + (f'  <meta property="og:title" content="{title} | {ctx.client_name}">\n'
-                       f'  <meta property="og:description" content="{meta_desc or title}">\n'
-                       f'  <meta property="og:url" content="{public_url}">\n'
-                       f'  <meta property="og:type" content="website">\n' if public_url else '')
-                    + (f'{schema_block}\n' if schema_block else '')
-                    + '</head>\n<body>\n'
-                    f'<h1>{title}</h1>\n'
-                    f'{content}\n'
-                    '</body>\n</html>'
-                )
-                issues = validate_page_quality(raw_content_for_qc, ptype, base_url=public_url, domain=_domain_clean)
-            else:
-                issues = validate_page_quality(file_content, ptype, base_url=public_url, domain=ctx.pages_domain or ctx.domain)
-            if issues:
-                db_write(
-                    "UPDATE pages SET notes=COALESCE(notes||' ','')||?, status='ready', "
-                    "updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
-                    (f"[QC_FAIL:{';'.join(issues[:3])}]", page_dict["id"], ctx.tenant_id)
-                )
-                self.log(f"✗ Quality gate failed: {title} — {', '.join(issues[:2])}", "warning")
-                failed += 1
-                continue
-
-            content_b64 = base64.b64encode(file_content.encode("utf-8")).decode("utf-8")
-            commit_msg  = f"SEO: {title}"
-            content_hash = self.compute_content_hash(file_content)
-            self._current_page_id = page_dict["id"]
-
-            self.set_status("working", f"Publishing: {title[:50]}")
-
-            ok = self._publish_file(session, repo, branch, file_path, content_b64, commit_msg, content_hash)
-            if ok:
-                db_write(
-                    "UPDATE pages SET status='published', publish_url=?, updated_at=CURRENT_TIMESTAMP "
-                    "WHERE id=? AND tenant_id=?",
-                    (public_url, page_dict["id"], ctx.tenant_id)
-                )
-                self.log(f"✓ {file_path}", "success")
-                published += 1
-            else:
-                self.log(f"✗ Failed: {title}", "error")
-                failed += 1
-
-            delay = random.randint(self.MIN_DELAY_SECONDS, self.MAX_DELAY_SECONDS)
-            for _ in range(delay):
+                    path=f'{prefix}{folder}/{slug}.html'
+                    rendered=_build_html_page(page.get('meta_title') or page['title'],page.get('meta_description') or '',page['content'],styles,ctx,url)
+                    soup=BeautifulSoup(rendered,'html.parser')
+                    marker=soup.new_tag('meta',attrs={'name':'denzo-revision','content':revision_hash(page)})
+                    soup.head.append(marker)
+                    if page.get('schema_markup'):
+                        script=soup.new_tag('script',type='application/ld+json');script.string=schema_json(page['schema_markup']);soup.head.append(script)
+                    first=soup.find('img',src=True)
+                    if first:
+                        from urllib.parse import urljoin
+                        soup.head.append(soup.new_tag('meta',attrs={'property':'og:image','content':urljoin(url,first['src'])}))
+                    rendered=str(soup);quality_html=rendered
+                issues=validate_page_quality(quality_html,page.get('type','page'),base_url=url)
+                if issues:
+                    self.log(f'Quality checks failed: {issues[:3]}','warning');errors+=1;continue
+                attempt,current=reserve_publication(ctx.tenant_id,page['id'],'github',self.MAX_PAGES_PER_DAY,url)
+                if revision_hash(current)!=revision_hash(page):
+                    failed(attempt,'Content changed while rendering');continue
+                self._current_page_id=page['id']
                 if self.should_stop():
-                    break
-                time.sleep(1)
-
-        # Generate and publish sitemap.xml + robots.txt
-        if published > 0 and _base:
-            self._publish_sitemap(session, repo, branch, ctx, _base, path_prefix)
-            self._publish_llms_txt(session, repo, branch, ctx, _base, path_prefix)
-
-        self.log(f"GitHub Publisher done: {published} published, {failed} failed.", "success")
-        self.set_status("done", f"{published} pages published to GitHub")
+                    failed(attempt,'Cancelled before provider write');break
+                ok=self._publish_file(session,repo,branch,path,base64.b64encode(rendered.encode()).decode(),f'SEO: {page["title"]}',self.compute_content_hash(rendered))
+                if not ok:
+                    failed(attempt,'GitHub file protected or write rejected');errors+=1;continue
+                committed(attempt,url,f'{branch}:{path}')
+                verify_publication(attempt)
+                processed+=1
+            except ValueError as exc:
+                self.log(str(exc),'warning');errors+=1
+        self._current_page_id=None
+        # Static assets belong under public/ in Next.js projects.
+        asset_prefix=prefix+'public/' if fmt=='nextjs' else prefix
+        self._publish_sitemap(session,repo,branch,ctx,base,asset_prefix)
+        self._publish_llms_txt(session,repo,branch,ctx,base,asset_prefix)
+        self.set_status('error' if errors else 'done',f'{processed} committed; {errors} issues; deployment verification is separate')
 
     def _publish_sitemap(self, session, repo, branch, ctx, base_url, path_prefix):
         """Generate sitemap.xml from all published pages and push to GitHub."""
+        from html import escape
         from datetime import datetime, timezone
         published_pages = db_execute(
             "SELECT slug, type, publish_url, updated_at FROM pages "
-            "WHERE tenant_id=? AND status='published' AND publish_url IS NOT NULL "
+            "WHERE tenant_id=? AND status IN ('published','publishing') AND publish_url IS NOT NULL "
             "ORDER BY type, slug",
             (ctx.tenant_id,)
         )
@@ -513,14 +369,14 @@ class GitHubPublisher(TenantAwareBaseAgent):
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         urls = []
         for p in published_pages:
-            pub_url = p["publish_url"]
+            pub_url = escape(p["publish_url"], quote=True)
             ptype   = p["type"] or "page"
             priority = "1.0" if ptype in ("service", "location") else "0.8"
             changefreq = "weekly" if ptype in ("service", "location") else "monthly"
             urls.append(
                 f"  <url>\n"
                 f"    <loc>{pub_url}</loc>\n"
-                f"    <lastmod>{today}</lastmod>\n"
+                f"    <lastmod>{(p['updated_at'] or today)[:10]}</lastmod>\n"
                 f"    <changefreq>{changefreq}</changefreq>\n"
                 f"    <priority>{priority}</priority>\n"
                 f"  </url>"

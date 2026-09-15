@@ -28,7 +28,7 @@ class RankTracker(TenantAwareBaseAgent):
     # ── AI fallback ────────────────────────────────────────────────────────────
 
     def _ai_estimate(self, keywords: list, domain: str) -> list:
-        kw_list = [{"keyword": r["keyword"], "location": r.get("location", "")} for r in keywords]
+        kw_list = [{"keyword": r["keyword"], "location": dict(r).get("location", "")} for r in keywords]
         prompt = f"""{self.ctx.to_prompt_block()}
 
 You are a Senior SEO Rank Analysis Specialist with 12 years of experience evaluating

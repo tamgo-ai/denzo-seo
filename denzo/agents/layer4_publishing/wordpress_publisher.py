@@ -50,7 +50,7 @@ class WordPressPublisher(TenantAwareBaseAgent):
     # Sentinel returned when the lookup fails due to a network/server error
     _LOOKUP_ERROR = object()
 
-    def _find_wp_page_by_slug(self, api_base: str, auth: tuple, slug: str):
+    def _find_wp_page_by_slug(self, api_base: str, auth: tuple, slug: str, resource: str = "pages"):
         """
         Return the WP page dict if a page with this slug exists.
         Returns None if not found (404/empty list).
@@ -59,9 +59,9 @@ class WordPressPublisher(TenantAwareBaseAgent):
         """
         try:
             r = requests.get(
-                f"{api_base}/pages",
+                f"{api_base}/{resource}",
                 auth=auth, timeout=15,
-                params={"slug": slug, "per_page": 1, "status": "any"}
+                params={"slug": slug, "per_page": 1, "status": "any", "context": "edit"}
             )
             r.raise_for_status()
             data = r.json()
@@ -72,308 +72,85 @@ class WordPressPublisher(TenantAwareBaseAgent):
             return self._LOOKUP_ERROR
 
     def run(self):
-        self.log("WordPress Publisher starting...")
-        self.set_status("working", "Checking configuration")
-        ctx = self.ctx
-
-        if not ctx.wp_url or not ctx.wp_user or not ctx.wp_app_password:
-            # Soft-skip — same rationale as GitHub Publisher. Missing creds is
-            # a setup gap, not an agent fault. Marking 'done' lets the Director
-            # advance to Layer 6 instead of blocking the entire pipeline.
-            self.log(
-                "WordPress credentials not configured. Skipping publish step. "
-                "Pages remain in 'ready' state. Add wp_url + wp_user + "
-                "wp_app_password in Settings → Publisher Configuration to "
-                "enable real publishing.",
-                "warning",
-            )
-            self.set_status("done", "Skipped — no WordPress config")
+        from denzo.urls import site_base_url,public_page_url,quality_document,schema_json
+        from denzo.editorial import publishable,revision_hash
+        from denzo.publication import reserve_publication,committed,failed,verify_publication,reconcile_publications
+        ctx=self.ctx
+        if not all((ctx.wp_url,ctx.wp_user,ctx.wp_app_password)):
+            self.set_status('skipped','WordPress credentials are not configured')
             return
-
-        wp_url   = ctx.wp_url.rstrip("/")
-        api_base = f"{wp_url}/wp-json/wp/v2"
-        auth     = (ctx.wp_user, ctx.wp_app_password)
-
-        # Test connection
+        self.set_status('working','Checking WordPress connector capabilities')
+        base=site_base_url(ctx)
+        auth=(ctx.wp_user,ctx.wp_app_password)
+        api_base=ctx.wp_url.rstrip('/')+'/wp-json/wp/v2'
         try:
-            test = requests.get(f"{api_base}/posts", auth=auth, timeout=10, params={"per_page": 1})
-            if test.status_code == 401:
-                self.log("WordPress authentication failed. Check username and app password.", "error")
-                self.set_status("error", "Auth failed")
-                return
-        except Exception as e:
-            self.log(f"Cannot reach WordPress: {e}", "error")
-            self.set_status("error", str(e))
+            response=requests.get(ctx.wp_url.rstrip('/')+'/wp-json/denzo-seo/v1/capabilities',auth=auth,timeout=15)
+            response.raise_for_status()
+            capabilities=response.json()
+            if not capabilities.get('seo_metadata'):
+                raise ValueError('Install/activate the DENZO SEO Connector plugin')
+        except Exception as exc:
+            self.set_status('error',f'WordPress connector unavailable: {exc}')
             return
-
-        self.log(f"Connected to WordPress at {wp_url}")
-        self.log(
-            "Meta fields sent for both Yoast SEO and RankMath — whichever is active will use them.",
-            "info"
-        )
-
-        # Prereq check: need pages with status='ready'
-        ready_check = db_execute(
-            "SELECT COUNT(*) AS n FROM pages WHERE tenant_id=? AND status='ready' AND content IS NOT NULL AND content != '' "
-            "AND (notes IS NULL OR notes NOT LIKE '%[PENDING_REVIEW]%')",
-            (ctx.tenant_id,)
-        )
-        ready_count = ready_check[0]["n"] if ready_check else 0
-        if ready_count == 0:
-            self.log("No ready pages to publish. Run Programmatic SEO and content agents first.", "warning")
-            self.set_status("idle", "No ready pages — run content agents first")
-            return
-
-        pages = db_execute(
-            "SELECT id, title, slug, meta_title, meta_description, content FROM pages "
-            "WHERE tenant_id=? AND status='ready' AND content IS NOT NULL AND content != '' "
-            "AND (notes IS NULL OR notes NOT LIKE '%[PENDING_REVIEW]%') "
-            "ORDER BY id",
-            (ctx.tenant_id,)
-        )
-
-        if not pages:
-            self.log("No ready pages to publish.", "warning")
-            self.set_status("idle", "No ready pages")
-            return
-
+        reconcile_publications(ctx.tenant_id)
         self._load_velocity_settings()
-        self.log(f"Publishing {len(pages)} pages to WordPress (upsert mode)...")
-        self.log(
-            f"Velocity control: max {self.MAX_PAGES_PER_DAY}/day, "
-            f"{self.MIN_DELAY_SECONDS}-{self.MAX_DELAY_SECONDS}s between pages",
-            "info"
-        )
-        published = 0
-        updated   = 0
-        failed    = 0
-        today_count = self._pages_published_today()
-
+        pages=[dict(r) for r in db_execute("SELECT * FROM pages WHERE tenant_id=? AND status='ready'",(ctx.tenant_id,)) if publishable(r)]
+        processed=errors=0
         for page in pages:
             if self.should_stop():
                 break
-
-            # Velocity gate: don't exceed daily publishing limit
-            if today_count + published >= self.MAX_PAGES_PER_DAY:
-                remaining = len(pages) - published - updated - failed
-                self.log(
-                    f"Daily publishing limit reached ({self.MAX_PAGES_PER_DAY}/day). "
-                    f"{remaining} pages remain in 'ready' state for next cycle.",
-                    "warning"
-                )
-                break
-
-            page_dict = dict(page)
-            title     = page_dict.get("title", "")
-            slug      = page_dict.get("slug", "").lstrip("/")
-            content   = page_dict.get("content", "")
-            meta_desc = page_dict.get("meta_description", "")
-
-            self.set_status("working", f"Publishing: {title[:50]}")
-
-            # ── Quality gate: skip pages that don't meet minimum standards ──
-            ptype = page_dict.get("type", "service")
-            issues = validate_page_quality(content, ptype)
-            if issues:
-                db_write(
-                    "UPDATE pages SET notes=COALESCE(notes||' ','')||?, status='ready', "
-                    "updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
-                    (f"[QC_FAIL:{';'.join(issues[:3])}]", page_dict["id"], ctx.tenant_id)
-                )
-                self.log(f"✗ Quality gate failed: {title} — {', '.join(issues[:2])}", "warning")
-                failed += 1
-                continue
-
-            # Auto-generate meta description from content if missing
-            if not meta_desc and content:
-                import re as _re
-                # Extract first meaningful paragraph text
-                texts = _re.findall(r'<p[^>]*>(.*?)</p>', content, _re.DOTALL)
-                for t in texts:
-                    clean = _re.sub(r'<[^>]+>', '', t).strip()
-                    if len(clean) > 60:
-                        meta_desc = clean[:155].rsplit(' ', 1)[0]
-                        break
-
-            # Build meta title: keep under 60 chars
-            meta_title = page_dict.get("meta_title") or title
-            if len(meta_title) > 60:
-                meta_title = meta_title[:57] + "..."
-
-            # Strip full HTML document wrappers — Claude occasionally generates these
-            # even when told to output only fragments.
-            content = strip_html_wrappers(content)
-
-            # Wrap in Gutenberg HTML block to prevent WordPress wpautop() from
-            # mangling the custom HTML structure (divs, classes, nested elements).
-            # Without this, WP converts double newlines to <p> tags and breaks the layout.
-            if not content.startswith('<!-- wp:html -->'):
-                content = f'<!-- wp:html -->\n{content}\n<!-- /wp:html -->'
-
-            payload = {
-                "title":   title,
-                "slug":    slug,
-                "content": content,
-                "status":  "publish",
-                "excerpt": meta_desc,
-                # Yoast SEO meta (works when Yoast is installed)
-                "meta": {
-                    "_yoast_wpseo_metadesc":              meta_desc,
-                    "_yoast_wpseo_title":                 meta_title,
-                    "_yoast_wpseo_opengraph-description": meta_desc,
-                    "_yoast_wpseo_opengraph-title":       meta_title,
-                    # RankMath fallback
-                    "rank_math_description":              meta_desc,
-                    "rank_math_title":                    meta_title,
-                },
-            }
-
+            resource='posts' if page.get('type') in ('blog','article','post') else 'pages'
+            if not capabilities.get('publish_'+resource):
+                self.log(f'Account cannot publish {resource}','error');errors+=1;continue
+            slug=page['slug'].strip('/')
+            if '/' in slug:
+                self.log('WordPress generated slugs must be a single segment','error');errors+=1;continue
+            existing=self._find_wp_page_by_slug(api_base,auth,slug,resource)
+            if existing is self._LOOKUP_ERROR:
+                self.log(f'Lookup failed for {slug}; no write attempted','error');errors+=1;continue
+            path=f'{resource}/{slug}'
+            ownership=db_execute("SELECT managed FROM managed_paths WHERE tenant_id=? AND publisher='wordpress' AND path IN (?,?)",(ctx.tenant_id,path,slug))
+            remote_owner=(existing or {}).get('meta',{}).get('denzo_tenant')
+            if (ownership and not ownership[0]['managed']) or (existing and not ownership and remote_owner!=ctx.tenant_id):
+                self.log(f'Protected pre-existing WordPress content: {slug}','warning');continue
+            if existing:
+                page['publish_url']=existing.get('link') or public_page_url(page,ctx)
+            content=strip_html_wrappers(page['content'])
             try:
-                # ── Rule #1: Check ownership via managed_paths ──────────────
-                wp_path = slug  # WordPress uses slug as path identifier
-                owner_rows = db_execute(
-                    "SELECT managed FROM managed_paths WHERE tenant_id=? AND publisher='wordpress' AND path=?",
-                    (ctx.tenant_id, wp_path)
-                )
-                if owner_rows and owner_rows[0]['managed'] == 0:
-                    self.log(f"⛔ SKIP '{slug}': pre-existing client content (managed=0)", "warning")
-                    continue
-
-                # Check if page already exists by slug
-                existing = self._find_wp_page_by_slug(api_base, auth, slug)
-
-                if existing is self._LOOKUP_ERROR:
-                    self.log(f"✗ Lookup error for '{slug}' — skipping to avoid duplicates", "error")
-                    failed += 1
-                    continue
-                elif existing:
-                    # ── Rule #2: If page found on WP but NOT in our manifest ──
-                    if not owner_rows:
-                        # This page exists on WP but we never created it → protect it
-                        db_write(
-                            "INSERT OR REPLACE INTO managed_paths (tenant_id, publisher, path, page_id, managed) "
-                            "VALUES (?, 'wordpress', ?, ?, 0)",
-                            (ctx.tenant_id, wp_path, page_dict["id"])
-                        )
-                        self.log(f"⛔ SKIP '{slug}': existing WordPress page not managed by DENZO → marked protected", "warning")
-                        continue
-
-                    # UPDATE existing page (we own it)
-                    wp_id = existing["id"]
-                    r = requests.post(f"{api_base}/pages/{wp_id}", auth=auth, json=payload, timeout=30)
-                    action = "updated"
-                else:
-                    # CREATE new page
-                    r = requests.post(f"{api_base}/pages", auth=auth, json=payload, timeout=30)
-                    action = "published"
-
-                if r.status_code == 429:
-                    # Host rate limit (WP Engine, Kinsta throttle REST API)
-                    retry_after = int(r.headers.get("Retry-After", 60))
-                    self.log(f"Rate limited by WordPress — waiting {retry_after}s", "warning")
-                    time.sleep(retry_after)
-                    # Retry once
-                    if action == "updated":
-                        r = requests.post(f"{api_base}/pages/{wp_id}", auth=auth, json=payload, timeout=30)
-                    else:
-                        r = requests.post(f"{api_base}/pages", auth=auth, json=payload, timeout=30)
-
-                if r.status_code in (200, 201):
-                    wp_data    = r.json()
-                    public_url = wp_data.get("link", "")
-                    wp_post_id = str(wp_data.get("id", ""))
-                    db_write(
-                        "UPDATE pages SET status='published', publish_url=?, publish_ref=?, "
-                        "updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
-                        (public_url, wp_post_id, page_dict["id"], ctx.tenant_id)
-                    )
-                    # Register/update managed_paths manifest
-                    content_hash = self.compute_content_hash(content) if content else None
-                    db_write(
-                        "INSERT OR REPLACE INTO managed_paths (tenant_id, publisher, path, page_id, managed, content_hash) "
-                        "VALUES (?, 'wordpress', ?, ?, 1, ?)",
-                        (ctx.tenant_id, wp_path, page_dict["id"], content_hash)
-                    )
-                    self.log(f"✓ {action.capitalize()}: {title} → {public_url}", "success")
-                    if action == "updated":
-                        updated += 1
-                    else:
-                        published += 1
-                else:
-                    err_detail = ""
-                    try:
-                        err_detail = r.json().get("message", "")[:80]
-                    except Exception:
-                        pass
-                    self.log(f"✗ Failed ({r.status_code}): {title} — {err_detail}", "error")
-                    failed += 1
-
-            except Exception as e:
-                self.log(f"Error publishing {title}: {e}", "error")
-                failed += 1
-
-            # Velocity-controlled delay: random 30-90s between publishes to look natural.
-            # Google's algorithm flags sites that publish hundreds of pages simultaneously.
-            delay = random.randint(self.MIN_DELAY_SECONDS, self.MAX_DELAY_SECONDS)
-            self.log(f"Velocity delay: {delay}s before next page...", "info")
-            for _ in range(delay):
+                schema=schema_json(page.get('schema_markup'))
+                url=public_page_url(page,ctx)
+                issues=validate_page_quality(quality_document(content,page,ctx),page.get('type','page'),base_url=url)
+                if issues:
+                    self.log(f'Quality checks failed: {issues[:3]}','warning');errors+=1;continue
+                prepared_revision=revision_hash(page)
+                attempt,page=reserve_publication(ctx.tenant_id,page['id'],'wordpress',self.MAX_PAGES_PER_DAY,url)
+            except ValueError as exc:
+                self.log(str(exc),'warning');continue
+            if revision_hash(page)!=prepared_revision:
+                failed(attempt,'Content changed while preparing publication');continue
+            payload={'title':page['title'],'slug':slug,'status':'publish',
+                     'content':'<!-- wp:html --><div class="denzo-content">'+content+'</div><!-- /wp:html -->',
+                     'meta':{'denzo_title':page.get('meta_title') or page['title'],
+                             'denzo_description':page.get('meta_description') or '',
+                             'denzo_schema':schema,'denzo_revision':revision_hash(page),'denzo_tenant':ctx.tenant_id}}
+            try:
                 if self.should_stop():
-                    break
-                time.sleep(1)
-
-        _published = published + updated
-
-        # Sitemap discovery: handled by Indexation Accelerator (Layer 5 post-publish).
-        # It submits via IndexNow (Bing/Yandex/Seznam), Google Indexing API, and
-        # Google Search Console API. Sitemap is also discoverable via robots.txt.
-        if _published > 0:
-            self.log(
-                f"Sitemap at {ctx.domain.rstrip('/')}/wp-sitemap.xml — "
-                f"Indexation Accelerator will submit to search engines.",
-                "info"
-            )
-
-        # Publish llms.txt as a WordPress page (slug: llms-txt) so AI crawlers can
-        # discover it at /llms-txt/ (or via a server rewrite to /llms.txt)
-        if _published > 0:
-            try:
-                llms_content = self._build_llms_content(ctx)
-                llms_payload = {
-                    "title":   "llms.txt",
-                    "slug":    "llms-txt",
-                    "content": f"<!-- wp:html -->\n<pre>{llms_content}</pre>\n<!-- /wp:html -->",
-                    "status":  "publish",
-                    "excerpt": f"Structured business data for AI language models — {ctx.client_name}",
-                }
-                existing_llms = self._find_wp_page_by_slug(api_base, auth, "llms-txt")
-                if existing_llms is self._LOOKUP_ERROR:
-                    self.log("llms.txt page: lookup error — skipped", "warning")
-                elif existing_llms:
-                    r_llms = requests.post(
-                        f"{api_base}/pages/{existing_llms['id']}",
-                        auth=auth, json=llms_payload, timeout=30
-                    )
-                    if r_llms.status_code in (200, 201):
-                        self.log("✓ llms.txt page updated in WordPress", "success")
-                    else:
-                        self.log(f"llms.txt update failed ({r_llms.status_code})", "warning")
-                else:
-                    r_llms = requests.post(
-                        f"{api_base}/pages",
-                        auth=auth, json=llms_payload, timeout=30
-                    )
-                    if r_llms.status_code in (200, 201):
-                        self.log("✓ llms.txt page created in WordPress", "success")
-                    else:
-                        self.log(f"llms.txt creation failed ({r_llms.status_code})", "warning")
-            except Exception as e:
-                self.log(f"llms.txt page skipped: {e}", "info")
-
-        self.log(
-            f"WordPress Publisher done: {published} new, {updated} updated, {failed} failed.",
-            "success"
-        )
-        self.set_status("done", f"{published} new · {updated} updated · {failed} failed")
+                    failed(attempt,'Cancelled before provider write');break
+                endpoint=f'{api_base}/{resource}'+(f'/{existing["id"]}' if existing else '')
+                response=requests.post(endpoint,auth=auth,json=payload,timeout=30)
+                if response.status_code not in (200,201):
+                    failed(attempt,f'WordPress HTTP {response.status_code}');errors+=1;continue
+                result=response.json()
+                committed(attempt,result['link'],str(result['id']))
+                db_write("INSERT OR REPLACE INTO managed_paths(tenant_id,publisher,path,page_id,managed,content_hash) VALUES (?,'wordpress',?,?,1,?)",
+                         (ctx.tenant_id,path,page['id'],revision_hash(page)))
+                verify_publication(attempt)
+                processed+=1
+            except Exception as exc:
+                # An ambiguous provider timeout must be verified, not retried as a new create.
+                committed(attempt,url)
+                self.log(f'Publication needs verification: {type(exc).__name__}','warning');errors+=1
+        self.set_status('error' if errors else 'done',f'{processed} sent; {errors} issues; live status requires revision verification')
 
     def _build_llms_content(self, ctx) -> str:
         """Build llms.txt markdown content from ClientContext. Delegates to shared utility."""

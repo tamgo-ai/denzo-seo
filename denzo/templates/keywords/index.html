@@ -137,7 +137,7 @@
         <td style="padding:12px 20px;color:rgba(255,255,255,0.4);font-size:12px;">{{ kw.location or '—' }}</td>
         <td style="padding:12px 20px;text-align:right;">
           {% if kw.volume %}
-          <span style="font-weight:500;color:rgba(255,255,255,0.87);font-size:13px;">{{ kw.volume }}</span>
+          <span style="font-weight:500;color:rgba(255,255,255,0.87);font-size:13px;">{{ kw.volume }}{% if kw.source != "measured" %} <small title="Source: {{ kw.source }}">(estimate / unverified)</small>{% endif %}</span>
           {% else %}
           <span style="color:rgba(255,255,255,0.15);font-size:13px;" title="Data pending — run Keyword Strategist">—</span>
           {% endif %}

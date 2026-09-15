@@ -48,7 +48,7 @@
       <p style="font-size:12px;color:rgba(255,255,255,0.3);margin:8px 0 0;">out of {{ stats.total_checks or 0 }}</p>
     </div>
     <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:24px 28px;">
-      <p style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin:0 0 8px;">Citation Rate</p>
+      <p style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin:0 0 8px;">Brand Mention Rate</p>
       {% set rate = ((stats.total_cited or 0) / (stats.total_checks or 1) * 100) | round | int %}
       <p style="font-size:48px;font-weight:300;letter-spacing:-0.02em;line-height:1;margin:0;color:{% if rate >= 50 %}#4ade80{% elif rate >= 25 %}#fb923c{% else %}#f87171{% endif %};">{{ rate }}%</p>
       <p style="font-size:12px;color:rgba(255,255,255,0.3);margin:8px 0 0;">overall average</p>
@@ -60,7 +60,7 @@
     <svg style="width:48px;height:48px;color:rgba(255,255,255,0.2);margin:0 auto 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
     </svg>
-    <h3 style="font-size:18px;font-weight:600;color:rgba(255,255,255,0.87);margin:0 0 8px;">Start monitoring AI citations</h3>
+    <h3 style="font-size:18px;font-weight:600;color:rgba(255,255,255,0.87);margin:0 0 8px;">Start monitoring AI brand mentions</h3>
     <p style="color:rgba(255,255,255,0.4);margin:0 0 24px;font-size:14px;">Run GEO Monitor to discover how AI engines mention {{ client.name }}</p>
     <a href="/clients/{{ tenant_id }}/pipeline"
        style="display:inline-flex;align-items:center;gap:7px;background:#6366f1;border:none;color:white;border-radius:8px;font-weight:600;font-size:13px;padding:10px 20px;text-decoration:none;transition:background 0.15s;"
@@ -73,7 +73,7 @@
   <!-- Trend chart (last 14 days) — only when data exists -->
   {% if trend_data %}
   <div style="background:#111111;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:24px 28px;">
-    <h2 style="font-size:15px;font-weight:600;color:rgba(255,255,255,0.87);margin:0 0 16px;">Citation Rate — Last 14 Days</h2>
+    <h2 style="font-size:15px;font-weight:600;color:rgba(255,255,255,0.87);margin:0 0 16px;">Brand Mention Rate — Last 14 Days</h2>
     <div style="display:flex;align-items:flex-end;gap:8px;height:96px;">
       {% for day in trend_data %}
       {% set bar_h = [day.rate, 100] | min %}

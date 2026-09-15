@@ -18,7 +18,7 @@ def test_lighthouse_scale_and_zero(raw, expected, monkeypatch):
     parsed = pagespeed_real._parse_psi_response(psi(raw))
     assert parsed['score'] == expected
     assert parsed['field_data']['cumulative_layout_shift_score']['percentile'] == 0.03
-    monkeypatch.setattr(performance_estimator, 'get_real_performance', lambda _: parsed)
+    monkeypatch.setattr(performance_estimator, 'get_lighthouse_performance', lambda _: parsed)
     result = performance_estimator.estimate_performance('https://example.com', '', '')
     assert result['score'] == expected
     if expected is not None:
@@ -26,7 +26,7 @@ def test_lighthouse_scale_and_zero(raw, expected, monkeypatch):
 
 
 def modules():
-    return {name: {'score': 95, 'source': 'pagespeed_insights_api'} for name in scoring.BASE_WEIGHTS}
+    return {name: {'score': 95, 'source': 'lighthouse_local'} for name in scoring.BASE_WEIGHTS}
 
 
 def test_unavailable_is_never_a_bad_score():

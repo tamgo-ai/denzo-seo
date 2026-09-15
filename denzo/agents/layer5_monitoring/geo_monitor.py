@@ -9,6 +9,7 @@ Supported engines:
   claude      — Claude (cold, no business context — honest)    key: anthropic_api_key (auto)
   bing        — Bing Search → Copilot-style answer             key: bing_api_key
 """
+import time
 import json
 import os
 import re
@@ -33,7 +34,7 @@ def _query_perplexity(api_key, query):
             timeout=25,
         )
         r.raise_for_status()
-        return {"success": True, "response": r.json()["choices"][0]["message"]["content"]}
+        return {"success": True, "response": r.json()["choices"][0]["message"]["content"], "citations": r.json().get("citations", [])}
     except Exception as e:
         return {"success": False, "error": str(e), "response": ""}
 
@@ -123,28 +124,25 @@ def _query_bing(api_key, query):
         return {"success": False, "error": str(e), "response": ""}
 
 
-def _analyze_citation(response_text, business_name, website, competitors):
-    text_lower = response_text.lower()
-    name_lower = business_name.lower()
-    words      = name_lower.split()
-    domain     = (website or "").replace("https://", "").replace("www.", "").split("/")[0]
-
-    if name_lower in text_lower or (domain and domain in text_lower):
-        cited = "CITED"
-    elif len(words) >= 2 and words[0] in text_lower and words[-1] in text_lower:
-        cited = "PARTIAL"
-    else:
-        cited = "NOT_CITED"
-
-    position = None
-    if cited in ("CITED", "PARTIAL"):
-        for i, sentence in enumerate(re.split(r"[.!?\n]", response_text), 1):
-            if name_lower in sentence.lower():
-                position = i
-                break
-
-    comp_found = [c["name"] for c in competitors if c.get("name", "").lower() in text_lower]
-    return {"cited": cited, "position": position, "competitors_found": comp_found}
+def _analyze_citation(response_text, business_name, website, competitors, citations=None):
+    from urllib.parse import urlsplit
+    text = response_text.casefold()
+    name = (business_name or '').casefold().strip()
+    host = (urlsplit(website if '://' in (website or '') else 'https://'+(website or '')).hostname or '').removeprefix('www.').lower()
+    def matches(url):
+        if not isinstance(url,str):
+            return False
+        parsed = urlsplit(url)
+        other = (parsed.hostname or '').removeprefix('www.').lower()
+        return bool(host and parsed.scheme in ('https','http') and (other==host or other.endswith('.'+host)))
+    cited_urls = [url for url in (citations or []) if matches(url)]
+    mentioned = bool(name and re.search(r'(?<!\w)'+re.escape(name)+r'(?!\w)',text))
+    mentioned = mentioned or any(matches(u.rstrip('.,)')) for u in re.findall(r'https?://[^\s<>]+',response_text))
+    position = next((i for i,s in enumerate(re.split(r'[.!?\n]',text),1) if name and name in s),None) if mentioned else None
+    comp_found = [c['name'] for c in competitors if c.get('name') and c['name'].casefold() in text]
+    return {'cited':'CITED' if cited_urls else 'MENTIONED' if mentioned else 'NOT_MENTIONED',
+            'mentioned':mentioned,'citation_verified':bool(cited_urls),'citations':cited_urls,
+            'position':position,'competitors_found':comp_found}
 
 
 class GEOMonitor(TenantAwareBaseAgent):
@@ -308,18 +306,18 @@ Return ONLY valid JSON. Make queries sound natural and specific to this business
                     self.log(f"[{engine_name}] Error: {result.get('error','?')[:60]}", "warning")
                     continue
 
-                analysis   = _analyze_citation(result["response"], ctx.client_name, ctx.website_url, competitors)
-                cited_flag = 1 if analysis["cited"] == "CITED" else 0
+                analysis   = _analyze_citation(result["response"], ctx.client_name, ctx.website_url, competitors, result.get("citations", []))
+                cited_flag = int(analysis["mentioned"])
                 if cited_flag:
                     total_cited += 1
                 total_checks += 1
                 db_write(
                     "INSERT INTO geo_queries "
-                    "(tenant_id, query, ai_model, response, client_mentioned, client_position, competitors_mentioned) "
-                    "VALUES (?,?,?,?,?,?,?)",
+                    "(tenant_id, query, ai_model, response, client_mentioned, client_position, competitors_mentioned, citation_verified, citations_json, query_mode) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?)",
                     (ctx.tenant_id, query, engine_name, result["response"][:1000], cited_flag,
                      analysis["position"],
-                     json.dumps(analysis["competitors_found"]) if analysis["competitors_found"] else None)
+                     json.dumps(analysis["competitors_found"]), int(analysis["citation_verified"]), json.dumps(result.get("citations",[])), "retrieved_answer" if engine_name=="perplexity" else "model_response")
                 )
                 icon  = "✓" if analysis["cited"] == "CITED" else ("~" if analysis["cited"] == "PARTIAL" else "✗")
                 level = "success" if analysis["cited"] == "CITED" else ("warning" if analysis["cited"] == "PARTIAL" else "error")
@@ -328,5 +326,5 @@ Return ONLY valid JSON. Make queries sound natural and specific to this business
 
         rate        = round((total_cited / total_checks) * 100) if total_checks else 0
         engine_list = ", ".join(e[0] for e in engines)
-        self.log(f"Done. Citation rate: {rate}% ({total_cited}/{total_checks}) — {engine_list}", "success")
-        self.set_status("done", f"Citation rate: {rate}% · {total_checks} checks · {engine_list}")
+        self.log(f"Done. Brand mention rate: {rate}% ({total_cited}/{total_checks}) — {engine_list}", "success")
+        self.set_status("done", f"Brand mention rate: {rate}% · {total_checks} checks · {engine_list}")

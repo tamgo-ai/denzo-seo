@@ -28,7 +28,7 @@ def validate_url(url):
     return urlunsplit((p.scheme, p.netloc, p.path or '/', p.query, '')), addresses[0]
 
 
-def fetch_html(url, **_kwargs):
+def fetch_bytes(url, max_bytes=MAX_BYTES, **_kwargs):
     chain = []
     for _ in range(6):
         url, address = validate_url(url)
@@ -50,14 +50,20 @@ def fetch_html(url, **_kwargs):
             if response.status in (301, 302, 303, 307, 308) and response.getheader('Location'):
                 url = urljoin(url, response.getheader('Location'))
                 continue
-            body = response.read(MAX_BYTES + 1)
-            if len(body) > MAX_BYTES:
+            body = response.read(max_bytes + 1)
+            if len(body) > max_bytes:
                 raise ValueError('Website response exceeded audit size limit')
             if response.status >= 500 or response.status in (401, 403, 408, 429):
                 raise ValueError('Website temporarily unavailable or blocking automated analysis')
             return {'ok': 200 <= response.status < 300, 'html': body.decode('utf-8', errors='replace'),
-                    'status': response.status, 'headers': headers, 'final_url': url,
+                    'body': body, 'status': response.status, 'headers': headers, 'final_url': url,
                     'redirect_chain': chain, 'method': 'public_http'}
         finally:
             conn.close()
     raise ValueError('Website has too many redirects')
+
+
+def fetch_html(url, **kwargs):
+    result = fetch_bytes(url, **kwargs)
+    result.pop('body', None)
+    return result

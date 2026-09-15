@@ -7,8 +7,9 @@ Wants=redis-server.service
 Type=simple
 User=root
 WorkingDirectory=/root/denzo-seo
+Environment=DENZO_EXECUTOR=rq
 EnvironmentFile=/root/denzo-seo/.env
-ExecStart=/usr/local/bin/rq worker denzo-seo --url redis://localhost:6379/0
+ExecStart=/root/denzo-seo/.venv/bin/rq worker denzo-seo --url redis://localhost:6379/0
 Restart=always
 RestartSec=10
 StandardOutput=journal

@@ -1,5 +1,6 @@
 from flask import session, redirect, url_for, request, jsonify, abort
 from functools import wraps
+from inspect import signature
 from werkzeug.security import check_password_hash
 from denzo.db import get_db
 
@@ -28,7 +29,7 @@ def tenant_access_required(f):
             if request.path.startswith("/api/"):
                 return jsonify({"error": "Unauthorized"}), 401
             return redirect(url_for("auth.login", next=request.path))
-        tenant_id = kwargs.get("tenant_id")
+        tenant_id = signature(f).bind_partial(*args, **kwargs).arguments.get("tenant_id")
         if tenant_id and not can_access_tenant(tenant_id):
             if request.path.startswith("/api/"):
                 return jsonify({"error": "Access denied"}), 403
@@ -57,3 +58,29 @@ def check_credentials(username: str, password: str):
     if user and check_password_hash(user["password_hash"], password):
         return user["id"]
     return None
+
+
+def admin_required(f):
+    @wraps(f)
+    @login_required
+    def decorated(*args, **kwargs):
+        if session.get('role') != 'admin':
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+
+
+def visible_clients():
+    """The single owner-filtered client list for all navigation surfaces."""
+    db = get_db()
+    try:
+        rows = db.execute("""
+            SELECT c.*, (SELECT name FROM agents a WHERE a.tenant_id=c.tenant_id
+              AND a.status='working' ORDER BY a.id LIMIT 1) AS active_agent,
+              (SELECT COUNT(*) FROM keywords k WHERE k.tenant_id=c.tenant_id) AS keyword_count,
+              (SELECT COUNT(*) FROM pages p WHERE p.tenant_id=c.tenant_id) AS page_count
+            FROM clients c WHERE c.owner_user_id=? OR ?='admin' ORDER BY c.name
+        """, (session.get('user_id'), session.get('role', 'client'))).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        db.close()

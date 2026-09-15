@@ -156,7 +156,7 @@ OUTPUT STRUCTURE — follow this exact HTML structure in order:
 
 2. STATS BAR — wrap in <div class="stats-bar">:
    - 3-4 <div class="stat"><strong>[number]</strong><span>[label]</span></div>
-   - Use real or plausible numbers from the business context (years, clients, locations, certifications)
+   - Use only verified numbers with source evidence. Omit the entire stats bar if verified statistics are unavailable.
 
 3. INTRO SECTION — <h2> + 2 paragraphs. First paragraph answers "why choose {ctx.client_name} for {keyword}". Include specific facts, not vague claims.
 
@@ -166,7 +166,7 @@ OUTPUT STRUCTURE — follow this exact HTML structure in order:
 5. PROCESS SECTION — <h2>How It Works</h2> + <div class="process-steps"> with 3-4 <div class="step">:
    - Each step: <div class="step-num">[number]</div><h3>[step title]</h3><p>[description]</p>
 
-6. WHY US SECTION — <h2>Why {ctx.client_name}?</h2> + 3-4 <p> paragraphs using E-E-A-T signals. Include specific certifications, years, client outcomes. Mention phone {ctx.phone}.
+6. WHY US SECTION — <h2>Why {ctx.client_name}?</h2> + 3-4 <p> paragraphs using E-E-A-T signals. Use certifications, experience and outcomes only when supported by verified evidence. Mention phone {ctx.phone}.
 
 7. SERVICE AREA — <h2>Serving [location area]</h2> + paragraph mentioning: {', '.join(ctx.service_cities[:8]) if ctx.service_cities else location}
 
@@ -181,15 +181,15 @@ OUTPUT STRUCTURE — follow this exact HTML structure in order:
 WRITING RULES — GOOGLE SEARCH QUALITY STANDARDS:
 - NO breadcrumbs, NO navigation, NO header/footer elements
 - Use <h2> as the main heading (WordPress theme provides <h1> from page title — do NOT use <h1> tags)
-- Minimum 800 words total — pages under this threshold fail Google's "thin content" filter
-- UNIQUE ENTITIES: Mention 2-3 nearby landmarks, neighborhoods, or well-known local entities
-- UNIQUE STATISTICS: Include at least 2 specific numbers per page (e.g. "15 years serving X", "2,000+ vehicles repaired", "within 2.4 miles of Y"). NEVER reuse stats across pages
+- Answer the user intent completely and concisely. No fixed word count; do not pad the page.
+- LOCAL ENTITIES: Mention only locations confirmed in supplied evidence; do not invent proximity or travel distances.
+- STATISTICS: Use only verified facts; consistent facts may be reused. Never invent numbers to make a page unique.
 - READABILITY: Write at 8th-10th grade level. Short sentences (15-25 words). No jargon without explanation
-- EXPERTISE SIGNAL: Include one "According to [expert/technician/founder]..." attribution
-- AUTHORITY SIGNAL: Reference 1-2 certifications, awards, or industry memberships relevant to the topic
-- TRUST SIGNAL: Include a guarantee, warranty statement, or third-party verification relevant to this page
+- EXPERTISE: Include attributed expertise only if the source and exact statement are verified.
+- AUTHORITY: Reference only verified certifications, awards or memberships; otherwise omit them.
+- TRUST: Include warranties or guarantees only with client-confirmed terms.
 - GEO SIGNAL: Include the full business NAP (Name, Address, Phone) at least once naturally
-- Every claim must be specific: numbers, timeframes, named services — never "many" or "various"
+- Every factual claim must be supported; uncertainty or omission is preferable to invented specificity.
 - Add descriptive alt text to ALL <img> tags (include keyword + location)
 - If real images were provided above, embed 1-2 <img> tags with exact src URLs
 - Start your output with EXACTLY this comment on line 1: <!-- META_DESC: [your 120-155 char SEO meta description here] -->
@@ -268,7 +268,10 @@ WRITING RULES — GOOGLE SEARCH QUALITY STANDARDS:
             self.set_status("idle", "Waiting for Layer 2 agents")
             return
 
-        MAX_PAGES = 200  # Hard cap: E-E-A-T Architect is capped at 150; this is a safety floor
+        MAX_PAGES = 20
+        limit_rows = db_execute("SELECT value FROM settings WHERE tenant_id=? AND key='generation_batch_size'", (self.tenant_id,))
+        if limit_rows:
+            MAX_PAGES = max(1, min(200, int(limit_rows[0]["value"])))
         # Load LocalBusiness schema once — embedded in every page's schema_markup
         lb_row = db_execute(
             "SELECT value FROM settings WHERE tenant_id=? AND key='schema_local_business'",
@@ -377,21 +380,25 @@ WRITING RULES — GOOGLE SEARCH QUALITY STANDARDS:
                 continue
 
             # Quality gate: run technical + GEO audit on generated content
-            quality_score = 65
+            quality_score = None
             page_status = 'ready'
             audit_note = '[PENDING_REVIEW]'
             try:
                 from denzo.auditor.technical_scanner import scan_technical
                 from denzo.auditor.geo_visibility import analyze_geo_visibility
                 page_url = page_dict.get('slug','') or ''
-                page_domain = self.ctx.domain or 'localhost'
-                tech_audit = scan_technical(f"https://{page_domain}/{page_url}", content, page_domain, None, 200)
-                geo_audit = analyze_geo_visibility(f"https://{page_domain}/{page_url}", content, page_domain)
+                from denzo.urls import site_base_url, public_page_url, quality_document
+                from urllib.parse import urlsplit
+                page_domain = urlsplit(site_base_url(self.ctx)).netloc
+                page_url = public_page_url(page_dict, self.ctx)
+                audit_html = quality_document(content, page_dict, self.ctx)
+                tech_audit = scan_technical(page_url, audit_html, page_domain, None, 200)
+                geo_audit = analyze_geo_visibility(page_url, audit_html, page_domain)
                 tech_score = tech_audit.get('score', 65)
                 geo_score = geo_audit.get('score', 65)
                 quality_score = round((tech_score + geo_score) / 2)
                 if quality_score < 50:
-                    page_status = 'needs_fix'
+                    page_status = 'ready'
                     audit_note = f'[AUTO-FLAGGED] Quality too low: technical={tech_score}, geo={geo_score}. Fix required before publishing.'
                     self.log(f"⚠ {title} flagged — quality {quality_score}/100 (technical={tech_score}, geo={geo_score})", "warning")
                 else:

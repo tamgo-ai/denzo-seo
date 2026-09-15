@@ -45,6 +45,7 @@ def query_search_analytics(
     dimensions: list[str] = None,
     row_limit: int = 1000,
     start_row: int = 0,
+    query_filter: str | None = None,
 ) -> list[dict]:
     """Raw Search Analytics query.
 
@@ -52,7 +53,10 @@ def query_search_analytics(
     {'keys': ['2026-05-01', 'auto body whittier', 'https://...'],
      'clicks': 12, 'impressions': 340, 'ctr': 0.035, 'position': 7.2}
     """
-    dims = dimensions or ["date", "query", "page"]
+    site_url = site_url or get_bound_site(tenant_id)
+    if not site_url:
+        raise OAuthError("No Search Console property selected")
+    dims = ["date", "query", "page"] if dimensions is None else dimensions
     body = {
         "startDate":  start_date,
         "endDate":    end_date,
@@ -61,6 +65,8 @@ def query_search_analytics(
         "startRow":   start_row,
         "dataState":  "all",   # include fresh data, not just final
     }
+    if query_filter:
+        body["dimensionFilterGroups"] = [{"filters":[{"dimension":"query","operator":"equals","expression":query_filter}]}]
     url = f"{SC_BASE}/sites/{_quote_site(site_url)}/searchAnalytics/query"
     data = authed_request(tenant_id, "gsc", url, method="POST", body=body)
     return data.get("rows", []) or []
@@ -76,7 +82,7 @@ def sync_last_n_days(tenant_id: str, n_days: int = 28, log=None) -> dict:
         raise OAuthError("No GSC site bound to this tenant — user must pick one.")
 
     end_date   = date.today() - timedelta(days=2)   # GSC has ~2-day lag
-    start_date = end_date - timedelta(days=n_days)
+    start_date = end_date - timedelta(days=n_days-1)
     start_str  = start_date.isoformat()
     end_str    = end_date.isoformat()
 
@@ -160,7 +166,7 @@ def top_queries(tenant_id: str, days: int = 28, limit: int = 50) -> list[dict]:
                SUM(impressions)                         AS impressions,
                CASE WHEN SUM(impressions) > 0
                     THEN 1.0 * SUM(clicks) / SUM(impressions) ELSE 0 END AS ctr,
-               AVG(position)                            AS position
+               SUM(position * impressions) / NULLIF(SUM(impressions),0)                            AS position
         FROM gsc_queries
         WHERE tenant_id=? AND date >= ?
         GROUP BY query
@@ -180,7 +186,7 @@ def top_pages(tenant_id: str, days: int = 28, limit: int = 50) -> list[dict]:
                SUM(impressions)                         AS impressions,
                CASE WHEN SUM(impressions) > 0
                     THEN 1.0 * SUM(clicks) / SUM(impressions) ELSE 0 END AS ctr,
-               AVG(position)                            AS position
+               SUM(position * impressions) / NULLIF(SUM(impressions),0)                            AS position
         FROM gsc_queries
         WHERE tenant_id=? AND date >= ?
         GROUP BY page
@@ -198,7 +204,7 @@ def position_for_query(tenant_id: str, query: str, days: int = 28) -> dict | Non
     row = db.execute("""
         SELECT SUM(clicks)      AS clicks,
                SUM(impressions) AS impressions,
-               AVG(position)    AS position
+               SUM(position * impressions) / NULLIF(SUM(impressions),0)    AS position
         FROM gsc_queries
         WHERE tenant_id=? AND date >= ? AND query = ?
     """, (tenant_id, cutoff, query)).fetchone()

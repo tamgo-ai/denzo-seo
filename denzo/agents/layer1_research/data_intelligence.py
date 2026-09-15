@@ -154,12 +154,15 @@ class DataIntelligence(TenantAwareBaseAgent):
             for p in raw_data.get("reddit", [])[:8]
         ]
         trends = raw_data.get("trends", [])[:10]
-        stats_links = [r.get("text", "") for r in raw_data.get("stats", [])[:8]]
+        stats_links = [json.dumps(r, ensure_ascii=False) for r in raw_data.get("stats", [])[:8]]
 
         prompt = f"""You are a content strategist analyzing industry data for {ctx.client_name},
 a {ctx.industry_vertical} business based in {ctx.primary_city}, {ctx.state}.
 
+EVIDENCE REQUIREMENTS: Keep source URLs. Mark hypotheses as unverified. Do not invent percentages, quotes or methods. Leave unavailable data empty.
+
 RAW DATA COLLECTED:
+{json.dumps(raw_data, ensure_ascii=False)[:16000]}
 
 INDUSTRY NEWS (recent headlines):
 {chr(10).join(f"- {t}" for t in news_titles) if news_titles else "No news data available."}
@@ -182,6 +185,8 @@ Analyze this data and produce a content intelligence report. Return ONLY valid J
       "headline": "Compelling data-driven insight title",
       "finding": "The specific data point or trend",
       "source_type": "news|reddit|trends|stats",
+      "source_url": "actual supplied source URL",
+      "evidence_status": "observed|hypothesis",
       "content_angle": "How to use this in a blog post"
     }}
   ],
@@ -193,9 +198,9 @@ Analyze this data and produce a content intelligence report. Return ONLY valid J
     "Pain point 5"
   ],
   "citation_bait_paragraphs": [
-    "A complete paragraph with specific data, percentages, and authoritative language that AI systems will cite. Reference the industry and location. Include a named framework or methodology.",
+    "A useful paragraph supported by the supplied evidence, with the source URL. No invented statistics, methods or claims of guaranteed citations.",
     "A second paragraph focusing on a different data angle.",
-    "A third paragraph with a surprising statistic or counterintuitive finding."
+    "A third paragraph only if independently supported evidence is available; otherwise omit."
   ],
   "suggested_titles": [
     "Data-driven blog post title 1",

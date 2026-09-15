@@ -125,7 +125,10 @@ def _classify_scraped_content(scraped: dict) -> str:
     else:
         return "unknown"
 
-from denzo.data.nearby_cities import NEARBY_CITIES as _NEARBY_CITIES
+try:
+    from denzo.data.nearby_cities import NEARBY_CITIES as _NEARBY_CITIES
+except ModuleNotFoundError:
+    _NEARBY_CITIES = {}  # Optional curated map; do not invent geographic evidence.
 
 
 def _nearby_cities_for(city: str) -> list[str]:
@@ -830,12 +833,14 @@ Return ONLY valid JSON:
                     ai_data = self._ai_analyze_competitor(name, url, city)
                     if ai_data:
                         scraped.update(ai_data)
-                        scraped["ok"] = True
+                        scraped["ok"] = False
                         scraped["source"] = "ai_generated"
                 # Detect industry from scraped content
                 scraped["detected_industry"] = _classify_scraped_content(scraped)
 
             comp_data.update(scraped)
+            db_write("UPDATE competitors SET evidence_source=?,observed_at=CURRENT_TIMESTAMP WHERE tenant_id=? AND name=?",
+                     (scraped.get("source", "scraped" if scraped.get("ok") else "hypothesis"), self.tenant_id, name))
 
             # Compute tier and score AFTER industry detection
             tier, score = self._compute_competitor_score(comp_data, our_brands, our_cities)
@@ -887,6 +892,7 @@ Return ONLY valid JSON:
                 "tier": c.get("tier"),
                 "certified_brands": c.get("certified_brands", []),
                 "title": c.get("title", ""),
+                "evidence_source": c.get("source", "scraped" if c.get("ok") else "hypothesis"),
                 "h1": c.get("h1", [])[:3],
                 "h2": c.get("h2", [])[:5],
             }
@@ -939,7 +945,7 @@ Analyze with this industry, brand tier, and geographic intelligence built in."""
 {summary}
 
 For each competitor, identify:
-1. Their strongest keyword themes (what they rank for)
+1. Their observed content themes; claim actual rankings only when measured SERP evidence is supplied. Label hypotheses clearly.
 2. Cities they target that we DON'T have pages for (gap cities)
 3. Brand certifications they advertise
 4. Content weaknesses we can exploit

@@ -23,59 +23,34 @@ class KeywordFootprintAgent(TenantAwareBaseAgent):
         super().__init__(name="Keyword Footprint", ctx=ctx, layer=1, color="sand")
 
     def run(self):
-        self.log("KeywordFootprintAgent: mapping existing keyword footprint...")
-        self.set_status("working", "Checking what keywords the client already ranks for")
-
-        keyword_map = {}  # keyword → url (the page that already owns it)
-
-        # ── Phase 1: Google Search Console (preferred) ─────────────────────
-        try:
-            from denzo.agents.utils.gsc_client import (
-                is_gsc_connected, top_queries, top_pages, query_search_analytics
-            )
-
-            if is_gsc_connected(self.tenant_id):
-                self.log("GSC connected — fetching real ranking data")
-                queries = top_queries(self.tenant_id, days=90, limit=200)
-                if queries:
-                    for q in queries:
-                        keyword = q.get("query", "").strip().lower()
-                        if keyword and keyword not in keyword_map:
-                            # Get the URL that ranks highest for this query
-                            pages = query_search_analytics(
-                                self.tenant_id,
-                                site_url=None,  # uses bound site
-                                start_date=(datetime.now(timezone.utc).strftime("%Y-%m-%d")),
-                                end_date=(datetime.now(timezone.utc).strftime("%Y-%m-%d")),
-                                dimensions=["page"],
-                                row_limit=1
-                            )
-                            top_url = pages[0]["keys"][0] if pages else ""
-                            keyword_map[keyword] = top_url
-                    self.log(f"Found {len(keyword_map)} keywords via GSC")
-        except Exception as e:
-            self.log(f"GSC lookup skipped: {e}", "info")
-
-        # ── Phase 2: Fallback — SEM/sERP from seed keywords ─────────────────
-        if not keyword_map:
-            self.log("No GSC data — falling back to seed keyword analysis")
-            keyword_map = self._footprint_from_seed_keywords()
-
-        # ── Phase 3: Cross-reference with site inventory ────────────────────
-        inventory_keywords = self._footprint_from_inventory()
-        for kw, url in inventory_keywords.items():
+        from denzo.agents.utils.gsc_client import is_gsc_connected,sync_last_n_days
+        from denzo.db import get_db
+        self.set_status('working','Mapping observed query/page pairs')
+        keyword_map, sources = {}, {}
+        if is_gsc_connected(self.tenant_id):
+            try:
+                sync_last_n_days(self.tenant_id,90)
+                db = get_db()
+                try:
+                    rows = db.execute("""SELECT query,page,SUM(impressions) impressions FROM gsc_queries
+                         WHERE tenant_id=? AND date>=date('now','-92 days')
+                         GROUP BY query,page ORDER BY impressions DESC""",(self.tenant_id,)).fetchall()
+                finally:
+                    db.close()
+                for row in rows:
+                    kw = row['query'].strip().lower()
+                    if kw and kw not in keyword_map:
+                        keyword_map[kw],sources[kw] = row['page'],'gsc'
+            except Exception as exc:
+                self.log(f'GSC unavailable: {exc}','warning')
+        # Inventory is evidence of targeting, not proof of ranking.
+        for kw,url in self._footprint_from_inventory().items():
             if kw not in keyword_map:
-                keyword_map[kw] = url
-
-        # Persist
-        self.save_output("existing_keyword_map", {
-            "keywords": keyword_map,
-            "total": len(keyword_map),
-            "source": "gsc" if len(keyword_map) > 50 else "seed+inventory",
-            "completed_at": datetime.now(timezone.utc).isoformat(),
-        })
-
-        self.set_status("done", f"Mapped {len(keyword_map)} existing keyword→URL pairs")
+                keyword_map[kw],sources[kw] = url,'inventory_target'
+        self.save_output('existing_keyword_map',{'keywords':keyword_map,'sources':sources,
+                         'total':len(keyword_map),'source':'mixed' if len(set(sources.values()))>1 else next(iter(sources.values()),'unavailable'),
+                         'completed_at':datetime.now(timezone.utc).isoformat()})
+        self.set_status('done',f'Mapped {len(keyword_map)} observed keyword/page pairs')
 
     def _footprint_from_seed_keywords(self) -> dict:
         """Without GSC, use the tenant's seed keywords and check if domain appears in SERP."""

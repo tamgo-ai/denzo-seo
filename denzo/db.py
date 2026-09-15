@@ -5,7 +5,7 @@ All tables include tenant_id. No data leaks between clients.
 import sqlite3, os, time
 from werkzeug.security import generate_password_hash
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "denzo.db")
+DB_PATH = os.getenv('DENZO_DB_PATH', os.path.join(os.path.dirname(__file__), "..", "data", "denzo.db"))
 
 
 def get_db():
@@ -19,6 +19,7 @@ def get_db():
 
 def _open_conn(timeout: int = 30):
     """Unified SQLite connection factory. Used by both web and agent code."""
+    os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=timeout)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
@@ -548,6 +549,9 @@ def init_db():
             conn.commit()
         except Exception:
             pass  # column already exists — safe to ignore
+
+    from denzo.migrations import migrate_platform
+    migrate_platform(conn)
 
     # ── Agent seeding migration — add any new agents to ALL existing clients ─────
     # Safe to run repeatedly — INSERT OR IGNORE skips agents already seeded.

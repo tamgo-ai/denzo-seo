@@ -2,27 +2,16 @@ import csv
 import io
 import json
 from flask import Blueprint, render_template, request, abort, Response, jsonify
-from denzo.auth import login_required, can_access_tenant
+from denzo.auth import tenant_access_required, can_access_tenant
+from denzo.auth import visible_clients
 from denzo.db import get_db
 
 bp = Blueprint("competitors", __name__, url_prefix="/clients/<tenant_id>")
 
 
 def _get_sidebar_clients():
-    db = get_db()
-    rows = db.execute("""
-        SELECT c.tenant_id, c.name, ag.name AS active_agent_name
-        FROM clients c
-        LEFT JOIN agents ag ON ag.tenant_id = c.tenant_id AND ag.status = 'working'
-        GROUP BY c.tenant_id
-        ORDER BY c.name
-    """).fetchall()
-    clients = [
-        {"tenant_id": r["tenant_id"], "name": r["name"], "active_agent": r["active_agent_name"]}
-        for r in rows
-    ]
-    db.close()
-    return clients
+    from denzo.auth import visible_clients
+    return visible_clients()
 
 
 def _parse_competitor(r: dict) -> dict:
@@ -48,7 +37,7 @@ def _parse_competitor(r: dict) -> dict:
 
 
 @bp.route("/competitors")
-@login_required
+@tenant_access_required
 def index(tenant_id):
     if not can_access_tenant(tenant_id):
         abort(403)
@@ -141,7 +130,7 @@ def index(tenant_id):
 
 
 @bp.route("/competitors/<int:competitor_id>/resolve-cannibalization", methods=["POST"])
-@login_required
+@tenant_access_required
 def resolve_cannibalization(tenant_id, competitor_id):
     """Mark a cannibalization risk as resolved."""
     db = get_db()
@@ -155,7 +144,7 @@ def resolve_cannibalization(tenant_id, competitor_id):
 
 
 @bp.route("/competitors/export.csv")
-@login_required
+@tenant_access_required
 def export_competitors_csv(tenant_id):
     db = get_db()
     client = db.execute("SELECT name FROM clients WHERE tenant_id=?", (tenant_id,)).fetchone()

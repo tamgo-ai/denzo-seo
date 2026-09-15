@@ -1,3 +1,4 @@
+from denzo.auth import visible_clients
 import json
 from flask import Blueprint, render_template, flash, redirect, url_for
 from denzo.auth import tenant_access_required
@@ -36,12 +37,7 @@ def index(tenant_id):
         (tenant_id,)
     ).fetchone()
 
-    clients = db.execute(
-        "SELECT c.tenant_id, c.name, ag.name AS active_agent "
-        "FROM clients c "
-        "LEFT JOIN agents ag ON ag.tenant_id = c.tenant_id AND ag.status = 'working' "
-        "GROUP BY c.tenant_id ORDER BY c.name"
-    ).fetchall()
+    clients = visible_clients()
     db.close()
 
     return render_template(

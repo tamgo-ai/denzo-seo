@@ -90,7 +90,13 @@ class SchemaLocalBusiness(BaseModel):
 
 class TechnicalAudit(BaseModel):
     """Written by: Technical Auditor. Read by: E-E-A-T Architect."""
-    score: int = Field(default=0, ge=0, le=100)
+    score: Optional[int] = Field(default=None, ge=0, le=100)
+    coverage: int = Field(default=0, ge=0, le=100)
+    status: str = "unavailable"
+    critical: list[dict] = Field(default_factory=list)
+    high_priority: list[dict] = Field(default_factory=list)
+    quick_wins: list[dict] = Field(default_factory=list)
+    summary: str = ""
     issues: list[dict] = Field(default_factory=list, description="[{'severity': str, 'description': str, 'fix': str}]")
     crawl_errors: int = Field(default=0)
     mobile_issues: int = Field(default=0)

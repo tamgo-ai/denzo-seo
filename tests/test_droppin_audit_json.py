@@ -26,9 +26,13 @@ def audit_api(tmp_path, monkeypatch):
     spec = importlib.util.spec_from_file_location('droppin_auditor_test_module', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    monkeypatch.setenv('AUDIT_SERVICE_TOKEN', 'test-service-secret')
     app = Flask(__name__)
+    app.secret_key = 'test-secret'
     app.register_blueprint(module.bp)
-    return app.test_client(), connect
+    client = app.test_client()
+    client.environ_base['HTTP_AUTHORIZATION'] = 'Bearer test-service-secret'
+    return client, connect
 
 
 @pytest.mark.parametrize('status,score,report,expected', [

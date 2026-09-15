@@ -1,5 +1,5 @@
 [Unit]
-Description=DENZO-SEO Web (gunicorn)
+Description=DENZO-SEO Pipeline Director (RQ)
 After=network.target redis-server.service
 Wants=redis-server.service
 
@@ -9,12 +9,12 @@ User=root
 WorkingDirectory=/root/denzo-seo
 Environment=DENZO_EXECUTOR=rq
 EnvironmentFile=/root/denzo-seo/.env
-ExecStart=/root/denzo-seo/.venv/bin/gunicorn -c gunicorn_config.py 'denzo:create_app()'
+ExecStart=/root/denzo-seo/.venv/bin/rq worker denzo-director --url redis://localhost:6379/0
 Restart=always
-RestartSec=5
+RestartSec=10
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=denzo-web
+SyslogIdentifier=denzo-director
 
 [Install]
 WantedBy=multi-user.target

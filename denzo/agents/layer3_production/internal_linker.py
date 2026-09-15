@@ -87,115 +87,43 @@ Return ONLY valid JSON array. Max 3 links per page. Use natural anchor text rele
         return []
 
     def run(self):
-        self.log("Building internal link structure...")
-        self.set_status("working", "Loading all pages")
-
-        # Prereq check: need ready/published pages with content
-        pages_check = db_execute(
-            "SELECT COUNT(*) AS n FROM pages WHERE tenant_id=? AND content IS NOT NULL AND content != '' "
-            "AND status IN ('ready', 'published')",
-            (self.ctx.tenant_id,)
-        )
-        pages_count = pages_check[0]["n"] if pages_check else 0
-        if pages_count == 0:
-            self.log("No ready/published pages with content found. Run Programmatic SEO first.", "warning")
-            self.set_status("idle", "No ready pages — run Programmatic SEO first")
-            return
-
-        pages = db_execute(
-            "SELECT id, title, slug, type, target_keyword, content FROM pages "
-            "WHERE tenant_id=? AND content IS NOT NULL AND content != '' "
-            "AND status IN ('ready', 'published') ORDER BY id",
-            (self.ctx.tenant_id,)
-        )
-
-        if not pages:
-            self.log("No pages with content found.", "warning")
-            self.set_status("idle", "No pages")
-            return
-
-        page_list = [{"id": r["id"], "title": r["title"], "slug": r["slug"], "type": r["type"], "keyword": r["target_keyword"]} for r in pages]
-        total = len(page_list)
-        self.log(f"Found {total} pages. Planning links in batches of {PLAN_BATCH}...")
-
-        # Collect link plan across all batches
-        link_plan = []
-        batches = [page_list[i:i + PLAN_BATCH] for i in range(0, total, PLAN_BATCH)]
-        for idx, batch in enumerate(batches):
+        from bs4 import BeautifulSoup, NavigableString
+        from denzo.urls import public_page_url
+        self.set_status('working','Planning links to canonical page URLs')
+        pages = [dict(r) for r in db_execute("SELECT * FROM pages WHERE tenant_id=? AND status IN ('ready','published','live_external')", (self.tenant_id,))]
+        by_id = {p['id']:p for p in pages}
+        eligible = [p for p in pages if p.get('managed') and p.get('content') and p['status']!='live_external']
+        plan = []
+        for i in range(0,len(eligible),15):
             if self.should_stop():
                 break
-            self.set_status("working", f"AI planning links: batch {idx + 1}/{len(batches)}")
-            instructions = self._plan_batch(batch, total)
-            link_plan.extend(instructions)
-            self.log(f"Batch {idx + 1}/{len(batches)}: {len(instructions)} instructions")
-
-        if not link_plan:
-            self.log("No link instructions from Claude (all batches returned empty/malformed JSON). Skipping internal linking.", "warning")
-            self.set_status("done", "0 internal links — Claude returned no plan (pages may lack enough content for linking)")
-            return
-
-        # Re-fetch fresh content from DB before injecting links.
-        # Content Optimizer may have rewritten pages while we were planning — using
-        # the stale copy from the initial SELECT would silently overwrite those rewrites.
-        fresh_rows = db_execute(
-            "SELECT id, content, slug FROM pages "
-            "WHERE tenant_id=? AND content IS NOT NULL AND content != '' "
-            "AND status IN ('ready', 'published') ORDER BY id",
-            (self.ctx.tenant_id,)
-        )
-        page_map = {r["id"]: {"content": r["content"], "slug": r["slug"]} for r in (fresh_rows or [])}
-
-        injected = 0
-        self.set_status("working", "Injecting links into pages")
-
-        # Build a slug → canonical URL map to fix any /wp/ prefix issues
-        slug_map = {r["id"]: r["slug"].lstrip("/") for r in pages}
-
-        for instruction in link_plan:
-            if self.should_stop():
-                break
-            pid = instruction.get("page_id")
-            if pid not in page_map:
+            plan.extend(self._plan_batch(eligible[i:i+15],len(pages)))
+        count = 0
+        for instruction in plan:
+            page = by_id.get(instruction.get('page_id'))
+            if not page or page not in eligible or self.should_stop():
                 continue
-
-            content = page_map[pid]["content"] or ""
-            links_to_add = instruction.get("add_links_to", [])
-
-            for link in links_to_add:
-                anchor = link.get("anchor_text", "")
-                target_id = link.get("target_id")
-                slug = link.get("target_slug", "")
-
-                # Prefer canonical slug from DB over AI-generated slug
-                if target_id and target_id in slug_map:
-                    slug = "/" + slug_map[target_id]
-                elif slug:
-                    # Sanitize: strip any /wp/ prefix from AI-generated slugs
-                    slug = re.sub(r'^/wp/', '/', slug)
-                    if not slug.startswith("/"):
-                        slug = "/" + slug
-
-                if not anchor or not slug:
+            soup = BeautifulSoup(page['content'],'html.parser')
+            changed = False
+            for link in instruction.get('add_links_to',[]):
+                target = by_id.get(link.get('target_id'))
+                anchor = (link.get('anchor_text') or '').strip()
+                if not target or target['id']==page['id'] or not anchor:
                     continue
-                # Only inject if anchor text appears in content and isn't already a link
-                if anchor.lower() in content.lower() and f'href="{slug}"' not in content:
-                    pattern = re.compile(re.escape(anchor), re.IGNORECASE)
-                    replacement = f'<a href="{slug}">{anchor}</a>'
-                    content, n = pattern.subn(replacement, content, count=1)
-                    if n:
-                        injected += 1
-
-            page_map[pid]["content"] = content
-
-        # Save updated content
-        saved = 0
-        for pid, data in page_map.items():
-            if data.get("content"):
-                db_write(
-                    "UPDATE pages SET content=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
-                    (data["content"], pid, self.ctx.tenant_id)
-                )
-                saved += 1
-
-        self.log(f"Internal linking complete: {injected} links injected across {saved} pages.", "success")
-        self.set_status("done", f"{injected} internal links added")
+                url = public_page_url(target,self.ctx)
+                if soup.find('a',href=url):
+                    continue
+                for node in list(soup.find_all(string=True)):
+                    if any(p.name in ('a','script','style','code','pre','h1','h2','h3') for p in node.parents):
+                        continue
+                    match = re.search(re.escape(anchor),str(node),re.I)
+                    if not match:
+                        continue
+                    a = soup.new_tag('a',href=url);a.string=str(node)[match.start():match.end()]
+                    node.replace_with(NavigableString(str(node)[:match.start()]),a,NavigableString(str(node)[match.end():]))
+                    changed=True;count+=1;break
+            if changed:
+                # A concurrent revision is never overwritten.
+                db_write('UPDATE pages SET content=?,updated_at=CURRENT_TIMESTAMP WHERE tenant_id=? AND id=? AND content=?',
+                         (str(soup),self.tenant_id,page['id'],page['content']))
+        self.set_status('done',f'{count} canonical internal links added')

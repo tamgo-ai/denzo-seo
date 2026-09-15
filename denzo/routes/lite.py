@@ -4,7 +4,7 @@ Same DB + agents as Enterprise, different frontend at /lite/<tenant_id>/
 """
 import json
 import logging
-from datetime import datetime, timedelta  # timedelta kept for next_run calc, timezone
+from datetime import datetime, timedelta, timezone
 from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ def _get_client_and_ctx(tenant_id):
 
 def _pending_review_count(db, tenant_id):
     row = db.execute(
-        "SELECT COUNT(*) FROM pages WHERE tenant_id=? AND status='draft' AND content IS NOT NULL AND content != ''",
+        "SELECT COUNT(*) FROM pages WHERE tenant_id=? AND status IN ('ready','draft') AND approval_hash IS NULL AND content IS NOT NULL AND content != ''",
         (tenant_id,)
     ).fetchone()
     return row[0] if row else 0
@@ -34,7 +34,7 @@ def _stats(db, tenant_id):
         SELECT
             SUM(CASE WHEN status='published' THEN 1 ELSE 0 END) AS published,
             SUM(CASE WHEN status='ready'     THEN 1 ELSE 0 END) AS ready,
-            SUM(CASE WHEN status='draft' AND content IS NOT NULL AND content != '' THEN 1 ELSE 0 END) AS draft,
+            SUM(CASE WHEN status IN ('ready','draft') AND approval_hash IS NULL AND content IS NOT NULL AND content != '' THEN 1 ELSE 0 END) AS draft,
             SUM(CASE WHEN status='pending'   THEN 1 ELSE 0 END) AS pending
         FROM pages WHERE tenant_id=?
     """, (tenant_id,)).fetchone()
@@ -64,15 +64,8 @@ def _stats(db, tenant_id):
 
 
 def _autopilot_on(db, tenant_id):
-    row = db.execute(
-        "SELECT value FROM settings WHERE tenant_id=? AND key='autopilot'", (tenant_id,)
-    ).fetchone()
-    if row:
-        try:
-            return json.loads(row["value"]).get("enabled", False)
-        except Exception as e:
-            logger.warning("Error: %s", e)
-    return False
+    row = db.execute('SELECT enabled FROM schedules WHERE tenant_id=?', (tenant_id,)).fetchone()
+    return bool(row and row['enabled'])
 
 
 # ── Index: redirect to first client or onboarding ────────────────────────────
@@ -116,20 +109,13 @@ def dashboard(tenant_id):
 
     # Recent drafts with content — the review queue
     recent_drafts_rows = db.execute(
-        "SELECT * FROM pages WHERE tenant_id=? AND status='draft' AND content IS NOT NULL AND content != '' ORDER BY created_at DESC LIMIT 3",
+        "SELECT * FROM pages WHERE tenant_id=? AND status IN ('ready','draft') AND approval_hash IS NULL AND content IS NOT NULL AND content != '' ORDER BY created_at DESC LIMIT 3",
         (tenant_id,)
     ).fetchall()
     recent_drafts = [dict(p) for p in recent_drafts_rows]
 
-    # Next run estimate
-    if autopilot_on:
-        now = datetime.now(timezone.utc)
-        next_9am = now.replace(hour=9, minute=0, second=0, microsecond=0)
-        if now >= next_9am:
-            next_9am += timedelta(days=1)
-        next_run = next_9am.strftime("%a %I:%M %p UTC")
-    else:
-        next_run = None
+    schedule = db.execute('SELECT next_run_at FROM schedules WHERE tenant_id=?', (tenant_id,)).fetchone()
+    next_run = schedule['next_run_at'] if schedule and autopilot_on else None
 
     db.close()
     return render_template(
@@ -149,17 +135,18 @@ def dashboard(tenant_id):
 @bp.route("/<tenant_id>/toggle-autopilot", methods=["POST"])
 @tenant_access_required
 def toggle_autopilot(tenant_id):
+    from denzo.scheduler import configure
+    from denzo.billing.enforce import agent_entitled
     data = request.get_json(silent=True) or {}
-    enabled = bool(data.get("enabled", False))
-    db = get_db()
-    db.execute("""
-        INSERT INTO settings (tenant_id, key, value, updated_at)
-        VALUES (?, 'autopilot', ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(tenant_id, key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP
-    """, (tenant_id, json.dumps({"enabled": enabled})))
-    db.commit()
-    db.close()
-    return jsonify({"ok": True, "enabled": enabled})
+    enabled = data.get('enabled') is True
+    allowed, reason = agent_entitled(tenant_id,'Pipeline Director')
+    if enabled and not allowed:
+        return jsonify({'error':reason}), 402
+    try:
+        next_run = configure(tenant_id, enabled, data.get('timezone','UTC'), int(data.get('hour',9)))
+    except (ValueError, KeyError) as exc:
+        return jsonify({'error':str(exc)}), 400
+    return jsonify({'ok':True,'enabled':enabled,'next_run':next_run})
 
 
 # ── Content ───────────────────────────────────────────────────────────────────
@@ -194,7 +181,7 @@ def content(tenant_id):
     counts = db.execute("""
         SELECT
             COUNT(*) AS total,
-            SUM(CASE WHEN status='draft' AND content IS NOT NULL AND content != '' THEN 1 ELSE 0 END) AS draft,
+            SUM(CASE WHEN status IN ('ready','draft') AND approval_hash IS NULL AND content IS NOT NULL AND content != '' THEN 1 ELSE 0 END) AS draft,
             SUM(CASE WHEN status='ready'     THEN 1 ELSE 0 END) AS ready,
             SUM(CASE WHEN status='published' THEN 1 ELSE 0 END) AS published
         FROM pages WHERE tenant_id=?

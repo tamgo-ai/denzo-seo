@@ -28,39 +28,21 @@ def _extract_h1(content_html: str, fallback: str) -> str:
     return fallback
 
 
-def _clean_html_for_jsx(html: str) -> str:
-    """
-    Clean AI-generated HTML for embedding in JSX.
-    - Remove wrapper divs/sections with class names from old template
-    - Remove hero sections, CTA sections (layout provides those)
-    - Remove H1 (we inject it as JSX)
-    - Normalize whitespace
-    """
-    # Strip hero/CTA sections — layout provides them
-    html = re.sub(
-        r'<section[^>]*class="[^"]*(?:hero-section|cta-section)[^"]*"[^>]*>.*?</section>',
-        '', html, flags=re.DOTALL | re.IGNORECASE)
-
-    # Strip standalone H1 tags (will be rendered as JSX)
-    html = re.sub(r'<h1[^>]*>.*?</h1>', '', html, flags=re.DOTALL | re.IGNORECASE)
-
-    # Remove script tags (schema is injected separately)
-    html = re.sub(r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>.*?</script>',
-                  '', html, flags=re.DOTALL | re.IGNORECASE)
-
-    # Strip wrapper classes from common patterns
-    for wrapper_class in ['section-content', 'section-alt', 'two-col', 'col-text',
-                          'col-image', 'container', 'page-wrap', 'site-header',
-                          'site-footer', 'breadcrumb']:
-        html = re.sub(
-            rf'<div[^>]*class="[^"]*{wrapper_class}[^"]*"[^>]*>',
-            '', html, flags=re.IGNORECASE)
-        html = re.sub(rf'</div>', '', html, count=1, flags=re.IGNORECASE) if wrapper_class in html else html
-
-    # Clean up excessive newlines
-    html = re.sub(r'\n{3,}', '\n\n', html)
-
-    return html.strip()
+def _clean_html_for_jsx(html):
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html,'html.parser')
+    for node in soup.select('h1, script, .hero-section, .cta-section, .site-header, .site-footer, .breadcrumb'):
+        node.decompose()
+    for node in soup.select('div.section-content, div.section-alt, div.two-col, div.col-text, div.col-image, div.container, div.page-wrap'):
+        node.unwrap()
+    for node in soup.find_all(True):
+        for attr in list(node.attrs):
+            if attr.lower().startswith('on'):
+                del node[attr]
+        for attr in ('href','src'):
+            if str(node.get(attr,'')).lower().strip().startswith('javascript:'):
+                del node[attr]
+    return str(soup.body.decode_contents() if soup.body else soup).strip()
 
 
 def render_nextjs_page(page: dict, ctx: ClientContext, assets: dict = None) -> str:
@@ -92,8 +74,8 @@ def render_nextjs_page(page: dict, ctx: ClientContext, assets: dict = None) -> s
     location = page.get("location") or ctx.primary_city or ""
 
     # Domain resolution
-    domain = ctx.pages_domain or (f"https://www.{ctx.domain}" if ctx.domain else "")
-    canonical = f"{domain}/en/{page_type}s/{slug}" if domain else f"/en/{page_type}s/{slug}"
+    from denzo.urls import public_page_url
+    canonical = public_page_url(page,ctx)
 
     # H1 from content
     h1_text = _extract_h1(content_html, title)
@@ -134,14 +116,17 @@ def render_nextjs_page(page: dict, ctx: ClientContext, assets: dict = None) -> s
             "areaServed": location,
         }
 
-    schema_json = json.dumps(schema_obj)
+    from denzo.urls import schema_json as encode_schema
+    schema_json = encode_schema(schema_obj)
 
     # Escape HTML content for JSX embedding
     # The content goes inside a JSX string that gets passed to dangerouslySetInnerHTML
     # We need to escape backslashes, backticks, and ${} since it's inside a JSX template literal
     escaped_html = clean_html.replace('\\', '\\\\').replace('`', '\\`').replace('${', '\\${')
 
+    from denzo.editorial import revision_hash
     return f"""export const metadata = {{
+  other: {{ "denzo-revision": {json.dumps(revision_hash(page))} }},
   title: {json.dumps(meta_title)},
   description: {json.dumps(meta_desc)},
   keywords: {json.dumps(keyword)},

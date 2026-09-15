@@ -35,13 +35,13 @@ Score this page content (0-100) on these 5 criteria. Be honest and critical.
 Page title: {title}
 Target keyword: {keyword}
 
-CONTENT PREVIEW (first 2000 chars):
-{content[:2000]}
+CONTENT (up to 40000 characters):
+{content[:40000]}
 
 Score on:
 1. Keyword targeting — exact keyword in heading and first paragraph? (0-20)
-2. Content depth — specific facts, numbers, process steps, not vague claims? (0-20)
-3. E-E-A-T signals — certifications, experience, trust indicators? (0-20)
+2. Content depth — useful explanations, documented facts and practical steps without invented claims? (0-20)
+3. E-E-A-T signals — accurate sources and clearly supported experience; do not require unsupported credentials? (0-20)
 4. GEO readiness — definition pattern, FAQ schema, citable facts? (0-20)
 5. Formatting — proper H2s, short paragraphs, calls to action? (0-20)
 
@@ -53,16 +53,14 @@ Return JSON only:
         if not raw:
             return None, ""  # API failed — caller will skip DB update
         try:
-            import re as _re
-            cleaned = strip_json_fences(raw)
-            result = json.loads(cleaned)
-            score = int(result.get("score", 75))
-            issues = result.get("issues", [])
-        except Exception:
-            # Try to extract just the score number
-            m = _re.search(r'"score"\s*:\s*(\d+)', raw)
-            score = int(m.group(1)) if m else 75
-            issues = []
+            result = json.loads(strip_json_fences(raw))
+            score = result['score']
+            if isinstance(score,bool) or not isinstance(score,(float,int)) or not 0 <= score <= 100:
+                return None, ''
+            score = round(score)
+            issues = result.get('issues',[])
+        except (ValueError,TypeError,KeyError):
+            return None, ''
 
         if score >= self.MIN_SCORE:
             return score, ""
@@ -123,7 +121,7 @@ Rules:
         ready_count = ready_check[0]["n"] if ready_check else 0
         if ready_count == 0:
             self.log("No pages needing optimization found. All pages meet quality threshold or no pages exist.", "warning")
-            self.set_status("idle", "All pages meet quality threshold — nothing to optimize")
+            self.set_status("done", "All pages meet quality threshold — nothing to optimize")
             return
 
         # Hard cap: each page can be rewritten at most 3 times before giving up.
@@ -178,22 +176,6 @@ Rules:
                 self.log(f"{title[:50]} → score {score}/100")
 
                 if new_content and len(new_content.strip()) > 200:
-                    # Save original content version before overwriting (rollback safety)
-                    old_content = page_dict.get("content", "")
-                    if old_content:
-                        db_write(
-                            "INSERT INTO content_versions (tenant_id, page_id, content, quality_score) "
-                            "VALUES (?,?,?,?)",
-                            (self.ctx.tenant_id, page_dict["id"], old_content, score)
-                        )
-                        # Trim: keep max 100 versions per tenant
-                        db_write(
-                            "DELETE FROM content_versions WHERE tenant_id=? AND id NOT IN ("
-                            "SELECT id FROM content_versions WHERE tenant_id=? "
-                            "ORDER BY id DESC LIMIT 100)",
-                            (self.ctx.tenant_id, self.ctx.tenant_id)
-                        )
-
                     # Track rewrite attempts in notes to prevent infinite loops.
                     # Extract current rewrite count from notes (format: [CO:N]).
                     import re as _re
@@ -216,7 +198,7 @@ Rules:
                     db_write(
                         "UPDATE pages SET content=?, quality_score=?, scored_by='haiku-4-5-scored', "
                         "notes=?, status='ready', updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
-                        (new_content, score, new_notes, page_dict["id"], self.ctx.tenant_id)
+                        (new_content, None, new_notes, page_dict["id"], self.ctx.tenant_id)
                     )
                     self.log(f"✓ Improved: {title} (score {score}/100, rewrite #{rewrite_count})", "success")
                     improved += 1
@@ -226,7 +208,7 @@ Rules:
                     tag = " [CO_OK]" if score >= self.MIN_SCORE else ""
                     db_write(
                         "UPDATE pages SET quality_score=?, scored_by='haiku-4-5-scored', "
-                        "notes=notes || ?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
+                        "notes=COALESCE(notes,'') || ?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
                         (score, tag, page_dict["id"], self.ctx.tenant_id)
                     )
                     skipped += 1

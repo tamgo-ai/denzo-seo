@@ -3,10 +3,11 @@ API blueprint — agent control, WebSocket log streaming, stats.
 """
 import json
 import time
-from flask import Blueprint, jsonify, request
+from flask import session, Blueprint, jsonify, request
 from denzo import sock
-from denzo.auth import login_required, can_access_tenant
+from denzo.auth import tenant_access_required, can_access_tenant
 from denzo.db import get_db
+from denzo.editorial import transition
 from denzo.agents.registry import AGENT_REGISTRY
 from denzo.agents.runner import AgentRunner
 
@@ -17,7 +18,7 @@ _can_access_tenant = can_access_tenant
 # ── Pipeline Director endpoints ─────────────────────────────────────────────────
 
 @bp.route("/<tenant_id>/pipeline/run", methods=["POST"])
-@login_required
+@tenant_access_required
 def run_pipeline(tenant_id):
     """Start the autonomous Director which orchestrates the full pipeline."""
     if not _can_access_tenant(tenant_id):
@@ -32,7 +33,7 @@ def run_pipeline(tenant_id):
 
 
 @bp.route("/<tenant_id>/pipeline/stop", methods=["POST"])
-@login_required
+@tenant_access_required
 def stop_pipeline(tenant_id):
     """Stop the autonomous Director and all child agents."""
     if not _can_access_tenant(tenant_id):
@@ -44,7 +45,7 @@ def stop_pipeline(tenant_id):
 
 
 @bp.route("/<tenant_id>/pipeline/reset", methods=["POST"])
-@login_required
+@tenant_access_required
 def reset_pipeline(tenant_id):
     """Reset ALL agents to idle. Emergency recovery button."""
     if not _can_access_tenant(tenant_id):
@@ -66,7 +67,7 @@ def reset_pipeline(tenant_id):
 # ── Agent control endpoints ────────────────────────────────────────────────────
 
 @bp.route("/<tenant_id>/agents/start/<agent_name>", methods=["POST"])
-@login_required
+@tenant_access_required
 def start_agent(tenant_id, agent_name):
     if not _can_access_tenant(tenant_id):
         return jsonify({"error": "Access denied"}), 403
@@ -84,7 +85,7 @@ def start_agent(tenant_id, agent_name):
 
 
 @bp.route("/<tenant_id>/agents/stop/<agent_name>", methods=["POST"])
-@login_required
+@tenant_access_required
 def stop_agent(tenant_id, agent_name):
     if not _can_access_tenant(tenant_id):
         return jsonify({"error": "Access denied"}), 403
@@ -94,7 +95,7 @@ def stop_agent(tenant_id, agent_name):
 
 
 @bp.route("/<tenant_id>/agents/status")
-@login_required
+@tenant_access_required
 def agents_status(tenant_id):
     if not _can_access_tenant(tenant_id):
         return jsonify({"error": "Access denied"}), 403
@@ -110,41 +111,35 @@ def agents_status(tenant_id):
 # ── Content review ─────────────────────────────────────────────────────────────
 
 @bp.route("/<tenant_id>/pages/<int:page_id>/approve", methods=["POST"])
-@login_required
+@tenant_access_required
 def approve_page(tenant_id, page_id):
-    """Approve a page for publishing. Removes [PENDING_REVIEW] tag, adds [APPROVED]."""
-    if not _can_access_tenant(tenant_id):
-        return jsonify({"error": "Access denied"}), 403
-    db = get_db()
-    db.execute(
-        "UPDATE pages SET notes=REPLACE(COALESCE(notes,''),'[PENDING_REVIEW]','')||' [APPROVED]', "
-        "updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
-        (page_id, tenant_id)
-    )
-    db.commit(); db.close()
-    return jsonify({"status": "approved"})
+    action = 'approve'
+    try:
+        result = transition(tenant_id, page_id, action, session['user_id'], request.form.get('note',''))
+    except LookupError as exc:
+        return jsonify(error=str(exc)), 404
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 409
+    return jsonify(result)
 
 
 @bp.route("/<tenant_id>/pages/<int:page_id>/reject", methods=["POST"])
-@login_required
+@tenant_access_required
 def reject_page(tenant_id, page_id):
-    """Reject a page. Returns it to draft for rework."""
-    if not _can_access_tenant(tenant_id):
-        return jsonify({"error": "Access denied"}), 403
-    db = get_db()
-    db.execute(
-        "UPDATE pages SET status='draft', notes=REPLACE(COALESCE(notes,''),'[PENDING_REVIEW]','')||' [REJECTED]', "
-        "updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
-        (page_id, tenant_id)
-    )
-    db.commit(); db.close()
-    return jsonify({"status": "rejected"})
+    action = 'reject'
+    try:
+        result = transition(tenant_id, page_id, action, session['user_id'], request.form.get('note',''))
+    except LookupError as exc:
+        return jsonify(error=str(exc)), 404
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 409
+    return jsonify(result)
 
 
 # ── Stats ──────────────────────────────────────────────────────────────────────
 
 @bp.route("/<tenant_id>/stats")
-@login_required
+@tenant_access_required
 def stats(tenant_id):
     if not _can_access_tenant(tenant_id):
         return jsonify({"error": "Access denied"}), 403

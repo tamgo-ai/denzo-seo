@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, abort
-from denzo.auth import login_required, can_access_tenant
+from denzo.auth import tenant_access_required, can_access_tenant
+from denzo.auth import visible_clients
 from denzo.db import get_db
 from denzo.agents.registry import LAYER_LABELS
 from denzo.routes.competitors import _table_exists
@@ -8,24 +9,12 @@ bp = Blueprint("pipeline", __name__, url_prefix="/clients/<tenant_id>")
 
 
 def _get_sidebar_clients():
-    db = get_db()
-    rows = db.execute("""
-        SELECT c.tenant_id, c.name, ag.name AS active_agent_name
-        FROM clients c
-        LEFT JOIN agents ag ON ag.tenant_id = c.tenant_id AND ag.status = 'working'
-        GROUP BY c.tenant_id
-        ORDER BY c.name
-    """).fetchall()
-    clients = [
-        {"tenant_id": r["tenant_id"], "name": r["name"], "active_agent": r["active_agent_name"]}
-        for r in rows
-    ]
-    db.close()
-    return clients
+    from denzo.auth import visible_clients
+    return visible_clients()
 
 
 @bp.route("/pipeline")
-@login_required
+@tenant_access_required
 def index(tenant_id):
     if not can_access_tenant(tenant_id):
         abort(403)
@@ -209,7 +198,7 @@ def index(tenant_id):
 
 
 @bp.route("/agents")
-@login_required
+@tenant_access_required
 def agents_page(tenant_id):
     if not can_access_tenant(tenant_id):
         abort(403)

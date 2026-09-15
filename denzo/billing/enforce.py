@@ -49,12 +49,15 @@ def get_user_plan(user_id: int | None = None) -> str:
     if user and user["plan"]:
         # Check if trial expired
         if user["plan"] == "trial" and user["trial_ends_at"]:
-            from datetime import datetime
+            from datetime import datetime, timezone
             try:
-                if datetime.now(timezone.utc) > datetime.fromisoformat(user["trial_ends_at"]):
+                expiry = datetime.fromisoformat(user["trial_ends_at"])
+                if expiry.tzinfo is None:
+                    expiry = expiry.replace(tzinfo=timezone.utc)
+                if datetime.now(timezone.utc) > expiry:
                     return PLAN_FREE  # expired trial → free
             except (ValueError, TypeError):
-                pass
+                return PLAN_FREE
         return user["plan"]
     return PLAN_FREE
 
@@ -113,3 +116,18 @@ def has_feature(user_id: int, feature: str) -> bool:
     """
     plan = get_plan(get_user_plan(user_id))
     return bool(plan.get(feature))
+
+
+def agent_entitled(tenant_id, agent_name):
+    db = get_db()
+    try:
+        owner = db.execute('SELECT u.id,u.role FROM clients c LEFT JOIN users u ON u.id=c.owner_user_id WHERE c.tenant_id=?', (tenant_id,)).fetchone()
+    finally:
+        db.close()
+    if not owner:
+        return False, 'Client not found'
+    # Legacy unassigned tenants remain admin-only through tenant access checks.
+    if owner['id'] is None or owner['role'] == 'admin':
+        return True, ''
+    allowed = get_plan(get_user_plan(owner['id']))['agents_unlocked']
+    return (True, '') if allowed == 'all' or agent_name in allowed else (False, 'Your current plan does not include this agent')

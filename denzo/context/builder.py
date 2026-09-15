@@ -14,7 +14,7 @@ def build_client_context(tenant_id: str) -> ClientContext:
     rows = db_execute(
         """SELECT c.name, c.website_url, c.phone, c.address, c.city, c.state,
                   c.publisher_type, c.is_multilocation, c.brand_tier, c.locations_json,
-                  cc.tagline, cc.description, cc.service_cities, cc.primary_city,
+                  cc.tagline, cc.description, cc.target_audience, cc.service_cities, cc.primary_city,
                   cc.certifications, cc.services, cc.differentiators,
                   cc.competitors, cc.insurance_partners, cc.domain,
                   cc.industry_vertical, cc.github_repo, cc.github_branch,
@@ -50,6 +50,7 @@ def build_client_context(tenant_id: str) -> ClientContext:
         state               = r["state"] or "CA",
         tagline             = r["tagline"] or "",
         description         = r["description"] or "",
+        target_audience     = r["target_audience"] or "",
         service_cities      = jlist(r["service_cities"]),
         certifications      = jlist(r["certifications"]),
         services            = jlist(r["services"]),

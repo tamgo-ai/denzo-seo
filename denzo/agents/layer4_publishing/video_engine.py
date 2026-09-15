@@ -72,7 +72,7 @@ class VideoEngine(TenantAwareBaseAgent):
             except Exception as e:
                 self.log(f"Video failed for page {page.get('slug', '?')}: {e}", "warning")
 
-        self.set_status("done", f"Generated {videos_generated} videos ({generated_this_month + videos_generated}/{monthly_limit} this month)")
+        self.set_status("done" if videos_generated else "error", f"Uploaded {videos_generated} videos ({generated_this_month + videos_generated}/{monthly_limit} this month)")
 
     # ── Page selection ─────────────────────────────────────────────────────
 
@@ -89,7 +89,7 @@ class VideoEngine(TenantAwareBaseAgent):
         rows = db_execute(
             """SELECT COUNT(*) as n FROM activity
                WHERE tenant_id=? AND type='video' AND agent='Video Engine'
-               AND created_at >= datetime('now', 'start of month')""",
+               AND level='success' AND message LIKE '%youtube.com/watch?v=%' AND created_at >= datetime('now', 'start of month')""",
             (self.tenant_id,)
         )
         return rows[0]["n"] if rows else 0
@@ -122,18 +122,25 @@ class VideoEngine(TenantAwareBaseAgent):
         metadata = self._generate_video_metadata(title, content, keyword, slug)
 
         # Step 2: Generate video via external API
-        video_url = self._generate_video(metadata["script"], title, slug)
+        job_key = f'video_source_{page["id"]}'
+        previous = self.load_output(job_key) or {}
+        video_url = previous.get('url') or self._generate_video(metadata['script'], title, slug)
+        if video_url:
+            self.save_output(job_key, {'url':video_url})
 
         # Step 3: Upload to YouTube (if OAuth configured)
         youtube_url = None
-        if video_url or True:  # Proceed even without video gen API
+        if video_url:
             youtube_url = self._upload_to_youtube(metadata, video_url, page)
 
         # Step 4: Embed on source page
         if youtube_url:
             self._embed_video_on_page(page, youtube_url, metadata)
 
-        # Log activity
+        if not youtube_url:
+            self.log('Video incomplete; not counted as generated or published', 'warning')
+            return False
+        # Log successful uploads only.
         from denzo.agents.base_agent import db_write
         db_write(
             "INSERT INTO activity (tenant_id, type, message, agent, level, created_at) VALUES (?,?,?,?,?,datetime('now'))",
@@ -195,7 +202,7 @@ Return ONLY valid JSON:
         elif provider == "synthesia":
             return self._gen_synthesia(script)
         else:
-            self.log("No VIDEO_API_PROVIDER configured. Skipping video generation (metadata + YouTube still proceed).", "info")
+            self.log("No VIDEO_API_PROVIDER configured. No video will be generated or uploaded.", "info")
             return None
 
     def _gen_kling(self, script: str, title: str) -> str | None:
@@ -268,57 +275,77 @@ Return ONLY valid JSON:
 
     # ── YouTube upload ─────────────────────────────────────────────────────
 
-    def _upload_to_youtube(self, metadata: dict, video_url: str | None, page: dict) -> str | None:
-        """Upload video to YouTube via YouTube Data API v3.
-
-        Requires OAuth scope: https://www.googleapis.com/auth/youtube.upload
-        Set DENZO_YOUTUBE_CHANNEL_ID in settings per tenant.
-        """
-        try:
-            from denzo.agents.utils.google_oauth import get_access_token
-            token = get_access_token(self.tenant_id, "youtube")
-        except Exception:
-            self.log("YouTube OAuth not connected. Add youtube.upload scope in Google Cloud Console.", "info")
-            return None
-
-        if not video_url:
-            # No video to upload, but we can still create metadata-only listing
-            self.log("No video URL — YouTube requires a video file. Skipping upload.", "warning")
-            return None
-
+    def _upload_to_youtube(self, metadata, video_url, page):
+        """Send actual bytes using a persisted resumable session; reuse it after failures."""
         import requests
-
-        # Step 1: Create video resource (metadata)
-        snippet = {
-            "title": metadata["title"][:100],
-            "description": metadata.get("description", "")[:5000],
-            "tags": metadata.get("tags", [])[:20],
-        }
-        body = {
-            "snippet": snippet,
-            "status": {"privacyStatus": "public", "selfDeclaredMadeForKids": False},
-        }
-
+        from urllib.parse import urlsplit
+        from denzo.agents.utils.google_oauth import get_access_token
+        from denzo.auditor.safe_fetch import fetch_bytes
+        state_key = f'youtube_upload_{page["id"]}'
+        state = self.load_output(state_key) or {}
+        if state.get('video_id'):
+            return 'https://www.youtube.com/watch?v='+state['video_id']
+        if not video_url:
+            self.log('No completed video file available; no upload or quota success recorded', 'warning')
+            return None
         try:
-            # Create the video entry
-            r = requests.post(
-                "https://www.googleapis.com/upload/youtube/v3/videos?part=snippet,status",
-                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-                json=body,
-                timeout=15
-            )
-            if r.status_code == 200:
-                video_data = r.json()
-                video_id = video_data.get("id", "")
-                youtube_url = f"https://www.youtube.com/watch?v={video_id}" if video_id else None
-                self.log(f"YouTube: {metadata['title'][:50]} → {youtube_url or 'created'}")
-                return youtube_url
+            token = get_access_token(self.tenant_id,'youtube')
+            media = fetch_bytes(video_url,max_bytes=128*1024*1024)
+            body = media.get('body',b'')
+            if not media.get('ok') or not body:
+                raise ValueError('Video file unavailable')
+            mime = 'video/mp4' if body[4:8]==b'ftyp' else 'video/webm' if body[:4]==b'\x1aE\xdf\xa3' else None
+            if not mime:
+                raise ValueError('Expected a completed MP4 or WebM file')
+            import hashlib
+            digest = hashlib.sha256(body).hexdigest()
+            if state.get('hash') and state['hash']!=digest:
+                raise ValueError('Upload source changed; restore the original video file')
+            auth = {'Authorization':f'Bearer {token}'}
+            uri = state.get('upload_uri')
+            if not uri:
+                if self.should_stop():
+                    return None
+                response = requests.post('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',
+                  headers=dict(auth, **{'Content-Type':'application/json','X-Upload-Content-Length':str(len(body)),'X-Upload-Content-Type':mime}),
+                  json={'snippet':{'title':metadata['title'][:100],'description':metadata.get('description','')[:5000], 'tags':metadata.get('tags',[])[:20]},
+                        'status':{'privacyStatus':'public','selfDeclaredMadeForKids':False}}, timeout=30,allow_redirects=False)
+                response.raise_for_status()
+                uri = response.headers.get('Location','')
+                parsed = urlsplit(uri)
+                if parsed.scheme!='https' or parsed.hostname!='www.googleapis.com' or not parsed.path.startswith('/upload/youtube/'):
+                    raise ValueError('Invalid upload session location')
+                state = {'upload_uri':uri,'hash':digest}
+                self.save_output(state_key,state)
+            # Check completed or partial uploads before transferring (including after a timeout).
+            parsed = urlsplit(uri)
+            if parsed.scheme!='https' or parsed.hostname!='www.googleapis.com' or not parsed.path.startswith('/upload/youtube/'):
+                raise ValueError('Invalid saved upload session')
+            status = requests.put(uri,headers=dict(auth, **{'Content-Length':'0','Content-Range':f'bytes */{len(body)}'}),data=b'',timeout=30,allow_redirects=False)
+            if status.status_code in (200,201):
+                result = status.json()
             else:
-                self.log(f"YouTube API error: {r.status_code} {r.text[:100]}", "warning")
-        except Exception as e:
-            self.log(f"YouTube upload error: {e}", "warning")
-
-        return None
+                if status.status_code!=308:
+                    raise ValueError(f'Upload session HTTP {status.status_code}; source preserved for recovery')
+                received = status.headers.get('Range','')
+                offset = int(received.rsplit('-',1)[1])+1 if received else 0
+                if not 0<=offset<len(body):
+                    raise ValueError('Invalid upload offset')
+                if self.should_stop():
+                    return None
+                response = requests.put(uri,headers=dict(auth, **{'Content-Type':mime,'Content-Length':str(len(body)-offset),
+                    'Content-Range':f'bytes {offset}-{len(body)-1}/{len(body)}'}),data=body[offset:],timeout=120,allow_redirects=False)
+                if response.status_code not in (200,201):
+                    raise ValueError(f'Upload not completed (HTTP {response.status_code}); retry resumes session')
+                result = response.json()
+            if not result.get('id'):
+                raise ValueError('Upload returned no video ID')
+            state['video_id'] = result['id']
+            self.save_output(state_key,state)
+            return 'https://www.youtube.com/watch?v='+result['id']
+        except Exception as exc:
+            self.log(f'YouTube upload pending or failed: {type(exc).__name__}', 'warning')
+            return None
 
     # ── Schema embedding ────────────────────────────────────────────────────
 

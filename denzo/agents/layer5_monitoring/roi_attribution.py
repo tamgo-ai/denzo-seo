@@ -34,14 +34,17 @@ class ROIAttribution(TenantAwareBaseAgent):
             if not queries and not pages:
                 return None
 
-            total_clicks      = sum(int(q["clicks"] or 0) for q in queries)
-            total_impressions = sum(int(q["impressions"] or 0) for q in queries)
-            avg_ctr   = (total_clicks / total_impressions) if total_impressions else 0
-            avg_pos   = (
-                sum(float(q["position"] or 0) for q in queries) / len(queries)
-                if queries else 0
-            )
-
+            from datetime import date,timedelta
+            from denzo.agents.utils.gsc_client import get_bound_site,query_search_analytics
+            end = date.today()-timedelta(days=2)
+            start = end-timedelta(days=27)
+            totals = query_search_analytics(self.tenant_id,get_bound_site(self.tenant_id),start.isoformat(),end.isoformat(),dimensions=[],row_limit=1)
+            if not totals:
+                return None
+            total_clicks = int(totals[0].get('clicks',0))
+            total_impressions = int(totals[0].get('impressions',0))
+            avg_ctr = total_clicks/total_impressions if total_impressions else 0
+            avg_pos = float(totals[0].get('position',0))
             return {
                 "total_clicks":      total_clicks,
                 "total_impressions": total_impressions,

@@ -1,20 +1,5 @@
-"""
-Visual Content Optimizer — Layer 4
-====================================
-Optimizes pages at the VISUAL level — completely separate from the
-text-only Content Optimizer.
-
-What it does:
-1. Scans page HTML for <img> tags
-2. Generates SEO-optimized alt text for images missing it (uses Claude)
-3. Adds loading="lazy" + width/height to prevent Cumulative Layout Shift (CLS)
-4. Renames generic filenames (e.g. IMG_1234.jpg → bmw-certified-collision-repair-north-hollywood.jpg)
-5. Adds Open Graph image tags if missing
-6. Adds schema.org ImageObject markup
-7. Adds srcset hints for responsive images
-8. Reports visual SEO score per page
-
-It NEVER touches prose text, headings, or body copy — that's the Content Optimizer's job.
+"""Measure images; fix evidence-backed alt text, actual dimensions and loading.
+Existing responsive sources are preserved. Assets are not renamed or recompressed.
 """
 import json
 import re
@@ -49,10 +34,10 @@ class VisualContentOptimizer(TenantAwareBaseAgent):
         fixes = []
         score = 100
 
-        missing_alt = [img for img in images if not img.get("alt", "").strip()]
+        missing_alt = [img for img in images if not img.get("alt", "").strip() and not img.get("decorative")]
         generic_alt = [img for img in images if img.get("alt", "").strip()
                        and img["alt"].strip().lower() in ("image", "photo", "picture", "img", "banner")]
-        missing_lazy = [img for img in images if img.get("loading", "") != "lazy"]
+        missing_lazy = [img for i,img in enumerate(images) if i>0 and img.get("loading", "") not in ("lazy","eager")]
         missing_dims = [img for img in images if not img.get("width") or not img.get("height")]
         generic_filenames = [
             img for img in images
@@ -89,120 +74,66 @@ class VisualContentOptimizer(TenantAwareBaseAgent):
             issues.append(f"{len(generic_filenames)} image(s) have non-descriptive filenames (e.g. IMG_1234.jpg)")
             fixes.append("optimize_filenames")
 
-        # Keyword in alt text check
-        keyword_in_alt = any(
-            page_keyword.lower() in img.get("alt", "").lower()
-            for img in images if img.get("alt", "").strip()
-        )
-        if images and not keyword_in_alt and page_keyword:
-            score -= 10
-            issues.append(f"Target keyword '{page_keyword}' not found in any image alt text")
-            fixes.append("add_keyword_alt")
-
         return {
             "score": max(0, min(100, score)),
             "issues": issues,
             "fixes_needed": list(set(fixes))
         }
 
-    def _generate_alt_texts(self, images: list[dict], page_title: str, keyword: str) -> dict:
-        """
-        Use Claude to generate SEO-optimized alt text for images.
-        Returns {src: alt_text} mapping.
-        """
-        ctx = self.ctx
-        images_to_fix = [img for img in images if not img.get("alt", "").strip()
-                        or img.get("alt", "").strip().lower() in ("image", "photo", "picture", "img", "banner")]
-        if not images_to_fix:
-            return {}
+    def _generate_alt_texts(self, images, page_title, keyword):
+        from urllib.parse import urljoin
+        from denzo.urls import site_base_url
+        output = {}
+        for image in images[:10]:
+            if self.should_stop():
+                break
+            # An explicitly empty alt may be intentional decoration.
+            if image.get('decorative') or (image.get('alt','').strip() and image['alt'].lower() not in ('image','photo','picture','img','banner')):
+                continue
+            url = urljoin(site_base_url(self.ctx),image.get('src',''))
+            prompt = ('Describe only what is visible in this image for an accessible alt attribute. '
+                      'Do not infer identities, certification, location or before/after results. '
+                      'Do not force a keyword. Return JSON {"alt":"..."}, at most 180 characters. '
+                      f'Page context: {page_title}')
+            try:
+                from denzo.auditor.safe_fetch import validate_url
+                validate_url(url)
+                result = json.loads(strip_json_fences(self.call_claude_vision(url,prompt,max_tokens=180)))
+                alt = result.get('alt','').strip()
+                if alt:
+                    output[image['src']] = alt[:180]
+            except Exception as exc:
+                self.log(f'Image description unavailable: {type(exc).__name__}','warning')
+        return output
 
-        img_list = []
-        for img in images_to_fix[:15]:
-            src = img.get("src", "")
-            filename = src.split("/")[-1].split("?")[0] if src else "unknown"
-            img_list.append({"src": src, "filename": filename, "current_alt": img.get("alt", "")})
-
-        prompt = f"""{ctx.to_prompt_block()}
-
-You are an SEO image optimization expert. Generate descriptive, SEO-optimized alt text for these images.
-
-Page title: {page_title}
-Target keyword: {keyword}
-Business: {ctx.client_name} — {ctx.industry_vertical}
-
-Images to fix:
-{json.dumps(img_list, ensure_ascii=False)}
-
-Rules for alt text:
-1. Be descriptive and specific — describe what's actually in the image based on the filename/context
-2. Include the target keyword naturally in AT LEAST ONE alt text (don't keyword-stuff every image)
-3. Keep alt text under 125 characters
-4. Do not use "image of", "photo of", "picture of" — start with the subject
-5. Be contextually relevant to the business ({ctx.client_name}, {ctx.primary_city})
-6. For logos: "{{business_name}} logo — {{tagline}}"
-7. For location/building: "{{business_name}} {{city}} — {{service_description}}"
-8. For before/after: "{{service}} before and after at {{business_name}} {{city}}"
-
-Return ONLY a JSON object mapping filename → alt text:
-{{
-  "filename_or_src": "descriptive alt text here",
-  ...
-}}
-"""
-        raw = self.call_claude(prompt, max_tokens=1000, model="claude-haiku-4-5-20251001")
-        if not raw:
-            return {}
-        try:
-            data = json.loads(strip_json_fences(raw))
-            return data if isinstance(data, dict) else {}
-        except Exception:
-            return {}
-
-    def _apply_visual_fixes(self, html: str, page: dict, alt_map: dict, fixes_needed: list) -> str:
-        """
-        Apply visual SEO fixes to HTML without touching any text content.
-        Returns improved HTML string.
-        """
-        soup = BeautifulSoup(html, "html.parser")
-        keyword = page.get("target_keyword", page.get("title", ""))
+    def _apply_visual_fixes(self, html, page, alt_map, fixes_needed):
+        from urllib.parse import urljoin
+        from denzo.urls import site_base_url
+        soup = BeautifulSoup(html,'html.parser')
         changed = False
-
-        for img in soup.find_all("img"):
-            src = img.get("src", "")
-            filename = src.split("/")[-1].split("?")[0] if src else ""
-
-            # Fix missing / generic alt text
-            current_alt = img.get("alt", "").strip()
-            is_generic = current_alt.lower() in ("", "image", "photo", "picture", "img", "banner")
-
-            if is_generic and ("add_alt_text" in fixes_needed or "improve_alt_text" in fixes_needed):
-                # Look up in alt_map by filename or full src
-                new_alt = alt_map.get(filename) or alt_map.get(src)
-                if new_alt:
-                    img["alt"] = new_alt.strip()
-                    changed = True
-
-            # Add lazy loading
-            if "add_lazy_loading" in fixes_needed and img.get("loading", "") != "lazy":
-                # Don't lazy-load above-the-fold hero images (first image or hero class)
-                parent_classes = " ".join(
-                    p.get("class", []) if isinstance(p.get("class"), list) else [p.get("class", "")]
-                    for p in img.parents if hasattr(p, "get")
-                )
-                is_hero = any(h in parent_classes.lower() for h in ["hero", "banner", "header-img", "above-fold"])
-                if not is_hero:
-                    img["loading"] = "lazy"
-                    changed = True
-
-            # Add decoding=async for non-critical images
-            if not img.get("decoding") and img.get("loading") == "lazy":
-                img["decoding"] = "async"
-                changed = True
-
-        if not changed:
-            return html
-
-        return str(soup)
+        for index,img in enumerate(soup.find_all('img')):
+            src = img.get('src','')
+            decorative = img.get('role')=='presentation' or img.get('aria-hidden')=='true' or ('alt' in img.attrs and img['alt']=='')
+            alt = alt_map.get(src) or alt_map.get(src.split('/')[-1].split('?')[0])
+            if alt and not decorative and img.get('alt','').lower() in ('','image','photo','picture','img','banner'):
+                img['alt']=alt; changed=True
+            parent_classes = ' '.join(str(c) for p in img.parents if hasattr(p,'get') for c in (p.get('class',[]) if isinstance(p.get('class'),list) else [p.get('class','')]))
+            hero = index==0 or any(word in parent_classes.lower() for word in ('hero','banner','above-fold'))
+            loading = 'eager' if hero else 'lazy'
+            if img.get('loading') != loading:
+                img['loading']=loading; changed=True
+            if hero and img.get('fetchpriority')!='high':
+                img['fetchpriority']='high'; changed=True
+            if not hero and img.get('decoding')!='async':
+                img['decoding']='async'; changed=True
+            if src and (not img.get('width') or not img.get('height')):
+                try:
+                    from denzo.media import image_dimensions
+                    width,height = image_dimensions(urljoin(site_base_url(self.ctx),src))
+                    img['width'],img['height']=str(width),str(height);changed=True
+                except (ValueError,OSError):
+                    pass
+        return str(soup) if changed else html
 
     def _add_og_image(self, html: str, page: dict) -> str:
         """Add Open Graph and Twitter Card image meta tags if missing."""
@@ -249,6 +180,7 @@ Return ONLY a JSON object mapping filename → alt text:
             images.append({
                 "src": img.get("src", ""),
                 "alt": img.get("alt", ""),
+                "decorative": img.get("role")=="presentation" or img.get("aria-hidden")=="true" or ("alt" in img.attrs and img["alt"]==""),
                 "width": img.get("width", ""),
                 "height": img.get("height", ""),
                 "loading": img.get("loading", ""),
@@ -276,7 +208,7 @@ Return ONLY a JSON object mapping filename → alt text:
         optimized = 0
         skipped = 0
         round_num = 0
-        MAX_ROUNDS = 8
+        MAX_ROUNDS = 1  # One measured pass; unresolved issues remain visible.
 
         while not self.should_stop() and round_num < MAX_ROUNDS:
             round_num += 1
@@ -309,7 +241,7 @@ Return ONLY a JSON object mapping filename → alt text:
                 if not images:
                     # Mark as visually scored (no images = neutral)
                     db_write(
-                        "UPDATE pages SET visual_score=75, updated_at=CURRENT_TIMESTAMP "
+                        "UPDATE pages SET visual_score=50, updated_at=CURRENT_TIMESTAMP "
                         "WHERE id=? AND tenant_id=?",
                         (page_dict["id"], self.ctx.tenant_id)
                     )
@@ -324,7 +256,7 @@ Return ONLY a JSON object mapping filename → alt text:
 
                 self.log(f"{title[:50]} → visual score {score}/100 | {len(images)} imgs | fixes: {fixes_needed or 'none'}")
 
-                if score < self.MIN_VISUAL_SCORE and fixes_needed:
+                if fixes_needed:
                     # Generate alt texts if needed
                     alt_map = {}
                     if any(f in fixes_needed for f in ("add_alt_text", "improve_alt_text", "add_keyword_alt")):
@@ -336,7 +268,7 @@ Return ONLY a JSON object mapping filename → alt text:
 
                     if new_html != html:
                         # Bump score to reflect fixes applied (alt text, lazy loading, dims, filenames)
-                        fixed_score = min(100, score + min(30, len(fixes_needed) * 5))
+                        fixed_score = self._score_images(self._extract_images_from_html(new_html),keyword)["score"]
                         db_write(
                             "UPDATE pages SET content=?, visual_score=?, updated_at=CURRENT_TIMESTAMP "
                             "WHERE id=? AND tenant_id=?",

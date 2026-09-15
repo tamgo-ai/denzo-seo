@@ -31,6 +31,19 @@ def create_app():
 
     sock.init_app(app)
 
+    @app.before_request
+    def _tenant_boundary():
+        # Defence in depth: newly added tenant routes cannot omit authorization.
+        from flask import abort, jsonify, redirect, session, url_for
+        from denzo.auth import can_access_tenant
+        tenant_id = (request.view_args or {}).get('tenant_id')
+        if tenant_id and not can_access_tenant(tenant_id):
+            if request.path.startswith('/api/'):
+                return jsonify(error='Access denied'), 403 if session.get('user_id') else 401
+            if not session.get('user_id'):
+                return redirect(url_for('auth.login'))
+            abort(403)
+
     from denzo.db import init_db
 
     @app.before_request
@@ -75,6 +88,7 @@ def create_app():
                 {"tenant_id": r["tenant_id"], "name": r["name"], "active_agent": r["active_agent_name"]}
                 for r in rows
             ]
+            db.close()
         except Exception as e:
             import logging
             logging.getLogger(__name__).error("sidebar clients error: %s", e)
@@ -176,44 +190,15 @@ def create_app():
 
 
 def _reset_stale_agents():
-    """Reset agents stuck in 'working' for >15 minutes from a previous server crash.
-    Only resets agents that have been in 'working' state for a significant time,
-    avoiding killing agents that were just started during a quick restart."""
-    import logging
+    from denzo.execution import recover_expired_jobs
+    from denzo.db import get_db
+    recover_expired_jobs()
+    db = get_db()
     try:
-        from denzo.db import get_db
-        db = get_db()
-        # Only reset agents stuck in 'working' for more than 15 minutes
-        # This avoids killing agents that were legitimately started just before a restart
-        stale = db.execute(
-            "SELECT tenant_id, name FROM agents WHERE status='working' "
-            "AND updated_at < datetime('now', '-15 minutes')"
-        ).fetchall()
-        if stale:
-            for row in stale:
-                db.execute(
-                    "UPDATE agents SET status='idle', current_task='Reset after server restart', "
-                    "last_message=NULL WHERE tenant_id=? AND name=?",
-                    (row["tenant_id"], row["name"])
-                )
-                db.execute(
-                    "INSERT INTO activity (tenant_id, type, message, agent, level) VALUES (?,?,?,?,?)",
-                    (row["tenant_id"], "system",
-                     "Agent reset to idle after server restart (was stuck in working >15 min).",
-                     row["name"], "warning")
-                )
-            db.commit()
-            logging.getLogger(__name__).warning("Reset %d stale agents (working >15 min)", len(stale))
-        else:
-            # Quick check: agents that are 'working' but <15 min — leave them alone
-            recent = db.execute(
-                "SELECT COUNT(*) AS n FROM agents WHERE status='working' "
-                "AND updated_at >= datetime('now', '-15 minutes')"
-            ).fetchone()
-            if recent and recent["n"] > 0:
-                logging.getLogger(__name__).info(
-                    "%d agent(s) in 'working' state (<15 min) — not resetting (may be legit)", recent["n"]
-                )
+        db.execute("""UPDATE agents SET status='error',current_task='Interrupted legacy execution; review and retry'
+          WHERE status IN ('working','starting') AND NOT EXISTS (
+          SELECT 1 FROM agent_jobs j WHERE j.tenant_id=agents.tenant_id AND j.agent_name=agents.name
+          AND j.status IN ('queued','running'))""")
+        db.commit()
+    finally:
         db.close()
-    except Exception as e:
-        logging.getLogger(__name__).error("stale agent reset error: %s", e)

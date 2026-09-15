@@ -34,13 +34,41 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
         super().__init__(name="Site Inventory", ctx=ctx, layer=1, color="stone")
 
     def run(self):
-        try:
-            self._run_impl()
-        except Exception as e:
-            import traceback
-            self.log(f"CRASH: {e}", "error")
-            self.log(traceback.format_exc()[-300:], "error")
-            self.set_status("error", f"SiteInventory crashed: {str(e)[:150]}")
+        from denzo.urls import site_base_url
+        self.set_status('working','Discovering site URLs')
+        base = site_base_url(self.ctx)
+        urls = self._crawl_sitemap(base)
+        method = 'sitemap' if urls else 'bounded_bfs'
+        urls = urls or self._crawl_bfs(base)
+        if base not in urls:
+            urls.insert(0,base)
+        previous = self.load_output('site_inventory') or {}
+        offset = int(previous.get('next_offset',0)) if previous.get('base_url') == base else 0
+        if offset >= len(urls):
+            offset = 0
+        budget = 500
+        batch = urls[offset:offset+budget]
+        completed, errors = 0, []
+        for url in batch:
+            if self.should_stop():
+                break
+            try:
+                data = self._fetch_page_data(url)
+                if not data:
+                    raise ValueError('Page unavailable')
+                self._insert_existing_page(data)
+                completed += 1
+            except Exception as exc:
+                errors.append({'url':url,'error':str(exc)[:160]})
+            offset += 1
+        self.save_output('site_inventory', {
+            'total_urls_found':len(urls),'pages_inventoried':completed,'errors':len(errors),
+            'failed_urls':errors,'base_url':base,'next_offset':offset if offset<len(urls) else 0,
+            'coverage':'partial' if method=='bounded_bfs' or errors or offset<len(urls) or len(urls)>=10000 else 'complete_for_discovered_urls',
+            'discovery_method':method,
+            'page_budget':budget,'completed_at':datetime.now(timezone.utc).isoformat(),
+        })
+        self.set_status('done',f'{completed} pages read; {max(0,len(urls)-offset)} remaining; {len(errors)} unavailable')
 
     def _run_impl(self):
         self.log("SiteInventoryAgent: crawling existing site...")
@@ -122,102 +150,75 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
 
     # ── Internal helpers ────────────────────────────────────────────────────
 
-    def _crawl_sitemap(self, base_url: str) -> list[str]:
-        """Try sitemap.xml and sitemap_index.xml. Returns list of URLs or empty list."""
-        from denzo.agents.utils.stealth_fetch import fetch_html
-
-        sitemap_urls = [
-            f"{base_url}/sitemap.xml",
-            f"{base_url}/sitemap_index.xml",
-            f"{base_url}/wp-sitemap.xml",  # WordPress
-        ]
-
-        for sitemap_url in sitemap_urls:
-            try:
-                result = fetch_html(sitemap_url, timeout=self.FETCH_TIMEOUT)
-                if not result["ok"]:
-                    continue
-
-                html = result["html"]
-                # Try XML parsing
-                try:
-                    root = ET.fromstring(html)
-                    # Handle both sitemap and sitemap index
-                    ns = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
-                    urls = []
-                    for loc in root.findall(".//sm:url/sm:loc", ns):
-                        urls.append(loc.text.strip())
-                    if not urls:
-                        for loc in root.findall(".//sm:sitemap/sm:loc", ns):
-                            urls.append(loc.text.strip())
-                    if urls:
-                        return urls
-                except ET.ParseError:
-                    # Might be a text sitemap (one URL per line)
-                    lines = html.strip().split("\n")
-                    urls = [l.strip() for l in lines if l.strip().startswith("http")]
-                    if urls:
-                        return urls
-
-            except Exception:
+    def _crawl_sitemap(self, base_url):
+        from collections import deque
+        from urllib.parse import urljoin, urlsplit, urldefrag
+        from denzo.auditor.safe_fetch import fetch_html
+        allowed = urlsplit(base_url).hostname
+        queue = deque((f'{base_url}/sitemap.xml',f'{base_url}/sitemap_index.xml',f'{base_url}/wp-sitemap.xml'))
+        visited, found = set(), dict()
+        while queue and len(visited)<1000 and len(found)<10000 and not self.should_stop():
+            sitemap = queue.popleft()
+            if sitemap in visited or urlsplit(sitemap).hostname != allowed:
                 continue
-
-        return []
-
-    def _crawl_bfs(self, base_url: str) -> list[str]:
-        """BFS crawl from homepage. Returns up to MAX_PAGES URLs."""
-        from denzo.agents.utils.stealth_fetch import fetch_html, parse_html
-
-        visited = set()
-        queue = [base_url]
-        discovered = [base_url]
-        depth = 0
-        parsed_base = urlparse(base_url)
-        base_domain = parsed_base.netloc
-
-        while queue and len(discovered) < self.MAX_PAGES and depth < self.MAX_DEPTH:
-            depth += 1
-            next_queue = []
-
-            for url in queue[:10]:  # max 10 per depth level
-                if url in visited:
+            visited.add(sitemap)
+            try:
+                result = fetch_html(sitemap)
+                if not result.get('ok'):
                     continue
-                visited.add(url)
-
-                try:
-                    result = fetch_html(url, timeout=self.FETCH_TIMEOUT)
-                    if not result["ok"]:
+                root = ET.fromstring(result['html'])
+                kind = root.tag.rsplit('}',1)[-1]
+                for child in root:
+                    loc = next((x.text for x in child if x.tag.rsplit('}',1)[-1]=='loc'),None)
+                    if not loc:
                         continue
+                    url = urldefrag(urljoin(sitemap,loc.strip()))[0]
+                    if urlsplit(url).hostname != allowed:
+                        continue
+                    if kind == 'sitemapindex':
+                        queue.append(url)
+                    elif kind == 'urlset':
+                        found[url] = None
+                    if len(found)>=10000:
+                        break
+            except (ValueError, OSError, ET.ParseError):
+                continue
+        return list(found)
 
-                    parsed = parse_html(result["html"])
-                    for link in parsed.get("links", []):
-                        href = link.get("href", "")
-                        if not href:
-                            continue
-                        # Resolve relative URLs
-                        full_url = urljoin(url, href)
-                        full_url = full_url.split("#")[0].split("?")[0]  # strip fragment + query
-
-                        parsed_full = urlparse(full_url)
-                        if (parsed_full.netloc == base_domain
-                                and full_url not in visited
-                                and full_url not in discovered
-                                and not full_url.endswith((".jpg", ".png", ".pdf", ".css", ".js", ".ico", ".svg"))
-                                and len(discovered) < self.MAX_PAGES):
-                            discovered.append(full_url)
-                            next_queue.append(full_url)
-
-                except Exception:
+    def _crawl_bfs(self, base_url):
+        from collections import deque
+        from urllib.parse import urljoin,urlsplit,urldefrag
+        from denzo.auditor.safe_fetch import fetch_html
+        from denzo.agents.utils.stealth_fetch import parse_html
+        queue = deque([(base_url,0)])
+        seen = set()
+        host = urlsplit(base_url).hostname
+        while queue and len(seen)<500 and not self.should_stop():
+            url, depth = queue.popleft()
+            if url in seen:
+                continue
+            seen.add(url)
+            if depth>=8:
+                continue
+            try:
+                result = fetch_html(url)
+                if not result.get('ok'):
                     continue
-
-                time.sleep(self.REQUEST_DELAY)
-            queue = next_queue
-
-        return discovered
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(result['html'],'html.parser')
+                for a in soup.find_all('a',href=True):
+                    target = urldefrag(urljoin(url,a['href']))[0]
+                    parts = urlsplit(target)
+                    if parts.scheme in ('http','https') and parts.hostname==host and not parts.query and target not in seen:
+                        queue.append((target,depth+1))
+            except (ValueError,OSError):
+                continue
+        return sorted(seen)
 
     def _fetch_page_data(self, url: str) -> dict | None:
         """Fetch and parse a single page. Returns dict or None on failure."""
-        from denzo.agents.utils.stealth_fetch import fetch_html, parse_html
+        from denzo.auditor.safe_fetch import fetch_html
+        from denzo.agents.utils.stealth_fetch import parse_html
 
         result = fetch_html(url, timeout=self.FETCH_TIMEOUT)
         if not result["ok"] or not result.get("html"):
@@ -237,7 +238,7 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
 
         # Extract slug from URL
         parsed_url = urlparse(url)
-        slug = parsed_url.path.rstrip("/").split("/")[-1] or "home"
+        slug = parsed_url.path.strip("/") or "home"
         # Remove extension
         slug = re.sub(r'\.[^.]+$', '', slug)
 
@@ -256,38 +257,35 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
             "target_keyword": target_keyword,
             "word_count": parsed.get("word_count", 0),
             "content_hash": content_hash,
-            "source_url": url,
+            "source_url": result.get("final_url", url),
+            "content": result["html"],
         }
 
-    def _insert_existing_page(self, data: dict):
-        """Insert an existing page with origin='existing', managed=0."""
-        from denzo.agents.base_agent import db_execute, db_write
-
-        # Check if this slug already exists
-        existing = db_execute(
-            "SELECT id FROM pages WHERE tenant_id=? AND slug=?",
-            (self.tenant_id, data["slug"])
-        )
-        if existing:
-            # Update the existing row with discovered metadata
-            db_write(
-                """UPDATE pages SET
-                   source_url=?, content_hash=?, origin='existing', managed=0,
-                   status='live_external'
-                   WHERE id=? AND tenant_id=?""",
-                (data["source_url"], data["content_hash"],
-                 existing[0]["id"], self.tenant_id)
-            )
-            return
-
-        db_write(
-            """INSERT INTO pages
-               (tenant_id, title, slug, type, target_keyword,
-                meta_description, source_url, content_hash,
-                origin, managed, status, created_at, updated_at)
-               VALUES (?, ?, ?, 'page', ?, ?, ?, ?, 'existing', 0, 'live_external',
-                       CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)""",
-            (self.tenant_id, data["title"], data["slug"],
-             data["target_keyword"], data["meta_description"],
-             data["source_url"], data["content_hash"])
-        )
+    def _insert_existing_page(self, data):
+        from denzo.db import get_db
+        db = get_db()
+        try:
+            db.execute('BEGIN IMMEDIATE')
+            existing = db.execute('SELECT * FROM pages WHERE tenant_id=? AND (source_url=? OR publish_url=?)',
+                                  (self.tenant_id,data['source_url'],data['source_url'])).fetchone()
+            if existing:
+                if existing['managed']:
+                    db.execute('UPDATE pages SET source_url=? WHERE id=?',(data['source_url'],existing['id']))
+                else:
+                    db.execute('UPDATE pages SET title=?,meta_description=?,content_hash=?,updated_at=CURRENT_TIMESTAMP WHERE id=?',
+                               (data['title'],data['meta_description'],data['content_hash'],existing['id']))
+            else:
+                slug = data['slug']
+                if db.execute('SELECT 1 FROM pages WHERE tenant_id=? AND slug=?',(self.tenant_id,slug)).fetchone():
+                    slug += '-external-' + hashlib.sha256(data['source_url'].encode()).hexdigest()[:10]
+                db.execute("""INSERT INTO pages(tenant_id,title,slug,type,target_keyword,meta_description,
+                          source_url,content_hash,content,origin,managed,status)
+                          VALUES (?,?,?,'page',?,?,?,?,?,'existing',0,'live_external')""",
+                           (self.tenant_id,data['title'],slug,data['target_keyword'],data['meta_description'],
+                            data['source_url'],data['content_hash'],data.get('content','')))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()

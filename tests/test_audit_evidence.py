@@ -73,7 +73,7 @@ def actual_report(monkeypatch, *, performance=95):
     monkeypatch.setattr(analyzer,'fetch_html',fetch)
     monkeypatch.setattr(robots_analyzer,'fetch_html',fetch)
     monkeypatch.setattr(sitemap_analyzer,'fetch_html',fetch)
-    monkeypatch.setattr(performance_estimator,'get_real_performance',lambda _:dict(score=performance,lab_data={},field_data={},final_url='https://www.example.com/'))
+    monkeypatch.setattr(performance_estimator,'get_lighthouse_performance',lambda _:dict(score=performance,lab_data={},field_data={},final_url='https://www.example.com/'))
     return analyzer.SiteAnalyzer('http://example.com/','example.com').run_full_analysis()
 
 

@@ -18,6 +18,8 @@ from denzo.agents.base_agent import (
     strip_json_fences,
 )
 
+from denzo.editorial import publishable
+
 # ── Agent names by layer ──────────────────────────────────────────────────────
 
 # Discovery agents (Capa 0.5) — must complete before any Layer 1+ generation
@@ -31,7 +33,7 @@ LAYER_1 = [
 LAYER_2 = ["E-E-A-T Architect", "Schema Engineer"]
 LAYER_2B = ["Vertical Matrix Generator"]  # needs EEAT done
 LAYER_3 = ["Programmatic SEO"]
-LAYER_4 = ["Content Optimizer", "Visual Content Optimizer", "GEO Optimizer", "Internal Linker"]
+LAYER_4 = ["Visual Content Optimizer", "GEO Optimizer", "Internal Linker", "Content Optimizer"]
 LAYER_4B = ["Content Freshness"]  # needs pages published
 LAYER_5 = ["GitHub Publisher", "WordPress Publisher", "Indexation Accelerator",
            "GBP Autopilot", "Video Engine"]
@@ -118,7 +120,8 @@ class PipelineDirector(TenantAwareBaseAgent):
 
         return {
             "keywords": {"total": kw_count, "high_priority": kw_high},
-            "pages": {"total": page_total, "draft": page_draft, "ready": page_ready, "published": page_pub},
+            "pages": {"total": page_total, "draft": page_draft, "ready": page_ready, "published": page_pub,
+                      "approved": sum(publishable(r) for r in db_execute("SELECT * FROM pages WHERE tenant_id=? AND status='ready'", (tid,)))},
             "quality": quality,
             "competitors": comp_count,
             "agents": agents,
@@ -141,21 +144,9 @@ class PipelineDirector(TenantAwareBaseAgent):
                 return a.get("run_count", 0) or 0
         return 0
 
-    def _all_done(self, names: list[str], agents: list) -> bool:
-        """True if ALL named agents are 'done'."""
-        statuses = {a["name"]: a["status"] for a in agents}
-        for name in names:
-            st = statuses.get(name, "unknown")
-            # Publisher self-skip counts as done
-            if st == "done":
-                continue
-            if name in LAYER_5 and st == "error":
-                # Check if it self-skipped (missing config)
-                task = next((a.get("current_task", "") for a in agents if a["name"] == name), "")
-                if "Skipped" in task or "skip" in task.lower():
-                    continue
-            return False
-        return True
+    def _all_done(self, names, agents):
+        statuses = {a['name']:a['status'] for a in agents}
+        return all(statuses.get(n) in ('done','skipped') for n in names)
 
     def _any_done(self, names: list[str], agents: list) -> bool:
         """True if at least one named agent is 'done'."""
@@ -393,212 +384,50 @@ Return ONLY valid JSON."""
 
     # ── State Machine ──────────────────────────────────────────────────────────
 
-    def _evaluate(self, state: dict) -> list[str]:
-        """
-        Python state machine — evaluates pipeline state and returns
-        a list of agent names to start this cycle. NO Claude API calls.
-        """
-        agents = state["agents"]
-        kw_total = state["keywords"]["total"]
-        kw_high = state["keywords"]["high_priority"]
-        pg_ready = state["pages"]["ready"]
-        pg_pub = state["pages"]["published"]
-        pg_draft = state["pages"]["draft"]
-        comp_count = state["competitors"]
-        avg_score = state["quality"].get("avg_score", 0) or 0
-        unscored = state["quality"].get("unscored", 0) or 0
+    def _evaluate(self, state):
+        agents = state['agents']
+        def next_stage(names, serial=False):
+            active = any(self._agent_status(n, agents) in ('working','starting') for n in names)
+            choices = self._idle_in_layer(names,agents) + self._retriable_errors(names,agents)
+            if serial:
+                if active:
+                    return []
+                for name in names:
+                    if self._agent_status(name,agents) not in ('done','skipped'):
+                        return [name] if name in choices else []
+                return []
+            return choices
 
-        to_start = []
+        if not db_execute("SELECT 1 FROM settings WHERE tenant_id=? AND key='world_state'", (self.tenant_id,)):
+            if self._all_done(DISCOVERY_AGENTS, agents):
+                self._reconcile_world_state(agents)
+                return []
+            return next_stage(DISCOVERY_AGENTS, serial=True)
 
-        # ── DISCOVERY GUARD: world_state must exist before any generation ────
-        world_state_exists = db_execute(
-            "SELECT value FROM settings WHERE tenant_id=? AND key='world_state'",
-            (self.tenant_id,)
-        )
-        if not world_state_exists:
-            # Only discovery agents can run. Block everything else.
-            discovery_idle = [a for a in DISCOVERY_AGENTS
-                              if self._agent_status(a, agents) in ("idle", "error")]
-            if discovery_idle:
-                self.log(f"[Director] DISCOVERY REQUIRED — starting: {discovery_idle}", "info")
-                for name in discovery_idle:
-                    to_start.append(name)
-            else:
-                # Discovery agents are running — wait, don't start anything else
-                discovery_running = [a for a in DISCOVERY_AGENTS
-                                     if self._agent_status(a, agents) == "working"]
-                if discovery_running:
-                    self.log(f"[Director] Discovery in progress: {discovery_running} — waiting", "info")
-                else:
-                    # All discovery done? Generate world_state
-                    self._reconcile_world_state(agents)
-            return to_start
+        # Every stage finishes before dependent work can read its outputs.
+        for stage, serial in [(LAYER_1, False), (LAYER_2+LAYER_2B, True), (LAYER_3, True), (LAYER_4, True)]:
+            if not self._all_done(stage, agents):
+                return next_stage(stage, serial=serial)
 
-        # ── Layer 1: Intelligence ───────────────────────────────────────────
-        l1_idle = self._idle_in_layer(LAYER_1, agents)
-        l1_retry = self._retriable_errors(LAYER_1, agents)
-
-        if kw_total < 20:
-            # Need keywords → start ALL idle Layer 1
-            for name in l1_idle:
-                to_start.append(name)
-            for name in l1_retry:
-                to_start.append(name)
-            if to_start:
-                self.log(f"[Director] L1 — starting intelligence agents (keywords={kw_total}, need ≥20)", "info")
-        elif comp_count < 3 and "Competitor Intel" in (l1_idle + l1_retry):
-            # Still need competitors
-            if "Competitor Intel" in l1_idle:
-                to_start.append("Competitor Intel")
-            elif "Competitor Intel" in l1_retry:
-                to_start.append("Competitor Intel")
-
-        # Keyword Clusterer: needs ≥10 keywords
-        if kw_total >= 10:
-            kc_status = self._agent_status("Keyword Clusterer", agents)
-            if kc_status == "idle":
-                to_start.append("Keyword Clusterer")
-            elif kc_status == "error" and self._agent_run_count("Keyword Clusterer", agents) < 3:
-                to_start.append("Keyword Clusterer")
-
-        # ── Layer 2: Strategy ──────────────────────────────────────────────
-        l2_idle = self._idle_in_layer(LAYER_2, agents)
-        l2_retry = self._retriable_errors(LAYER_2, agents)
-
-        if kw_total >= 20:
-            for name in l2_idle:
-                to_start.append(name)
-            for name in l2_retry:
-                to_start.append(name)
-
-        # Vertical Matrix Generator: needs E-E-A-T Architect done
-        if self._agent_status("E-E-A-T Architect", agents) == "done":
-            vmg_status = self._agent_status("Vertical Matrix Generator", agents)
-            if vmg_status == "idle":
-                to_start.append("Vertical Matrix Generator")
-            elif vmg_status == "error" and self._agent_run_count("Vertical Matrix Generator", agents) < 3:
-                to_start.append("Vertical Matrix Generator")
-
-        # ── Layer 3: Generation ────────────────────────────────────────────
-        l2_all = LAYER_2 + LAYER_2B
-        if kw_total >= 20 and self._all_done(l2_all, agents):
-            l3_idle = self._idle_in_layer(LAYER_3, agents)
-            l3_retry = self._retriable_errors(LAYER_3, agents)
-            for name in l3_idle:
-                to_start.append(name)
-            for name in l3_retry:
-                to_start.append(name)
-
-        # ── Layer 4: Optimization ──────────────────────────────────────────
-        if self._agent_status("Programmatic SEO", agents) == "done" and pg_ready >= 5:
-            l4_idle = self._idle_in_layer(LAYER_4, agents)
-            l4_retry = self._retriable_errors(LAYER_4, agents)
-            for name in l4_idle:
-                to_start.append(name)
-            for name in l4_retry:
-                to_start.append(name)
-
-        # ── Layer 5: Publishing ────────────────────────────────────────────
-        quality_ok = avg_score >= 70 or self._agent_run_count("Content Optimizer", agents) >= 5
-        publisher_ran = self._any_done(LAYER_5, agents)
-
-        _PUBLISHERS = ["GitHub Publisher", "WordPress Publisher"]
-        _INDEXERS  = ["Indexation Accelerator"]
-
-        # Publishers: start when pages are ready and quality is OK
-        if pg_ready >= 1 and quality_ok and not publisher_ran:
-            for pub_name in _PUBLISHERS:
-                pub_status = self._agent_status(pub_name, agents)
-                if pub_status == "idle":
-                    to_start.append(pub_name)
-                elif pub_status == "error":
-                    task = next((a.get("current_task", "") for a in agents if a["name"] == pub_name), "")
-                    if "Skipped" not in task and self._agent_run_count(pub_name, agents) < 3:
-                        to_start.append(pub_name)
-
-        # Indexation Accelerator: start AFTER at least one publisher is done
-        if self._any_done(_PUBLISHERS, agents):
-            ia_status = self._agent_status("Indexation Accelerator", agents)
-            if ia_status == "idle" and self._agent_run_count("Indexation Accelerator", agents) == 0:
-                to_start.append("Indexation Accelerator")
-
-        # ── Layer 4B: Content Freshness ────────────────────────────────────
-        if pg_pub >= 1:
-            cf_status = self._agent_status("Content Freshness", agents)
-            if cf_status == "idle":
-                to_start.append("Content Freshness")
-
-        # ── Layer 6: Analytics ─────────────────────────────────────────────
-        if pg_pub >= 1 or publisher_ran:
-            l6_idle = self._idle_in_layer(LAYER_6, agents)
-            for name in l6_idle:
-                # Only start analytics once
-                rc = self._agent_run_count(name, agents)
-                if rc == 0:
-                    to_start.append(name)
-
-        # ── Quality gate: re-run Content Optimizer if needed ───────────────
-        if unscored > 0 and self._agent_status("Content Optimizer", agents) == "idle":
-            co_rc = self._agent_run_count("Content Optimizer", agents)
-            if co_rc < 5:
-                to_start.append("Content Optimizer")
-
-        # Log the decision
-        if to_start:
-            self.log(f"[Director] This cycle: starting {to_start}", "info")
-            self.log(
-                f"[Director] State: kw={kw_total} comp={comp_count} "
-                f"pages(draft={pg_draft} ready={pg_ready} pub={pg_pub}) "
-                f"quality(avg={avg_score} unscored={unscored})",
-                "info"
-            )
-
-        return to_start
+        publisher = 'WordPress Publisher' if self.ctx.publisher_type == 'wordpress' else 'GitHub Publisher'
+        if state['pages'].get('approved',0) and self._agent_status(publisher,agents) not in ('done','skipped'):
+            return next_stage([publisher], serial=True)
+        if state['pages']['published']:
+            if self._agent_status('Indexation Accelerator', agents) not in ('done','skipped'):
+                return next_stage(['Indexation Accelerator'], serial=True)
+            if not self._all_done(LAYER_6,agents):
+                return next_stage(LAYER_6, serial=True)
+        return []
 
     # ── Pipeline complete detection ──────────────────────────────────────────
 
-    def _is_pipeline_complete(self, state: dict) -> bool:
-        """Determine if the pipeline has reached a natural end state."""
-        agents = state["agents"]
-        pg_ready = state["pages"]["ready"]
-        pg_pub = state["pages"]["published"]
-        avg_score = state["quality"].get("avg_score", 0) or 0
-
-        quality_ok = avg_score >= 70
-        co_exhausted = self._agent_run_count("Content Optimizer", agents) >= 5
-
-        publisher_done = False
-        publisher_skipped = False
-        for pub_name in LAYER_5:
-            st = self._agent_status(pub_name, agents)
-            task = next((a.get("current_task", "") for a in agents if a["name"] == pub_name), "")
-            if st == "done":
-                if "Skipped" in task:
-                    publisher_skipped = True
-                else:
-                    publisher_done = True
-
-        l6_all_ran = all(
-            self._agent_run_count(n, agents) > 0
-            for n in LAYER_6
-        )
-
-        # Case A: real publishing succeeded
-        if publisher_done and pg_pub >= 10 and (quality_ok or co_exhausted):
-            return True
-
-        # Case B: publishers skipped but everything else is done
-        if publisher_skipped and pg_ready >= 10 and (quality_ok or co_exhausted) and l6_all_ran:
-            if not self._publisher_skip_warned:
-                self.log(
-                    "[Director] Publishers skipped (no credentials configured). "
-                    "Pipeline did everything it could. Configure publisher settings to go live.",
-                    "warning"
-                )
-                self._publisher_skip_warned = True
-            return True
-
-        return False
+    def _is_pipeline_complete(self, state):
+        agents = state['agents']
+        if any(a['status'] in ('working','starting') for a in agents):
+            return False
+        if not self._all_done(LAYER_1+LAYER_2+LAYER_2B+LAYER_3+LAYER_4,agents):
+            return False
+        return not self._evaluate(state)
 
     # ── Deadlock Detection ────────────────────────────────────────────────────
 
@@ -620,22 +449,8 @@ Return ONLY valid JSON."""
     # ── Watchdog ──────────────────────────────────────────────────────────────
 
     def _watchdog(self):
-        """Reset agents that have been stuck in 'working' for >10 minutes."""
-        stale = db_execute(
-            """SELECT name FROM agents
-               WHERE tenant_id=? AND status='working'
-               AND updated_at < datetime('now', '-10 minutes')
-               AND name != 'Pipeline Director'""",
-            (self.ctx.tenant_id,)
-        )
-        for row in (stale or []):
-            name = row["name"]
-            db_write(
-                """UPDATE agents SET status='idle', current_task='Reset by watchdog', last_message=NULL
-                   WHERE tenant_id=? AND name=?""",
-                (self.ctx.tenant_id, name)
-            )
-            self.log(f"[Watchdog] Reset stale agent '{name}' (working >10 min)", "warning")
+        from denzo.execution import recover_expired_jobs
+        recover_expired_jobs(self.tenant_id)
 
     # ── Publisher error recovery ───────────────────────────────────────────────
 
@@ -714,7 +529,7 @@ Return ONLY valid JSON."""
             cycles += 1
             try:
                 self._watchdog()
-                self._reset_blocked_publishers()
+
 
                 # Quality gate: run after publisher is done
                 pub_rows = db_execute(
@@ -735,8 +550,8 @@ Return ONLY valid JSON."""
 
                 # Check pipeline complete
                 if self._is_pipeline_complete(state):
-                    self.log("[Director] Pipeline complete — all layers executed successfully.", "success")
-                    self.set_status("done", "Pipeline complete")
+                    self.log("[Director] Current batch finished; approvals and deployment may still be pending.", "info")
+                    self.set_status("done", "Batch finished — review content and publication status")
                     break
 
                 # Decide and execute
@@ -771,14 +586,15 @@ Return ONLY valid JSON."""
                         break
                     time.sleep(0.5)
 
-        if not self._stop_flag:
+        if self.should_stop() or self._stop_flag:
+            self.set_status("idle", "Stopped by user")
+        else:
             if cycles >= MAX_CYCLES:
                 # Ran out of cycles — pipeline not complete, save progress for resume
                 self.save_output("pipeline_progress", {"cycles_completed": cycles, "last_state": self._assess_state()})
                 self.set_status("idle", f"Paused after {cycles} cycles — click Run Pipeline to continue")
                 self.log(f"[Director] Paused after {MAX_CYCLES} cycles. Progress saved. Restart to continue.", "warning")
-            else:
-                self.set_status("done", "Pipeline complete — all layers executed")
+            # Keep the terminal status set in the loop, including errors.
         self.log("[Director] Director shutting down.", "info")
 
     def _start_agent(self, agent_name: str):
@@ -793,6 +609,9 @@ Return ONLY valid JSON."""
         elif status == "already_running":
             pass
         elif status == "prereq_failed":
+            active = db_execute("SELECT 1 FROM agents WHERE tenant_id=? AND name!='Pipeline Director' AND status IN ('working','starting')", (self.tenant_id,))
+            if not active:
+                db_write("UPDATE agents SET status='error',run_count=run_count+1,current_task=? WHERE tenant_id=? AND name=?", (result.get('message','Prerequisites unavailable'),self.tenant_id,agent_name))
             self.log(f"[Director] {agent_name} prerequisites not met: {result.get('message')}", "warning")
         else:
             self.log(f"[Director] Failed to start {agent_name}: {result.get('message')}", "error")

@@ -1,15 +1,4 @@
-"""
-Indexation Accelerator — Layer 5 (runs after publishing)
-=========================================================
-Submits newly published pages to search engines for instant crawling:
-- Google Indexing API (service account JSON key required)
-- IndexNow protocol (Bing, Yandex, Seznam) — no auth needed
-- Sitemap ping to Google + Bing
-
-Velocity-controlled: submits in batches of 10-20 with randomized delays
-to simulate natural publishing cadence. Google's algorithm detects
-mass page dumps and may throttle crawling or apply algorithmic penalties.
-"""
+"""Submit public URLs for discovery. Acceptance does not establish indexation."""
 import json
 import time
 import random
@@ -57,13 +46,16 @@ class IndexationAccelerator(TenantAwareBaseAgent):
         if not urls:
             return 0
 
+        from denzo.urls import site_base_url
+        from urllib.parse import urlsplit
+        base = site_base_url(self.ctx)
         try:
             resp = requests.post(
                 "https://api.indexnow.org/indexnow",
                 json={
-                    "host": (self.ctx.pages_domain or self.ctx.domain or "").replace("https://", "").replace("http://", "").split("/")[0],
+                    "host": urlsplit(base).hostname,
                     "key": key,
-                    "keyLocation": f"{(self.ctx.pages_domain or self.ctx.domain or '').rstrip('/')}/{key}.txt",
+                    "keyLocation": f"{base}/{key}.txt",
                     "urlList": urls,
                 },
                 headers={"Content-Type": "application/json"},
@@ -83,6 +75,10 @@ class IndexationAccelerator(TenantAwareBaseAgent):
         Automatically checks if domain is verified. Uses IndexNow as fallback.
         ONE service account covers ALL tenants. Zero per-tenant setup."""
         from denzo.agents.utils.google_verification import _get_credentials, is_domain_verified
+        eligible = {r['publish_url'] for r in db_execute("SELECT publish_url,schema_markup FROM pages WHERE tenant_id=? AND status='published'", (self.tenant_id,)) if google_indexing_eligible(r['schema_markup'])}
+        urls = [url for url in urls if url in eligible]
+        if not urls:
+            return 0
 
         domain = (self.ctx.pages_domain or self.ctx.domain or "").replace("https://", "").replace("http://", "").split("/")[0]
         if not domain or not is_domain_verified(domain):
@@ -121,88 +117,37 @@ class IndexationAccelerator(TenantAwareBaseAgent):
 
         return submitted
 
-    def _publish_key_file(self, key: str) -> bool:
-        """Publish the IndexNow key verification file to the domain root.
-        IndexNow requires {key}.txt to be accessible at the domain root.
-        For GitHub: commits the file to the repo. For WordPress: creates a page."""
-        domain = (self.ctx.pages_domain or self.ctx.domain or "").rstrip("/")
-        if not domain:
-            return False
-
-        publisher = self.ctx.publisher_type or "github"
-        key_content = key  # the file only contains the key itself
-
-        if publisher == "github" and self.ctx.github_repo and self.ctx.github_token:
-            try:
+    def _publish_key_file(self, key):
+        from denzo.urls import site_base_url
+        from denzo.auditor.safe_fetch import fetch_html
+        from denzo.agents.base_agent import build_llms_txt
+        base = site_base_url(self.ctx)
+        try:
+            existing = fetch_html(f'{base}/{key}.txt')
+            if existing.get('ok') and existing['html'].strip()==key:
+                return True
+            if self.ctx.publisher_type=='wordpress':
+                response = requests.post(self.ctx.wp_url.rstrip('/')+'/wp-json/denzo-seo/v1/resources',
+                    auth=(self.ctx.wp_user,self.ctx.wp_app_password),
+                    json={'indexnow_key':key,'llms':build_llms_txt(self.ctx,base_url=base)},timeout=20)
+                response.raise_for_status()
+            elif self.ctx.github_repo and self.ctx.github_token:
                 import base64
+                from denzo.agents.layer4_publishing.github_publisher import GitHubPublisher
+                publisher = GitHubPublisher(self.ctx)
                 session = requests.Session()
-                session.headers.update({
-                    "Authorization": f"Bearer {self.ctx.github_token}",
-                    "Accept": "application/vnd.github+json",
-                    "X-GitHub-Api-Version": "2022-11-28"
-                })
-                path = f"{key}.txt"
-                api_url = f"https://api.github.com/repos/{self.ctx.github_repo}/contents/{path}"
-                content_b64 = base64.b64encode(key_content.encode("utf-8")).decode("utf-8")
-
-                # Check if file exists (for SHA)
-                try:
-                    r = session.get(api_url, params={"ref": self.ctx.github_branch or "main"}, timeout=15)
-                    sha = r.json().get("sha") if r.status_code == 200 else None
-                except Exception:
-                    sha = None
-
-                payload = {"message": "SEO: publish IndexNow key for Bing/Yandex indexation",
-                          "content": content_b64, "branch": self.ctx.github_branch or "main"}
-                if sha:
-                    payload["sha"] = sha
-
-                r = session.put(api_url, json=payload, timeout=20)
-                if r.status_code in (200, 201):
-                    self.log(f"✓ IndexNow key published: {domain}/{key}.txt", "success")
-                    return True
-                else:
-                    self.log(f"IndexNow key publish failed: HTTP {r.status_code}", "warning")
-            except Exception as e:
-                self.log(f"IndexNow key publish error: {e}", "warning")
-
-        elif publisher == "wordpress" and self.ctx.wp_url and self.ctx.wp_user and self.ctx.wp_app_password:
-            try:
-                wp_url = self.ctx.wp_url.rstrip("/")
-                api_base = f"{wp_url}/wp-json/wp/v2"
-                auth = (self.ctx.wp_user, self.ctx.wp_app_password)
-
-                # Create a page with slug = the key
-                r = requests.post(
-                    f"{api_base}/pages",
-                    auth=auth, timeout=15,
-                    json={
-                        "title": f"IndexNow Key: {key[:8]}...",
-                        "slug": key,
-                        "content": f"<!-- wp:html --><pre>{key_content}</pre><!-- /wp:html -->",
-                        "status": "publish",
-                    }
-                )
-                if r.status_code in (200, 201):
-                    self.log(f"✓ IndexNow key page created: {wp_url}/{key}", "success")
-                    return True
-                elif r.status_code == 400 and "already exists" in (r.json().get("message", "") if r.ok else ""):
-                    self.log(f"IndexNow key page already exists: {wp_url}/{key}", "info")
-                    return True
-                else:
-                    self.log(f"IndexNow key page creation: HTTP {r.status_code}", "warning")
-            except Exception as e:
-                self.log(f"IndexNow key WP publish error: {e}", "warning")
-
-        else:
-            man_url = f"{domain}/{key}.txt"
-            self.log(
-                f"IndexNow key file must be published MANUALLY at: {man_url} (content: '{key}'). "
-                f"No publisher credentials configured to do this automatically.",
-                "warning"
-            )
-
-        return False
+                session.headers.update({'Authorization':f'Bearer {self.ctx.github_token}','Accept':'application/vnd.github+json'})
+                prefix = (self.ctx.github_path_prefix or '').strip('/')
+                prefix = (prefix+'/' if prefix else '') + ('public/' if self.ctx.github_format=='nextjs' else '')
+                if not publisher._publish_file(session,self.ctx.github_repo,self.ctx.github_branch or 'main',prefix+key+'.txt',base64.b64encode(key.encode()).decode(),'SEO: IndexNow verification'):
+                    return False
+            else:
+                return False
+            live = fetch_html(f'{base}/{key}.txt')
+            return bool(live.get('ok') and live['html'].strip()==key)
+        except Exception as exc:
+            self.log(f'IndexNow key not yet accessible: {type(exc).__name__}', 'warning')
+            return False
 
     def _ping_sitemap(self, sitemap_url: str) -> None:
         """Submit sitemap to Google Search Console via global service account."""
@@ -240,105 +185,57 @@ class IndexationAccelerator(TenantAwareBaseAgent):
             self.log(f"GSC sitemap: {str(e)[:80]}", "info")
 
     def run(self):
-        self.log("Indexation Accelerator starting — submitting URLs to search engines...")
-        self.set_status("working", "Finding newly published pages")
-
-        domain = self.ctx.pages_domain or self.ctx.domain or ""
-        if not domain:
-            self.log("No domain configured. Add pages_domain or domain in Settings.", "warning")
-            self.set_status("idle", "No domain — skip")
-            return
-
-        # Load IndexNow key
-        indexnow_key = self._get_indexnow_key()
-
-        # Find pages published but not yet submitted for indexation
-        # We track this via notes tag [INDEXED]
-        pages = db_execute(
-            """SELECT id, title, slug, publish_url FROM pages
-               WHERE tenant_id=? AND status='published'
-               AND publish_url IS NOT NULL
-               AND (notes IS NULL OR notes NOT LIKE '%[INDEXED]%')
-               ORDER BY published_at DESC LIMIT 200""",
-            (self.ctx.tenant_id,)
-        )
-
+        from denzo.urls import site_base_url
+        self.set_status('working','Submitting verified public URLs for discovery')
+        pages = [dict(r) for r in db_execute("""SELECT * FROM pages WHERE tenant_id=? AND status='published'
+          AND deployment_status='verified' AND publish_url IS NOT NULL
+          AND (notes IS NULL OR notes NOT LIKE '%[SUBMITTED]%') ORDER BY published_at LIMIT 200""", (self.tenant_id,))]
         if not pages:
-            self.log("All published pages already submitted for indexation.", "info")
-            self.set_status("done", "All pages up to date")
+            self.set_status('done','No new verified URLs to submit')
             return
-
-        total = len(pages)
-        self.log(f"Found {total} pages to submit for indexation (batches of {self.BATCH_SIZE})")
-
-        # Build full URLs
-        url_map = {}
-        for p in pages:
-            pub_url = p["publish_url"] or ""
-            if pub_url.startswith("/"):
-                pub_url = domain.rstrip("/") + pub_url
-            elif not pub_url.startswith("http"):
-                pub_url = domain.rstrip("/") + "/" + pub_url
-            url_map[p["id"]] = pub_url
-
-        all_urls = list(url_map.values())
-
-        # ── Step 0: Publish IndexNow key file so verification works ──────
-        key_published = self._publish_key_file(indexnow_key)
-
-        # ── Step 1: IndexNow (fast, no auth) ──────────────────────────────
-        self.set_status("working", "Submitting to IndexNow (Bing/Yandex)")
-        inow_submitted = 0
-        inow_batches = [all_urls[i:i + self.BATCH_SIZE] for i in range(0, len(all_urls), self.BATCH_SIZE)]
-
-        for batch_idx, batch in enumerate(inow_batches):
+        key = self._get_indexnow_key()
+        key_ready = self._publish_key_file(key)
+        acknowledged = set()
+        if key_ready:
+            for offset in range(0,len(pages),self.BATCH_SIZE):
+                if self.should_stop():
+                    break
+                batch = pages[offset:offset+self.BATCH_SIZE]
+                if self._indexnow_submit([p['publish_url'] for p in batch],key)==len(batch):
+                    acknowledged.update(p['id'] for p in batch)
+        for page in pages:
             if self.should_stop():
                 break
-            n = self._indexnow_submit(batch, indexnow_key)
-            inow_submitted += n
-            self.log(f"IndexNow batch {batch_idx + 1}/{len(inow_batches)}: {n} URLs", "info")
-
-            # Velocity control: random delay between batches
-            if batch_idx < len(inow_batches) - 1:
-                delay = random.randint(self.MIN_DELAY, self.MAX_DELAY)
-                self.log(f"Waiting {delay}s before next batch (velocity control)...", "info")
-                for _ in range(delay):
-                    if self.should_stop():
-                        break
-                    time.sleep(1)
-
-        self.log(f"IndexNow: {inow_submitted}/{total} URLs submitted", "success" if inow_submitted > 0 else "warning")
-
-        # ── Step 2: Google Indexing API (if configured) ───────────────────
+            if google_indexing_eligible(page.get('schema_markup')) and self._google_indexing_notify([page['publish_url']])==1:
+                acknowledged.add(page['id'])
+        for page_id in acknowledged:
+            db_write("UPDATE pages SET notes=COALESCE(notes,'')||' [SUBMITTED]' WHERE tenant_id=? AND id=?", (self.tenant_id,page_id))
         if not self.should_stop():
-            self.set_status("working", "Submitting to Google Indexing API")
-            google_submitted = self._google_indexing_notify(all_urls[:100])  # cap at 100 (Google quotas)
-            if google_submitted > 0:
-                self.log(f"Google Indexing API: {google_submitted}/{min(total, 100)} URLs submitted", "success")
+            suffix = '/wp-sitemap.xml' if self.ctx.publisher_type=='wordpress' else '/sitemap.xml'
+            self._ping_sitemap(site_base_url(self.ctx)+suffix)
+        self.set_status('done' if acknowledged else 'error', f'{len(acknowledged)}/{len(pages)} URLs accepted for discovery; indexation is not confirmed')
 
-        # ── Step 3: Sitemap ping ─────────────────────────────────────────
-        if not self.should_stop():
-            self.set_status("working", "Pinging sitemaps")
-            sitemap_url = f"{domain.rstrip('/')}/sitemap.xml"
-            self._ping_sitemap(sitemap_url)
-            # Also ping WordPress sitemap if present
-            wp_sitemap = f"{domain.rstrip('/')}/wp-sitemap.xml"
-            self._ping_sitemap(wp_sitemap)
 
-        # ── Step 4: Mark pages as indexed ─────────────────────────────────
-        for pid in url_map:
-            db_write(
-                "UPDATE pages SET notes=COALESCE(notes||' ','')||'[INDEXED]', "
-                "updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
-                (pid, self.ctx.tenant_id)
-            )
-
-        self.log(
-            f"Indexation complete: {inow_submitted} IndexNow + {google_submitted if 'google_submitted' in dir() else 0} Google + sitemap pings. "
-            f"Total pages: {total}",
-            "success"
-        )
-        self.set_status(
-            "done",
-            f"{inow_submitted} submitted to search engines"
-        )
+def google_indexing_eligible(schema):
+    from denzo.urls import schema_json
+    try:
+        data = json.loads(schema_json(schema))
+    except (ValueError,TypeError):
+        return False
+    def visit(node):
+        if isinstance(node,list):
+            return any(visit(x) for x in node)
+        if not isinstance(node,dict):
+            return False
+        kind = node.get('@type')
+        types = kind if isinstance(kind,list) else [kind]
+        if 'JobPosting' in types and all(node.get(k) for k in ('title','datePosted','hiringOrganization')):
+            return True
+        if 'VideoObject' in types:
+            events = node.get('publication',[])
+            if isinstance(events,dict):
+                events=[events]
+            if any(isinstance(e,dict) and e.get('@type')=='BroadcastEvent' and e.get('isLiveBroadcast') is True for e in events):
+                return True
+        return any(visit(v) for v in node.values() if isinstance(v,(dict,list)))
+    return visit(data)

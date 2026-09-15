@@ -5,13 +5,15 @@
 {% block content %}
 <div class="space-y-5" x-data="{
   autopilot: {{ 'true' if autopilot_on else 'false' }},
-  toggleAutopilot() {
-    this.autopilot = !this.autopilot;
-    fetch('{{ url_for('lite.toggle_autopilot', tenant_id=tenant_id) }}', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({enabled: this.autopilot})
-    });
+  async toggleAutopilot() {
+    try {
+      const response = await fetch('{{ url_for('lite.toggle_autopilot', tenant_id=tenant_id) }}', {
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({enabled: !this.autopilot})
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not save schedule');
+      window.location.reload();
+    } catch (error) { alert(error.message); }
   }
 }">
 
@@ -35,7 +37,7 @@
     <div class="lite-card p-5">
       <p class="text-xs text-gray-400 font-medium uppercase tracking-wide">GEO Citations</p>
       <p class="text-3xl font-bold text-gray-900 mt-1">{{ stats.geo_citations }}%</p>
-      <p class="text-xs text-gray-400 mt-1">AI citation rate</p>
+      <p class="text-xs text-gray-400 mt-1">Brand mention rate (model responses)</p>
     </div>
   </div>
 
@@ -50,8 +52,8 @@
       <div>
         <p class="font-semibold text-gray-900 text-sm">Pipeline Autopilot</p>
         <p class="text-xs text-gray-400 mt-0.5">
-          <span x-show="autopilot">Publishing 1 article per day. Next: <strong class="text-gray-700">{{ next_run or 'Tomorrow 9am' }}</strong></span>
-          <span x-show="!autopilot" x-cloak>Paused — no articles will publish until you turn it on.</span>
+          <span x-show="autopilot">Daily preparation and publishing of approved content. Next check: <strong class="text-gray-700">{{ next_run or 'Not scheduled' }}</strong></span>
+          <span x-show="!autopilot" x-cloak>Daily schedule paused.</span>
         </p>
       </div>
     </div>

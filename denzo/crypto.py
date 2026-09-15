@@ -12,6 +12,10 @@ Requires DENZO_ENCRYPTION_KEY in .env (generate with Fernet.generate_key()).
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from cryptography.fernet import Fernet
+
 import logging
 import os
 
