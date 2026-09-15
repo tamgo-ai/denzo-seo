@@ -54,12 +54,59 @@ def get_real_performance(url: str) -> dict:
         return None
 
 
+_LH_CACHE_TTL_HOURS = 24
+
+
+def _lh_cache_get(url: str):
+    """Return a cached Lighthouse result for this URL within the TTL, else None."""
+    import json
+    from denzo.db import get_db
+
+    db = get_db()
+    try:
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS lighthouse_cache (url TEXT PRIMARY KEY, result_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"
+        )
+        row = db.execute(
+            "SELECT result_json FROM lighthouse_cache WHERE url=? AND created_at > datetime('now', ?)",
+            (url, f"-{_LH_CACHE_TTL_HOURS} hours"),
+        ).fetchone()
+        return json.loads(row["result_json"]) if row else None
+    finally:
+        db.close()
+
+
+def _lh_cache_put(url: str, result: dict):
+    import json
+    from denzo.db import get_db
+
+    db = get_db()
+    try:
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS lighthouse_cache (url TEXT PRIMARY KEY, result_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"
+        )
+        db.execute(
+            "INSERT INTO lighthouse_cache(url, result_json, created_at) VALUES (?,?,CURRENT_TIMESTAMP) ON CONFLICT(url) DO UPDATE SET result_json=excluded.result_json, created_at=CURRENT_TIMESTAMP",
+            (url, json.dumps(result)),
+        )
+        db.commit()
+    finally:
+        db.close()
+
+
 def get_lighthouse_performance(url: str) -> dict:
     """Run local Lighthouse (headless Chrome) for lab performance.
 
     Replaces the Google PageSpeed Insights API so the auditor does not depend
     on an enabled GCP project. Returns the same shape as get_real_performance
-    but with lab data only (no CrUX field data)."""
+    but with lab data only (no CrUX field data).
+
+    Results are cached per URL in SQLite for a day so that re-auditing the same
+    page returns a stable score instead of a fresh, noisy Lighthouse lab run."""
+    cache_key = url.rstrip("/")
+    cached = _lh_cache_get(cache_key)
+    if cached:
+        return cached
     try:
         import json
         import shutil
@@ -76,6 +123,11 @@ def get_lighthouse_performance(url: str) -> dict:
         ]
         from denzo.processes import browser_slot,run_bounded
         with browser_slot():
+            # Re-check inside the shared-Chrome lock: a concurrent audit of the
+            # same URL may have just cached its Lighthouse run while we waited.
+            cached = _lh_cache_get(cache_key)
+            if cached:
+                return cached
             proc = run_bounded(cmd,timeout=180)
         if proc.returncode != 0:
             logger.warning("lighthouse failed (%s)", proc.returncode)
@@ -84,6 +136,7 @@ def get_lighthouse_performance(url: str) -> dict:
         result = _parse_psi_response({'lighthouseResult': data})
         if not valid_score(result.get('score')):
             return None
+        _lh_cache_put(cache_key, result)
         return result
     except Exception as e:
         logger.warning("lighthouse unavailable (%s)", type(e).__name__)

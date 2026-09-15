@@ -26,8 +26,13 @@ def kill_descendants(processes):
 
 
 @contextmanager
-def browser_slot(timeout=30):
-    """One Chrome audit per shared SQLite installation, including public audits."""
+def browser_slot(timeout=600):
+    """One Chrome audit per shared SQLite installation, including public audits.
+
+    The wait is generous so that when several audits run in parallel (see
+    DENZO_MAX_RUNNING_AUDITS) the non-browser work overlaps and only the
+    Lighthouse step queues behind the single shared Chrome, instead of failing.
+    """
     import fcntl
     from denzo.db import DB_PATH
 
