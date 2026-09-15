@@ -35,20 +35,36 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
 
     def run(self):
         from denzo.urls import site_base_url
+        from denzo.runtime_limits import setting
         self.set_status('working','Discovering site URLs')
         base = site_base_url(self.ctx)
-        urls = self._crawl_sitemap(base)
-        method = 'sitemap' if urls else 'bounded_bfs'
-        urls = urls or self._crawl_bfs(base)
+        previous = self.load_output('site_inventory') or {}
+        pending = self.load_output('site_inventory_urls') or {}
+        resuming=previous.get('base_url')==base and previous.get('next_offset') and pending.get('base_url')==base
+        if resuming:
+            urls=pending.get('urls',[])
+            method=previous.get('discovery_method','bounded_bfs')
+            self._discovery_partial=previous.get('coverage')=='partial'
+        else:
+            urls = self._crawl_sitemap(base)
+            method = 'sitemap' if urls else 'bounded_bfs'
+            urls = urls or self._crawl_bfs(base)
         if base not in urls:
             urls.insert(0,base)
-        previous = self.load_output('site_inventory') or {}
+        self.save_output('site_inventory_urls',{'base_url':base,'urls':urls})
         offset = int(previous.get('next_offset',0)) if previous.get('base_url') == base else 0
         if offset >= len(urls):
             offset = 0
-        budget = 500
+        budget = setting('DENZO_INVENTORY_PAGE_BATCH',50,1,100)
         batch = urls[offset:offset+budget]
         completed, errors = 0, []
+        def checkpoint():
+            self.save_output('site_inventory', {
+                'total_urls_found':len(urls),'pages_inventoried':completed,'errors':len(errors),
+                'failed_urls':errors,'base_url':base,'next_offset':offset if offset<len(urls) else 0,
+                'coverage':'partial' if method=='bounded_bfs' or errors or offset<len(urls) or getattr(self,'_discovery_partial',False) or len(urls)>=10000 else 'complete_for_discovered_urls',
+                'discovery_method':method,'page_budget':budget,'completed_at':datetime.now(timezone.utc).isoformat(),
+            })
         for url in batch:
             if self.should_stop():
                 break
@@ -61,13 +77,9 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
             except Exception as exc:
                 errors.append({'url':url,'error':str(exc)[:160]})
             offset += 1
-        self.save_output('site_inventory', {
-            'total_urls_found':len(urls),'pages_inventoried':completed,'errors':len(errors),
-            'failed_urls':errors,'base_url':base,'next_offset':offset if offset<len(urls) else 0,
-            'coverage':'partial' if method=='bounded_bfs' or errors or offset<len(urls) or len(urls)>=10000 else 'complete_for_discovered_urls',
-            'discovery_method':method,
-            'page_budget':budget,'completed_at':datetime.now(timezone.utc).isoformat(),
-        })
+            if offset%5==0:
+                checkpoint()
+        checkpoint()
         self.set_status('done',f'{completed} pages read; {max(0,len(urls)-offset)} remaining; {len(errors)} unavailable')
 
     def _run_impl(self):
@@ -157,13 +169,13 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
         allowed = urlsplit(base_url).hostname
         queue = deque((f'{base_url}/sitemap.xml',f'{base_url}/sitemap_index.xml',f'{base_url}/wp-sitemap.xml'))
         visited, found = set(), dict()
-        while queue and len(visited)<1000 and len(found)<10000 and not self.should_stop():
+        while queue and len(visited)<30 and len(found)<10000 and not self.should_stop():
             sitemap = queue.popleft()
             if sitemap in visited or urlsplit(sitemap).hostname != allowed:
                 continue
             visited.add(sitemap)
             try:
-                result = fetch_html(sitemap)
+                result = fetch_html(sitemap,timeout=self.FETCH_TIMEOUT)
                 if not result.get('ok'):
                     continue
                 root = ET.fromstring(result['html'])
@@ -176,13 +188,17 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
                     if urlsplit(url).hostname != allowed:
                         continue
                     if kind == 'sitemapindex':
-                        queue.append(url)
+                        if len(queue)<1000:
+                            queue.append(url)
+                        else:
+                            self._discovery_partial=True
                     elif kind == 'urlset':
                         found[url] = None
                     if len(found)>=10000:
                         break
             except (ValueError, OSError, ET.ParseError):
                 continue
+        self._discovery_partial=getattr(self,'_discovery_partial',False) or bool(queue)
         return list(found)
 
     def _crawl_bfs(self, base_url):
@@ -191,9 +207,10 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
         from denzo.auditor.safe_fetch import fetch_html
         from denzo.agents.utils.stealth_fetch import parse_html
         queue = deque([(base_url,0)])
+        discovered={base_url}
         seen = set()
         host = urlsplit(base_url).hostname
-        while queue and len(seen)<500 and not self.should_stop():
+        while queue and len(seen)<50 and not self.should_stop():
             url, depth = queue.popleft()
             if url in seen:
                 continue
@@ -201,7 +218,7 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
             if depth>=8:
                 continue
             try:
-                result = fetch_html(url)
+                result = fetch_html(url,timeout=self.FETCH_TIMEOUT)
                 if not result.get('ok'):
                     continue
                 from bs4 import BeautifulSoup
@@ -209,11 +226,12 @@ class SiteInventoryAgent(TenantAwareBaseAgent):
                 for a in soup.find_all('a',href=True):
                     target = urldefrag(urljoin(url,a['href']))[0]
                     parts = urlsplit(target)
-                    if parts.scheme in ('http','https') and parts.hostname==host and not parts.query and target not in seen:
+                    if parts.scheme in ('http','https') and parts.hostname==host and not parts.query and target not in discovered and len(discovered)<10000:
+                        discovered.add(target)
                         queue.append((target,depth+1))
             except (ValueError,OSError):
                 continue
-        return sorted(seen)
+        return sorted(discovered)
 
     def _fetch_page_data(self, url: str) -> dict | None:
         """Fetch and parse a single page. Returns dict or None on failure."""

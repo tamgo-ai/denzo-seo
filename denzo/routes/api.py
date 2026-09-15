@@ -25,6 +25,8 @@ def run_pipeline(tenant_id):
         return jsonify({"error": "Access denied"}), 403
 
     result = AgentRunner.start(tenant_id, "Pipeline Director")
+    if result['status']=='busy':
+        return jsonify({'error':result['message'],'status':'busy'}),429,{'Retry-After':str(result.get('retry_after',30))}
     if result["status"] == "already_running":
         return jsonify({"error": "Director already running"}), 409
     if result["status"] == "error":
@@ -77,6 +79,8 @@ def start_agent(tenant_id, agent_name):
         return jsonify({"error": f"Unknown agent: {agent_name}"}), 400
 
     result = AgentRunner.start(tenant_id, agent_name)
+    if result['status']=='busy':
+        return jsonify({'error':result['message'],'status':'busy'}),429,{'Retry-After':str(result.get('retry_after',30))}
     if result["status"] == "already_running":
         return jsonify({"error": "Agent already running"}), 409
     if result["status"] == "prereq_failed":

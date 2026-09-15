@@ -98,50 +98,51 @@ def sync_last_n_days(tenant_id: str, n_days: int = 28, log=None) -> dict:
     # Page through results — GSC caps at 25k rows per page.
     start_row = 0
     page_size = 5000
-    while True:
-        rows = query_search_analytics(
-            tenant_id, site_url,
-            start_date=start_str, end_date=end_str,
-            dimensions=["date", "query", "page"],
-            row_limit=page_size,
-            start_row=start_row,
-        )
-        if not rows:
-            break
-
-        for r in rows:
-            keys = r.get("keys") or []
-            if len(keys) != 3:
-                continue
-            d, q, p = keys
-            clicks      = int(r.get("clicks", 0) or 0)
-            impressions = int(r.get("impressions", 0) or 0)
-            ctr         = float(r.get("ctr", 0) or 0.0)
-            position    = float(r.get("position", 0) or 0.0)
-            cur = db.execute(
-                """INSERT INTO gsc_queries (tenant_id, date, query, page,
-                                            clicks, impressions, ctr, position)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                   ON CONFLICT(tenant_id, date, query, page) DO UPDATE SET
-                       clicks      = excluded.clicks,
-                       impressions = excluded.impressions,
-                       ctr         = excluded.ctr,
-                       position    = excluded.position,
-                       fetched_at  = CURRENT_TIMESTAMP""",
-                (tenant_id, d, q, p, clicks, impressions, ctr, position),
+    from denzo.runtime_limits import check_cancelled,setting
+    import hashlib,json
+    seen=set()
+    truncated=False
+    stop_reason=None
+    try:
+        for _ in range(setting('DENZO_GSC_MAX_BATCHES',20,1,100)):
+            check_cancelled()
+            rows = query_search_analytics(
+                tenant_id, site_url,start_date=start_str,end_date=end_str,
+                dimensions=['date','query','page'],row_limit=page_size,start_row=start_row,
             )
-            if cur.rowcount == 1:
-                inserted += 1
-            else:
-                updated += 1
-            total_rows += 1
-        db.commit()
-
-        if len(rows) < page_size:
-            break
-        start_row += page_size
-
-    db.close()
+            if not rows:
+                break
+            signature=hashlib.sha256(json.dumps([r.get('keys') for r in rows]).encode()).hexdigest()
+            if signature in seen:
+                truncated,stop_reason=True,'Provider repeated a results page'
+                break
+            seen.add(signature)
+            for index,r in enumerate(rows):
+                if index%100==0:
+                    check_cancelled()
+                keys=r.get('keys') or []
+                if len(keys)!=3:
+                    continue
+                d,q,p=keys
+                clicks=int(r.get('clicks',0) or 0)
+                impressions=int(r.get('impressions',0) or 0)
+                ctr=float(r.get('ctr',0) or 0)
+                position=float(r.get('position',0) or 0)
+                db.execute("""INSERT INTO gsc_queries(tenant_id,date,query,page,clicks,impressions,ctr,position)
+                    VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(tenant_id,date,query,page) DO UPDATE SET
+                    clicks=excluded.clicks,impressions=excluded.impressions,ctr=excluded.ctr,
+                    position=excluded.position,fetched_at=CURRENT_TIMESTAMP""", (tenant_id,d,q,p,clicks,impressions,ctr,position))
+                inserted+=1
+                total_rows+=1
+            check_cancelled()
+            db.commit()
+            if len(rows)<page_size:
+                break
+            start_row+=page_size
+        else:
+            truncated,stop_reason=True,'Per-run GSC pagination limit reached'
+    finally:
+        db.close()
 
     summary = {
         "site":        site_url,
@@ -150,6 +151,8 @@ def sync_last_n_days(tenant_id: str, n_days: int = 28, log=None) -> dict:
         "rows":        total_rows,
         "inserted":    inserted,
         "updated":     updated,
+        "truncated": truncated,
+        "stop_reason": stop_reason,
     }
     if log:
         log(f"GSC sync done: {total_rows} rows ({inserted} new, {updated} updated)")

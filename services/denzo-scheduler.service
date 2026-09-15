@@ -2,9 +2,15 @@
 Description=DENZO-SEO Daily scheduler and publication verifier
 After=network.target redis-server.service
 Wants=redis-server.service
+StartLimitIntervalSec=300
+StartLimitBurst=3
 
 [Service]
 Type=simple
+Slice=denzo-background.slice
+OOMPolicy=kill
+KillMode=control-group
+TimeoutStopSec=30
 User=root
 WorkingDirectory=/root/denzo-seo
 Environment=DENZO_EXECUTOR=rq

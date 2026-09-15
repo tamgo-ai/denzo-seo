@@ -209,6 +209,7 @@ class VisualContentOptimizer(TenantAwareBaseAgent):
         skipped = 0
         round_num = 0
         MAX_ROUNDS = 1  # One measured pass; unresolved issues remain visible.
+        from denzo.runtime_limits import setting
 
         while not self.should_stop() and round_num < MAX_ROUNDS:
             round_num += 1
@@ -217,7 +218,7 @@ class VisualContentOptimizer(TenantAwareBaseAgent):
                 "WHERE tenant_id=? AND status='ready' AND content IS NOT NULL "
                 "AND (visual_score IS NULL OR visual_score < ?) "
                 "ORDER BY id LIMIT ?",
-                (self.ctx.tenant_id, self.MIN_VISUAL_SCORE, self.BATCH)
+                (self.ctx.tenant_id, self.MIN_VISUAL_SCORE, min(self.BATCH,setting('DENZO_PAGE_BATCH_SIZE',10,1,50)))
             )
 
             if not pages:

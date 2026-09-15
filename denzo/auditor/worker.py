@@ -38,6 +38,8 @@ def main():
             heartbeat(worker_id, job['audit_id'])
             process.join(min(30, max(0, deadline-time.monotonic())))
         if process.is_alive():
+            from denzo.processes import descendants,kill_descendants
+            kill_descendants(descendants(process.pid))
             process.terminate()
             process.join(10)
             if process.is_alive():

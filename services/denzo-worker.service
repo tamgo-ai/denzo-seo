@@ -2,15 +2,21 @@
 Description=DENZO-SEO Agent Worker (RQ)
 After=network.target redis-server.service
 Wants=redis-server.service
+StartLimitIntervalSec=300
+StartLimitBurst=3
 
 [Service]
 Type=simple
+Slice=denzo-background.slice
+OOMPolicy=kill
+KillMode=control-group
+TimeoutStopSec=30
 User=root
 WorkingDirectory=/root/denzo-seo
 Environment=DENZO_EXECUTOR=rq
 Environment=REDIS_URL=redis://localhost:6379/0
 EnvironmentFile=/root/denzo-seo/.env
-ExecStart=/root/denzo-seo/.venv/bin/rq worker denzo-seo --url ${REDIS_URL}
+ExecStart=/root/denzo-seo/.venv/bin/rq worker denzo-seo --worker-class denzo.worker.BoundedWorker --url ${REDIS_URL}
 Restart=always
 RestartSec=10
 StandardOutput=journal

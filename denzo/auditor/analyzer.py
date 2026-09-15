@@ -52,11 +52,17 @@ class SiteAnalyzer:
         results = analyze_onpage(final_url, html, headers, is_local)
         results['_industry'] = industry
         self.progress(25, 'Checking crawler access, sitemaps and measured mobile performance')
+        from denzo.agents.base_agent import _sqlite_local,close_thread_connection
+        parent_token=getattr(_sqlite_local,'job_token',None)
         def run(name, fn):
+            _sqlite_local.job_token=parent_token
             try: return fn()
             except Exception as exc:
                 logging.getLogger(__name__).warning('Audit module %s unavailable: %s', name, type(exc).__name__)
                 return dict(score=None, status='unavailable', findings=[], error=f'{name} could not be measured')
+            finally:
+                _sqlite_local.job_token=None
+                close_thread_connection()
         with ThreadPoolExecutor(max_workers=3) as pool:
             robots_future = pool.submit(run, 'robots', lambda: analyze_robots(final_url, html, domain))
             performance_future = pool.submit(run, 'performance', lambda: estimate_performance(final_url, html, domain))

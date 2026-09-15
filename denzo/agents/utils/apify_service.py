@@ -103,9 +103,12 @@ class ApifyService:
                 self._log(f"[Apify] {actor_id} returned no run object", "warning")
                 return []
 
-            items = list(
-                client.dataset(run["defaultDatasetId"]).iterate_items()
-            )[:max_items]
+            from itertools import islice
+            from denzo.runtime_limits import check_cancelled
+            items = []
+            for item in islice(client.dataset(run['defaultDatasetId']).iterate_items(),max(0,min(max_items,5000))):
+                check_cancelled()
+                items.append(item)
 
             elapsed  = round(time.time() - t0, 1)
             est_cost = round(len(items) * COST_PER_ITEM.get(actor_key, 0.001), 4)

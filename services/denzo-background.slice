@@ -1,0 +1,13 @@
+[Unit]
+Description=Shared budget for DENZO SEO, director and browser audits
+
+[Slice]
+CPUAccounting=yes
+MemoryAccounting=yes
+TasksAccounting=yes
+CPUQuota=75%
+CPUWeight=20
+MemoryHigh=35%
+MemoryMax=45%
+MemorySwapMax=256M
+TasksMax=256

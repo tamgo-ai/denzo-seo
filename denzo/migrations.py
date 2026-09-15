@@ -21,6 +21,8 @@ def migrate_platform(conn):
             "query_mode": "TEXT DEFAULT 'legacy_unverified'",
         },
         "client_context": {"target_audience": "TEXT DEFAULT ''"},
+        "agents": {"retry_after": "TEXT"},
+        "pipeline_runs": {"job_id": "TEXT"},
     }
     for table, fields in additions.items():
         existing = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
@@ -83,6 +85,17 @@ def migrate_platform(conn):
         r[1] for r in conn.execute("PRAGMA table_info(publication_attempts)")
     }:
         conn.execute("ALTER TABLE publication_attempts ADD COLUMN last_checked_at TEXT")
+    job_fields = {r[1] for r in conn.execute('PRAGMA table_info(agent_jobs)')}
+    for name, definition in {
+        'deadline_at': 'TEXT', 'parent_job_id': 'TEXT',
+        'api_calls': 'INTEGER NOT NULL DEFAULT 0', 'retryable': 'INTEGER NOT NULL DEFAULT 1',
+    }.items():
+        if name not in job_fields:
+            conn.execute(f'ALTER TABLE agent_jobs ADD COLUMN {name} {definition}')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_agent_jobs_status ON agent_jobs(status,agent_name)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_agent_jobs_parent ON agent_jobs(parent_job_id,status)')
+    if 'failure_streak' not in {r[1] for r in conn.execute('PRAGMA table_info(schedules)')}:
+        conn.execute('ALTER TABLE schedules ADD COLUMN failure_streak INTEGER NOT NULL DEFAULT 0')
     migrate_limits(conn)
     # Recover orphan regeneration states; old content remains available for review.
     conn.execute(

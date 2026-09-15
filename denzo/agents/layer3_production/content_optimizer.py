@@ -3,6 +3,7 @@ Content Optimizer — Layer 3
 Scores existing page content and rewrites low-quality pages.
 """
 import json
+from denzo.runtime_limits import setting
 from denzo.agents.base_agent import TenantAwareBaseAgent, ClientContext, db_execute, db_write, strip_json_fences
 
 
@@ -108,12 +109,13 @@ Rules:
         return score, cleaned2 if cleaned2.startswith("<") else ""
 
     def run(self):
-        self.log("Starting content optimization — will run until all pages are optimized...")
+        self.log("Starting a bounded content optimization batch...")
         self.set_status("working", "Loading pages for review")
 
         # Prereq check: need pages with content (ready or published with unscored/low-quality)
         ready_check = db_execute(
             "SELECT COUNT(*) AS n FROM pages WHERE tenant_id=? AND status IN ('ready','published') "
+            "AND COALESCE(managed,1)=1 "
             "AND content IS NOT NULL AND content != '' "
             "AND (quality_score IS NULL OR quality_score < ?)",
             (self.ctx.tenant_id, self.MIN_SCORE)
@@ -144,17 +146,18 @@ Rules:
         improved = 0
         skipped  = 0
         round_num = 0
-        MAX_ROUNDS = 10  # cap: 10 rounds × BATCH(10) = max 100 pages per run
+        MAX_ROUNDS = 1  # Each page is attempted once; failed/unchanged pages cannot loop.
 
         while not self.should_stop() and round_num < MAX_ROUNDS:
             round_num += 1
             pages = db_execute(
-                "SELECT id, title, slug, target_keyword, content, notes FROM pages "
+                "SELECT id, title, slug, target_keyword, content, notes, managed FROM pages "
                 "WHERE tenant_id=? AND status IN ('ready','published') AND content IS NOT NULL AND content != '' "
+                "AND COALESCE(managed,1)=1 "
                 "AND (quality_score IS NULL OR quality_score < ?) "
                 "AND (notes IS NULL OR (notes NOT LIKE '%[CO_MAX_RETRIES]%' AND notes NOT LIKE '%[CO:3]%' AND notes NOT LIKE '%[CO:4]%' AND notes NOT LIKE '%[CO:5]%')) "
-                "ORDER BY id LIMIT ?",
-                (self.ctx.tenant_id, self.MIN_SCORE, self.BATCH)
+                "ORDER BY updated_at,id LIMIT ?",
+                (self.ctx.tenant_id, self.MIN_SCORE, min(self.BATCH,setting('DENZO_PAGE_BATCH_SIZE',10,1,50)))
             )
 
             if not pages:
@@ -172,6 +175,7 @@ Rules:
                 score, new_content = self._score_and_fix(page_dict, brand_voice=brand_voice)
                 if score is None:
                     self.log(f"{title[:50]} → API failed, skipping", "warning")
+                    db_write("UPDATE pages SET updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?", (page_dict['id'],self.tenant_id))
                     continue
                 self.log(f"{title[:50]} → score {score}/100")
 
@@ -215,6 +219,7 @@ Rules:
 
         remaining = db_execute(
             "SELECT COUNT(*) n FROM pages WHERE tenant_id=? AND status IN ('ready','published') "
+            "AND COALESCE(managed,1)=1 "
             "AND content IS NOT NULL AND (quality_score IS NULL OR quality_score < ?)",
             (self.ctx.tenant_id, self.MIN_SCORE)
         )

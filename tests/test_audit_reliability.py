@@ -63,7 +63,8 @@ def audit_db(tmp_path, monkeypatch):
     return connect
 
 
-def test_persistent_idempotency_rate_limit_and_lease_fencing(audit_db):
+def test_persistent_idempotency_rate_limit_and_lease_fencing(audit_db,monkeypatch):
+    monkeypatch.setenv('DENZO_MAX_RUNNING_AUDITS','2')
     first = queue.enqueue('https://example.com/', 'stable-1', 'client', 2)
     assert queue.enqueue('https://example.com/', 'stable-1', 'client', 2) == first
     with pytest.raises(ValueError):
@@ -83,6 +84,16 @@ def test_persistent_idempotency_rate_limit_and_lease_fencing(audit_db):
     assert not queue.finish(job, result)
     assert queue.finish(replacement, result)
     assert queue.read_progress(first)['event'] == 'complete'
+
+
+def test_audit_worker_concurrency_has_a_shared_limit(audit_db,monkeypatch):
+    monkeypatch.setenv('DENZO_MAX_RUNNING_AUDITS','1')
+    queue.enqueue('https://example.com/','first','client')
+    queue.enqueue('https://other.com/','second','client')
+    first=queue.claim()
+    assert first and queue.claim() is None
+    assert queue.finish(first,{'status':'failed','error':'Test failure'})
+    assert queue.claim()['audit_id']!=first['audit_id']
 
 
 @pytest.mark.parametrize('url', ['http://localhost','http://127.0.0.1','http://169.254.169.254/latest/meta-data','file:///etc/passwd','https://user:password@example.com','https://example.com:22'])

@@ -6,6 +6,7 @@ import http.client
 import ipaddress
 import socket
 import ssl
+import time
 from urllib.parse import urlsplit, urlunsplit, urljoin
 
 MAX_BYTES = 3 * 1024 * 1024
@@ -28,16 +29,25 @@ def validate_url(url):
     return urlunsplit((p.scheme, p.netloc, p.path or '/', p.query, '')), addresses[0]
 
 
-def fetch_bytes(url, max_bytes=MAX_BYTES, **_kwargs):
+def fetch_bytes(url, max_bytes=MAX_BYTES, timeout=15, **_kwargs):
+    from denzo.runtime_limits import check_cancelled
+    deadline=time.monotonic()+max(1,min(120,float(timeout)))
+    def remaining():
+        check_cancelled()
+        value=deadline-time.monotonic()
+        if value<=0:
+            raise TimeoutError('Website request time limit reached')
+        return value
     chain = []
     for _ in range(6):
+        remaining()
         url, address = validate_url(url)
         p = urlsplit(url)
         chain.append(url)
         port = p.port or (443 if p.scheme == 'https' else 80)
-        conn = http.client.HTTPConnection(address, port, timeout=15)
+        conn = http.client.HTTPConnection(address, port, timeout=remaining())
         try:
-            conn.sock = socket.create_connection((address, port), timeout=15)
+            conn.sock = socket.create_connection((address, port), timeout=remaining())
             if p.scheme == 'https':
                 conn.sock = ssl.create_default_context().wrap_socket(conn.sock, server_hostname=p.hostname)
             conn.request('GET', urlunsplit(('', '', p.path, p.query, '')), headers={
@@ -45,17 +55,30 @@ def fetch_bytes(url, max_bytes=MAX_BYTES, **_kwargs):
                 'Accept': 'text/html,application/xhtml+xml,application/xml,text/plain',
                 'Accept-Encoding': 'identity', 'Connection': 'close',
             })
+            request_socket = conn.sock
             response = conn.getresponse()
             headers = dict(response.getheaders())
             if response.status in (301, 302, 303, 307, 308) and response.getheader('Location'):
                 url = urljoin(url, response.getheader('Location'))
                 continue
-            body = response.read(max_bytes + 1)
+            chunks=[]
+            size=0
+            while True:
+                if response.isclosed():
+                    break
+                request_socket.settimeout(remaining())
+                chunk=response.read1(min(65536,max_bytes+1-size))
+                if not chunk:
+                    break
+                chunks.append(chunk);size+=len(chunk)
+                if size>max_bytes:
+                    raise ValueError('Website response exceeded audit size limit')
+            body=b''.join(chunks)
             if len(body) > max_bytes:
                 raise ValueError('Website response exceeded audit size limit')
             if response.status >= 500 or response.status in (401, 403, 408, 429):
                 raise ValueError('Website temporarily unavailable or blocking automated analysis')
-            return {'ok': 200 <= response.status < 300, 'html': body.decode('utf-8', errors='replace'),
+            return {'ok': 200 <= response.status < 300,
                     'body': body, 'status': response.status, 'headers': headers, 'final_url': url,
                     'redirect_chain': chain, 'method': 'public_http'}
         finally:
@@ -65,5 +88,5 @@ def fetch_bytes(url, max_bytes=MAX_BYTES, **_kwargs):
 
 def fetch_html(url, **kwargs):
     result = fetch_bytes(url, **kwargs)
-    result.pop('body', None)
+    result['html']=result.pop('body',b'').decode('utf-8',errors='replace')
     return result

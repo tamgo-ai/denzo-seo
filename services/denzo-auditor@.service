@@ -1,9 +1,13 @@
 [Unit]
 Description=DENZO persistent audit worker %i
 After=network.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
 
 [Service]
 Type=simple
+Slice=denzo-background.slice
+OOMPolicy=kill
 User=root
 WorkingDirectory=/root/denzo-seo
 EnvironmentFile=/root/denzo-seo/.env

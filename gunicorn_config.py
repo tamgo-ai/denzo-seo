@@ -16,7 +16,11 @@ bind = f"127.0.0.1:{os.getenv('DENZO_PORT', '5055')}"
 # ── Workers ────────────────────────────────────────────────────────────────────
 # gevent = async I/O, required for flask-sock WebSocket
 worker_class = "gevent"
-workers = 4
+from denzo.runtime_limits import setting
+workers = setting('DENZO_WEB_WORKERS',2,1,8)
+worker_connections = 200
+max_requests = 1000
+max_requests_jitter = 100
 threads = 1
 timeout = 120  # agents can take a while
 graceful_timeout = 30

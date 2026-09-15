@@ -29,6 +29,9 @@ def configure(tenant_id, enabled, zone="UTC", hour=9, now=None):
             timezone=excluded.timezone,hour=excluded.hour,next_run_at=excluded.next_run_at""",
             (tenant_id, int(enabled), zone, hour, upcoming),
         )
+        db.execute(
+            "UPDATE schedules SET failure_streak=0 WHERE tenant_id=?", (tenant_id,)
+        )
         db.commit()
     finally:
         db.close()
@@ -43,6 +46,14 @@ def _run_due(tenant_id):
         return "busy"
     db = get_db()
     try:
+        blocked = db.execute(
+            """SELECT 1 FROM agent_jobs j JOIN agents a ON a.tenant_id=j.tenant_id AND a.name=j.agent_name
+            WHERE j.tenant_id=? AND j.status='error' AND j.retryable=0 AND a.status='error'
+            AND j.id=(SELECT id FROM agent_jobs WHERE tenant_id=j.tenant_id AND agent_name=j.agent_name ORDER BY created_at DESC,rowid DESC LIMIT 1) LIMIT 1""",
+            (tenant_id,),
+        ).fetchone()
+        if blocked:
+            return "blocked"
         pages = [
             dict(r)
             for r in db.execute("SELECT * FROM pages WHERE tenant_id=?", (tenant_id,))
@@ -86,7 +97,9 @@ def _run_due(tenant_id):
     finally:
         db.close()
     result = AgentRunner.start(tenant_id, agent)
-    return "busy" if result["status"] == "already_running" else result["status"]
+    return (
+        "busy" if result["status"] in ("already_running", "busy") else result["status"]
+    )
 
 
 def tick(now=None, verify=True):
@@ -126,6 +139,8 @@ def tick(now=None, verify=True):
                 "Schedule failed: %s", row["tenant_id"]
             )
             result = "error"
+        failures = row["failure_streak"] + 1 if result == "error" else 0
+        paused = result == "blocked" or failures >= 3
         upcoming = (
             now + timedelta(minutes=5)
             if result in ("busy", "error")
@@ -134,8 +149,15 @@ def tick(now=None, verify=True):
         db = get_db()
         try:
             db.execute(
-                "UPDATE schedules SET next_run_at=?,last_run_at=?,last_result=? WHERE tenant_id=? AND enabled=1",
-                (upcoming.isoformat(), now.isoformat(), result, row["tenant_id"]),
+                "UPDATE schedules SET next_run_at=?,last_run_at=?,last_result=?,failure_streak=?,enabled=? WHERE tenant_id=? AND enabled=1",
+                (
+                    None if paused else upcoming.isoformat(),
+                    now.isoformat(),
+                    "paused_after_failures" if paused else result,
+                    failures,
+                    0 if paused else 1,
+                    row["tenant_id"],
+                ),
             )
             db.commit()
         finally:

@@ -73,6 +73,11 @@ def claim(now=None):
         db.execute("""UPDATE site_audits SET status='error',error_message='Audit retry limit reached',overall_score=NULL
                       WHERE audit_id IN (SELECT audit_id FROM audit_jobs WHERE state='running' AND lease_until<? AND attempts>=3)""", (now,))
         db.execute("UPDATE audit_jobs SET state='failed',finished_at=? WHERE state='running' AND lease_until<? AND attempts>=3", (now, now))
+        from denzo.runtime_limits import setting
+        running=db.execute("SELECT COUNT(*) FROM audit_jobs WHERE state='running' AND lease_until>=?", (now,)).fetchone()[0]
+        if running>=setting('DENZO_MAX_RUNNING_AUDITS',1,1,4):
+            db.commit()
+            return None
         row = db.execute("""SELECT * FROM audit_jobs WHERE attempts<3 AND
           ((state='queued' AND available_at<=?) OR (state='running' AND lease_until<?))
           ORDER BY created_at LIMIT 1""", (now, now)).fetchone()

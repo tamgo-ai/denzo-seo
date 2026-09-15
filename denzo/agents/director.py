@@ -87,7 +87,7 @@ class PipelineDirector(TenantAwareBaseAgent):
         comp_count = c["comp_total"] or 0
 
         agent_rows = db_execute(
-            """SELECT name, status, current_task, run_count, layer
+            """SELECT name, status, current_task, run_count, layer, retry_after
                FROM agents WHERE tenant_id=? AND name != 'Pipeline Director'
                ORDER BY layer, name""",
             (tid,),
@@ -164,7 +164,10 @@ class PipelineDirector(TenantAwareBaseAgent):
         for a in agents:
             if a["name"] in names and a["status"] == "error":
                 if (a.get("run_count") or 0) < max_retries:
-                    result.append(a["name"])
+                    ready = db_execute("SELECT 1 FROM agents WHERE tenant_id=? AND name=? AND (retry_after IS NULL OR retry_after<=datetime('now'))", (self.tenant_id,a['name']))
+                    last = db_execute('SELECT retryable FROM agent_jobs WHERE tenant_id=? AND agent_name=? ORDER BY created_at DESC,rowid DESC LIMIT 1', (self.tenant_id,a['name']))
+                    if ready and (not last or last[0]['retryable']):
+                        result.append(a["name"])
         return result
 
     def _layer_summary(self, names: list[str], agents: list) -> str:
@@ -405,7 +408,7 @@ Return ONLY valid JSON."""
             return next_stage(DISCOVERY_AGENTS, serial=True)
 
         # Every stage finishes before dependent work can read its outputs.
-        for stage, serial in [(LAYER_1, False), (LAYER_2+LAYER_2B, True), (LAYER_3, True), (LAYER_4, True)]:
+        for stage, serial in [(LAYER_1, True), (LAYER_2+LAYER_2B, True), (LAYER_3, True), (LAYER_4, True)]:
             if not self._all_done(stage, agents):
                 return next_stage(stage, serial=serial)
 
@@ -433,17 +436,14 @@ Return ONLY valid JSON."""
 
     def _check_deadlock(self, agents: list) -> str | None:
         """Returns reason string if pipeline is deadlocked, None if healthy."""
-        active = [a for a in agents if a["status"] not in ("done", "idle")]
-        if not active:
-            return None
-
-        min_layer = min(a["layer"] for a in active if a["layer"] is not None)
-        layer_agents = [a for a in active if a["layer"] == min_layer]
-
-        errored = [a for a in layer_agents if a["status"] == "error" and (a.get("run_count") or 0) >= 3]
-        if errored and len(errored) == len(layer_agents):
-            names = ", ".join(a["name"] for a in errored)
-            return f"Layer {min_layer} deadlock: all agents failed ≥3 times — {names}. Manual intervention required."
+        publisher = 'WordPress Publisher' if self.ctx.publisher_type=='wordpress' else 'GitHub Publisher'
+        scheduled = set(DISCOVERY_AGENTS+LAYER_1+LAYER_2+LAYER_2B+LAYER_3+LAYER_4+LAYER_6+[publisher,'Indexation Accelerator'])
+        for agent in agents:
+            if agent['name'] not in scheduled or agent['status']!='error':
+                continue
+            last = db_execute('SELECT retryable FROM agent_jobs WHERE tenant_id=? AND agent_name=? ORDER BY created_at DESC,rowid DESC LIMIT 1', (self.tenant_id,agent['name']))
+            if (agent.get('run_count') or 0)>=3 or (last and not last[0]['retryable']):
+                return f"Pipeline stopped at {agent['name']}: retry or runtime limit reached. Check its error before restarting."
         return None
 
     # ── Watchdog ──────────────────────────────────────────────────────────────
@@ -524,21 +524,13 @@ Return ONLY valid JSON."""
 
         MAX_CYCLES = 240  # 240 × 30s = 2 hours max per run (can be restarted, Director persists state)
         cycles = 0
+        cycle_errors = 0
+        waiting_since = time.monotonic()
 
         while not self.should_stop() and not self._stop_flag and cycles < MAX_CYCLES:
             cycles += 1
             try:
                 self._watchdog()
-
-
-                # Quality gate: run after publisher is done
-                pub_rows = db_execute(
-                    "SELECT status, run_count FROM agents WHERE tenant_id=? AND name='GitHub Publisher'",
-                    (self.ctx.tenant_id,)
-                )
-                if pub_rows and pub_rows[0]["status"] == "done" and pub_rows[0]["run_count"] > 0:
-                    self._run_quality_gate()
-
                 state = self._assess_state()
 
                 # Deadlock guard
@@ -556,6 +548,12 @@ Return ONLY valid JSON."""
 
                 # Decide and execute
                 to_start = self._evaluate(state)
+                has_running = any(a['status']=='working' for a in state['agents'])
+                if has_running or to_start:
+                    waiting_since = time.monotonic()
+                elif time.monotonic()-waiting_since >= 300:
+                    self.set_status('error','No agent can progress for 5 minutes; check queues, workers and prerequisites')
+                    break
                 for agent_name in to_start:
                     if self.should_stop() or self._stop_flag:
                         break
@@ -570,21 +568,23 @@ Return ONLY valid JSON."""
                         "pg_pub": state["pages"]["published"],
                     })
 
-                if not to_start:
+                if not to_start and cycles%10==1:
                     self.log(f"[Director] No agents to start this cycle — waiting.", "info")
-
-                # Wait 30s, polling for stop signal
-                for _ in range(60):
-                    if self.should_stop() or self._stop_flag:
-                        break
-                    time.sleep(0.5)
+                cycle_errors = 0
+                from denzo.runtime_limits import interruptible_wait
+                interruptible_wait(30,self._stop)
 
             except Exception as exc:
+                from denzo.execution import AgentCancelled
+                from denzo.runtime_limits import RuntimeLimitExceeded,interruptible_wait
+                if isinstance(exc,(AgentCancelled,RuntimeLimitExceeded)):
+                    raise
+                cycle_errors += 1
                 self.log(f"[Director] Cycle error: {exc}", "error")
-                for _ in range(60):
-                    if self.should_stop() or self._stop_flag:
-                        break
-                    time.sleep(0.5)
+                if cycle_errors>=3:
+                    self.set_status('error','Director stopped after 3 consecutive orchestration errors')
+                    break
+                interruptible_wait(30*cycle_errors,self._stop)
 
         if self.should_stop() or self._stop_flag:
             self.set_status("idle", "Stopped by user")
@@ -608,12 +608,17 @@ Return ONLY valid JSON."""
             self.log(f"[Director] Started {agent_name}", "info")
         elif status == "already_running":
             pass
+        elif status == 'busy':
+            pass  # Admission control: do not turn overload into another job or retry.
         elif status == "prereq_failed":
             active = db_execute("SELECT 1 FROM agents WHERE tenant_id=? AND name!='Pipeline Director' AND status IN ('working','starting')", (self.tenant_id,))
             if not active:
-                db_write("UPDATE agents SET status='error',run_count=run_count+1,current_task=? WHERE tenant_id=? AND name=?", (result.get('message','Prerequisites unavailable'),self.tenant_id,agent_name))
+                db_write("UPDATE agents SET status='error',run_count=3,current_task=? WHERE tenant_id=? AND name=?", (result.get('message','Prerequisites unavailable'),self.tenant_id,agent_name))
             self.log(f"[Director] {agent_name} prerequisites not met: {result.get('message')}", "warning")
         else:
+            # Failures before reservation must also consume a bounded attempt.
+            if not result.get('job_id'):
+                db_write("UPDATE agents SET status='error',run_count=run_count+1,retry_after=datetime('now','+60 seconds'),current_task=? WHERE tenant_id=? AND name=? AND status NOT IN ('starting','working')", (result.get('message','Unable to start'),self.tenant_id,agent_name))
             self.log(f"[Director] Failed to start {agent_name}: {result.get('message')}", "error")
 
     def _stop_agent(self, agent_name: str):

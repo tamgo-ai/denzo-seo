@@ -268,10 +268,12 @@ WRITING RULES — GOOGLE SEARCH QUALITY STANDARDS:
             self.set_status("idle", "Waiting for Layer 2 agents")
             return
 
-        MAX_PAGES = 20
+        from denzo.runtime_limits import setting
+        server_batch = setting('DENZO_PAGE_BATCH_SIZE',10,1,50)
+        MAX_PAGES = server_batch
         limit_rows = db_execute("SELECT value FROM settings WHERE tenant_id=? AND key='generation_batch_size'", (self.tenant_id,))
         if limit_rows:
-            MAX_PAGES = max(1, min(200, int(limit_rows[0]["value"])))
+            MAX_PAGES = max(1, min(server_batch, int(limit_rows[0]["value"])))
         # Load LocalBusiness schema once — embedded in every page's schema_markup
         lb_row = db_execute(
             "SELECT value FROM settings WHERE tenant_id=? AND key='schema_local_business'",

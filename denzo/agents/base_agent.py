@@ -4,6 +4,7 @@ Every agent inherits from this. ClientContext carries all client-specific data.
 No hardcoded business info anywhere — everything flows from the DB via ClientContext.
 """
 import sqlite3, os, time, threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import List
 from datetime import datetime, timezone
@@ -13,10 +14,9 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "denzo.db")
 
-# ── Global API rate limiter — shared across ALL tenants and ALL agents ────────
-# Configurable via DENZO_API_CONCURRENCY (default 4). The 2-second inter-call
-# gap provides enough throttling; the semaphore controls peak parallelism.
-_MAX_CONCURRENCY = int(os.getenv("DENZO_API_CONCURRENCY", "4"))
+# Per-process API limiter. Server-wide admission is enforced by agent_jobs.
+from denzo.runtime_limits import setting, check_cancelled, interruptible_wait, RuntimeLimitExceeded
+_MAX_CONCURRENCY = setting('DENZO_API_CONCURRENCY',1,1,4)
 _api_semaphore = threading.Semaphore(_MAX_CONCURRENCY)
 _last_api_call = 0.0
 _api_lock = threading.Lock()
@@ -36,7 +36,7 @@ def _get_anthropic_client():
                 _anthropic_client = anthropic.Anthropic(
                     api_key=os.getenv("ANTHROPIC_API_KEY", ""),
                     base_url="https://api.anthropic.com",
-                    timeout=90.0,
+                    timeout=45.0,
                     max_retries=0,  # we handle retries ourselves
                 )
     return _anthropic_client
@@ -213,6 +213,7 @@ def strip_json_fences(raw: str, start_char: str = "{") -> str:
 def db_execute(sql: str, params=(), retries=5):
     """Execute a read query. Uses thread-local connection pool."""
     for attempt in range(retries):
+        check_cancelled()
         try:
             conn = _get_conn()
             rows = conn.execute(sql, params).fetchall()
@@ -226,10 +227,7 @@ def db_execute(sql: str, params=(), retries=5):
 
 def db_write(sql: str, params=()):
     """One transaction per write; cancelled jobs cannot mutate further content."""
-    token = getattr(_sqlite_local,'job_token',None)
-    if token and token.is_set():
-        from denzo.execution import AgentCancelled
-        raise AgentCancelled()
+    check_cancelled()
     conn = _get_conn()
     for attempt in range(5):
         try:
@@ -696,17 +694,60 @@ class TenantAwareBaseAgent:
 
     # ── Claude API ───────────────────────────────────────────────────────────
 
+    @contextmanager
+    def _api_slot(self):
+        global _last_api_call
+        while not _api_semaphore.acquire(timeout=.25):
+            interruptible_wait(0,self._stop)
+        try:
+            interruptible_wait(0,self._stop)
+            with _api_lock:
+                now=time.monotonic()
+                delay=max(0,_last_api_call+2-now)
+                _last_api_call=now+delay
+            interruptible_wait(delay,self._stop)
+            token=getattr(_sqlite_local,'job_token',None)
+            if token:
+                token.consume_api_call()
+            yield
+        finally:
+            _api_semaphore.release()
+
+    def _request_claude(self, kwargs):
+        import anthropic
+        client=_get_anthropic_client()
+        for attempt in range(3):
+            try:
+                with self._api_slot():
+                    response=client.messages.create(**kwargs)
+                self._provider_failures=0
+                return next((block.text for block in response.content if hasattr(block,'text')), '')
+            except (anthropic.APIConnectionError,anthropic.APITimeoutError,anthropic.APIStatusError) as exc:
+                status=getattr(exc,'status_code',None)
+                permanent=status is not None and 400<=status<500 and status not in (408,409,429)
+                if permanent:
+                    self._stop_provider(f'Provider rejected the request (HTTP {status}); check credentials and configuration')
+                if attempt<2:
+                    self.log(f'Provider unavailable; retry {attempt+1}/2', 'warning')
+                    interruptible_wait((30 if status==429 else 5)*(attempt+1),self._stop)
+        self._provider_failures=getattr(self,'_provider_failures',0)+1
+        if self._provider_failures>=3:
+            self._stop_provider('Provider failed 3 consecutive requests; automatic calls stopped')
+        return ''
+
+    def _stop_provider(self, reason):
+        token=getattr(_sqlite_local,'job_token',None)
+        if token:
+            token.block(reason)
+        raise RuntimeLimitExceeded(reason)
+
     def call_claude(self, prompt: str, max_tokens: int = 1500,
                     system: str = None, model: str = "claude-haiku-4-5-20251001",
                     cache_system: bool = False) -> str:
-        import anthropic
         if system is None:
             system = SEO_EXPERTISE
         from denzo.evidence import FACTUAL_RULES
         system = system + "\n" + FACTUAL_RULES
-        global _last_api_call
-
-        client = _get_anthropic_client()
         messages = [{"role": "user", "content": prompt}]
         kwargs = dict(model=model, max_tokens=max_tokens, messages=messages)
 
@@ -725,35 +766,7 @@ class TenantAwareBaseAgent:
         elif system:
             kwargs["system"] = system
 
-        for attempt in range(4):
-            retry_wait = 0
-            with _api_semaphore:
-                with _api_lock:
-                    elapsed = time.time() - _last_api_call
-                    if elapsed < 2:
-                        time.sleep(2 - elapsed)
-                    _last_api_call = time.time()
-                try:
-                    response = client.messages.create(**kwargs)
-                    for block in response.content:
-                        if hasattr(block, 'text'):
-                            return block.text
-                    return ""
-                except anthropic.RateLimitError:
-                    retry_wait = 30 * (attempt + 1)
-                    self.log(f"Rate limit — waiting {retry_wait}s...", "warning")
-                except anthropic.APITimeoutError:
-                    retry_wait = 10 * (attempt + 1)
-                    self.log(f"Timeout — retry {attempt+1}/4", "warning")
-                except Exception as e:
-                    if attempt < 3:
-                        retry_wait = 8
-                    else:
-                        self.log(f"API error: {str(e)[:80]}", "error")
-                        return ""
-            if retry_wait:
-                time.sleep(retry_wait)
-        return ""
+        return self._request_claude(kwargs)
 
     def build_cacheable_system(self, extra: str = "") -> str:
         """Build a cacheable system prompt combining SEO_EXPERTISE + ClientContext.
@@ -766,25 +779,25 @@ class TenantAwareBaseAgent:
 
     def call_claude_vision(self, image_url: str, prompt: str, max_tokens: int = 500) -> str:
         """Send an image URL to Claude Vision and return the text response."""
-        import anthropic
         import base64
-        import requests as _req
-
-        global _last_api_call
+        from io import BytesIO
+        from PIL import Image
+        from denzo.auditor.safe_fetch import fetch_bytes
+        interruptible_wait(0,self._stop)
 
         try:
-            r = _req.get(image_url, timeout=12, headers={"User-Agent": "Mozilla/5.0"})
-            r.raise_for_status()
-            image_data = base64.b64encode(r.content).decode("utf-8")
-            content_type = r.headers.get("content-type", "image/jpeg").split(";")[0].strip()
-            ct_map = {"image/jpg": "image/jpeg", "image/svg+xml": "image/png"}
-            media_type = ct_map.get(content_type, content_type)
-            if media_type not in ("image/jpeg", "image/png", "image/gif", "image/webp"):
-                media_type = "image/jpeg"
+            fetched=fetch_bytes(image_url,timeout=12,max_bytes=5*1024*1024)
+            if not fetched.get('ok'):
+                raise ValueError('Image could not be read within the download limit')
+            body=fetched['body']
+            with Image.open(BytesIO(body)) as im:
+                if im.width*im.height>20_000_000 or im.format not in ('JPEG','PNG','GIF','WEBP'):
+                    raise ValueError('Unsupported image format or excessive pixel count')
+                media_type=Image.MIME[im.format]
+            image_data = base64.b64encode(body).decode('ascii')
         except Exception as e:
             return f"__download_error__: {e}"
 
-        client = _get_anthropic_client()
         messages = [{
             "role": "user",
             "content": [
@@ -800,34 +813,7 @@ class TenantAwareBaseAgent:
             ]
         }]
 
-        for attempt in range(3):
-            retry_wait = 0
-            with _api_semaphore:
-                with _api_lock:
-                    elapsed = time.time() - _last_api_call
-                    if elapsed < 2:
-                        time.sleep(2 - elapsed)
-                    _last_api_call = time.time()
-                try:
-                    resp = client.messages.create(
-                        model="claude-haiku-4-5-20251001",
-                        max_tokens=max_tokens,
-                        messages=messages
-                    )
-                    for block in resp.content:
-                        if hasattr(block, 'text'):
-                            return block.text
-                    return ""
-                except anthropic.RateLimitError:
-                    retry_wait = 30 * (attempt + 1)
-                except Exception as e:
-                    if attempt < 2:
-                        retry_wait = 8
-                    else:
-                        return f"__vision_error__: {str(e)[:60]}"
-            if retry_wait:
-                time.sleep(retry_wait)
-        return ""
+        return self._request_claude(dict(model='claude-haiku-4-5-20251001',max_tokens=max_tokens,messages=messages))
 
     def run(self):
         raise NotImplementedError("Each agent must implement run()")

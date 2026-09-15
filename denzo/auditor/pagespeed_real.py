@@ -61,7 +61,6 @@ def get_lighthouse_performance(url: str) -> dict:
     on an enabled GCP project. Returns the same shape as get_real_performance
     but with lab data only (no CrUX field data)."""
     try:
-        import subprocess
         import json
         import shutil
         lighthouse_bin = shutil.which('lighthouse')
@@ -75,7 +74,9 @@ def get_lighthouse_performance(url: str) -> dict:
             '--only-categories=performance',
             '--quiet',
         ]
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        from denzo.processes import browser_slot,run_bounded
+        with browser_slot():
+            proc = run_bounded(cmd,timeout=180)
         if proc.returncode != 0:
             logger.warning("lighthouse failed (%s)", proc.returncode)
             return None
@@ -173,4 +174,3 @@ def _summarize_details(details: dict) -> dict:
                 'wasted_bytes': item.get('wastedBytes', 0),
             })
     return summary
-

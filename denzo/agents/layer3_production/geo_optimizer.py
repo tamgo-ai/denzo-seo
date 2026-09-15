@@ -113,7 +113,8 @@ Return the FULL improved HTML content with ALL these 16 techniques applied. Retu
         skipped = 0
         round_num = 0
         processed_ids = set()
-        MAX_ROUNDS = 5  # cap: 5 rounds × BATCH(20) = max 100 pages per run
+        MAX_ROUNDS = 1
+        from denzo.runtime_limits import setting
 
         while not self.should_stop() and round_num < MAX_ROUNDS:
             round_num += 1
@@ -122,7 +123,7 @@ Return the FULL improved HTML content with ALL these 16 techniques applied. Retu
                 "WHERE tenant_id=? AND status='ready' AND content IS NOT NULL AND content != '' "
                 "AND (notes NOT LIKE '%[GEO]%' OR notes IS NULL) "
                 "ORDER BY id LIMIT ?",
-                (self.ctx.tenant_id, self.BATCH)
+                (self.ctx.tenant_id, min(self.BATCH,setting('DENZO_PAGE_BATCH_SIZE',10,1,50)))
             )
 
             # Filter out already-processed pages in this run

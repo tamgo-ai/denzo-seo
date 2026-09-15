@@ -2,6 +2,8 @@
 
 Esta versión se entrega en la rama `codex/platform-reliability`, mediante el PR #3. La actualización del servidor corresponde al operador. No se ha probado contra las credenciales ni las webs de producción.
 
+La actualización posterior `codex/agent-runtime-guards` añade límites de recursos y cambia las unidades de los trabajadores. Si la aplicas, sigue también [Evitar saturación del servidor](AGENT_RUNTIME_LIMITS.md).
+
 ## Qué cambia
 
 - Todas las rutas de clientes, exportaciones y menús respetan la propiedad del cliente. La configuración global requiere administrador. Los clientes nuevos tienen propietario desde su creación.
