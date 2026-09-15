@@ -313,7 +313,6 @@ def _normalize_and_enqueue(url: str, client_ip: str):
 
 
 @bp.route('/analyze', methods=['POST'])
-@service_token_required
 def analyze():
     """Start a new site analysis. Returns audit_id for progress tracking."""
     data = request.get_json(silent=True)
