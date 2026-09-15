@@ -10,20 +10,8 @@ bp = Blueprint("geo", __name__, url_prefix="/clients/<tenant_id>")
 
 
 def _sidebar_clients():
-    db = get_db()
-    rows = db.execute("""
-        SELECT c.tenant_id, c.name, ag.name AS active_agent_name
-        FROM clients c
-        LEFT JOIN agents ag ON ag.tenant_id = c.tenant_id AND ag.status = 'working'
-        GROUP BY c.tenant_id
-        ORDER BY c.name
-    """).fetchall()
-    clients = [
-        {"tenant_id": r["tenant_id"], "name": r["name"], "active_agent": r["active_agent_name"]}
-        for r in rows
-    ]
-    db.close()
-    return clients
+    from denzo.auth import visible_clients
+    return visible_clients()
 
 
 @bp.route("/geo")
@@ -45,7 +33,7 @@ def index(tenant_id):
         """SELECT query, ai_model,
               MAX(checked_at) as last_checked,
               client_mentioned,
-              response,
+              response, citation_verified, citations_json, query_mode,
               competitors_mentioned
            FROM geo_queries
            WHERE tenant_id=?
@@ -78,16 +66,13 @@ def index(tenant_id):
         (tenant_id,)
     ).fetchone()
 
-    # Per-query summary (latest result only)
-    query_summary = db.execute(
-        """SELECT query,
-              MAX(checked_at) as last_checked,
-              SUM(client_mentioned) as cited_count,
-              COUNT(*) as check_count
-           FROM geo_queries WHERE tenant_id=?
-           GROUP BY query ORDER BY cited_count DESC""",
-        (tenant_id,)
-    ).fetchall()
+    # Use exactly one latest observation per query and engine.
+    query_summary = db.execute("""WITH recent AS (
+       SELECT *,ROW_NUMBER() OVER(PARTITION BY query,ai_model ORDER BY checked_at DESC,id DESC) AS rn
+       FROM geo_queries WHERE tenant_id=?)
+       SELECT query,MAX(checked_at) last_checked,SUM(client_mentioned) cited_count,
+          SUM(citation_verified) verified_count,COUNT(*) check_count FROM recent WHERE rn=1
+       GROUP BY query ORDER BY cited_count DESC""", (tenant_id,)).fetchall()
 
     db.close()
 

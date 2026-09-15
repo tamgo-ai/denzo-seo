@@ -16,21 +16,21 @@ from denzo.agents.base_agent import ClientContext
 
 def _component_name(slug: str) -> str:
     """Convert slug to PascalCase component name."""
-    parts = re.split(r'[-_]', slug.strip("/"))
-    return "".join(p.capitalize() for p in parts if p) or "DenzoPage"
+    parts = re.split(r'[^a-zA-Z0-9]+', slug.strip("/"))
+    return "DenzoPage" + "".join(p.capitalize() for p in parts if p)
 
 
 def _extract_h1(content_html: str, fallback: str) -> str:
     """Extract H1 text from HTML content, return fallback if none found."""
-    m = re.search(r'<h1[^>]*>(.*?)</h1>', content_html, re.DOTALL | re.IGNORECASE)
-    if m:
-        return re.sub(r'<[^>]+>', '', m.group(1)).strip()
-    return fallback
+    from bs4 import BeautifulSoup
+    heading = BeautifulSoup(content_html, 'html.parser').find('h1')
+    return heading.get_text(' ', strip=True) if heading else fallback
 
 
 def _clean_html_for_jsx(html):
     from bs4 import BeautifulSoup
-    soup = BeautifulSoup(html,'html.parser')
+    from denzo.html_content import sanitize_fragment
+    soup = BeautifulSoup(html or '', 'html.parser')
     for node in soup.select('h1, script, .hero-section, .cta-section, .site-header, .site-footer, .breadcrumb'):
         node.decompose()
     for node in soup.select('div.section-content, div.section-alt, div.two-col, div.col-text, div.col-image, div.container, div.page-wrap'):
@@ -42,7 +42,7 @@ def _clean_html_for_jsx(html):
         for attr in ('href','src'):
             if str(node.get(attr,'')).lower().strip().startswith('javascript:'):
                 del node[attr]
-    return str(soup.body.decode_contents() if soup.body else soup).strip()
+    return sanitize_fragment(str(soup.body.decode_contents() if soup.body else soup)).strip()
 
 
 def render_nextjs_page(page: dict, ctx: ClientContext, assets: dict = None) -> str:
@@ -83,12 +83,19 @@ def render_nextjs_page(page: dict, ctx: ClientContext, assets: dict = None) -> s
     # Clean content for JSX embedding
     clean_html = _clean_html_for_jsx(content_html)
 
+    from bs4 import BeautifulSoup
+    from urllib.parse import urljoin
+    image = BeautifulSoup(clean_html,'html.parser').find('img',src=True)
+    image_urls = [urljoin(canonical,image['src'])] if image else []
+
     # Component name
     fn_name = _component_name(slug)
 
     # Primary color from assets (github_publisher resolves this from
     # nextjs_assets → site_style_guide → default #0b3950)
     primary = assets.get("primary_color", "#0b3950")
+    if not re.fullmatch(r"#[0-9a-fA-F]{3,8}",str(primary)):
+        primary = "#0b3950"
 
     # Schema.org (from page if exists, otherwise generate)
     schema_raw = page.get("schema_markup", "")
@@ -134,6 +141,7 @@ def render_nextjs_page(page: dict, ctx: ClientContext, assets: dict = None) -> s
     canonical: {json.dumps(canonical)},
   }},
   openGraph: {{
+    images: {json.dumps(image_urls)},
     title: {json.dumps(meta_title)},
     description: {json.dumps(meta_desc)},
     url: {json.dumps(canonical)},
@@ -142,6 +150,7 @@ def render_nextjs_page(page: dict, ctx: ClientContext, assets: dict = None) -> s
     type: 'website',
   }},
   twitter: {{
+    images: {json.dumps(image_urls)},
     card: 'summary_large_image',
     title: {json.dumps(meta_title)},
     description: {json.dumps(meta_desc)},
@@ -168,7 +177,7 @@ export default function {fn_name}() {{
       [&_td]:border [&_td]:border-gray-200 [&_td]:px-4 [&_td]:py-2">
 
       <h1 className="text-3xl md:text-4xl font-bold text-[{primary}] mb-8 pb-4 border-b-2 border-gray-200">
-        {json.dumps(h1_text)}
+        {{{json.dumps(h1_text)}}}
       </h1>
 
       <div dangerouslySetInnerHTML={{{{ __html: `{escaped_html}` }}}} />

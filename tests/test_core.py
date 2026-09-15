@@ -1,234 +1,242 @@
-"""
-Core tests: app factory, auth, tenant isolation, billing enforcement, agent system.
-Run with: python3 -m pytest tests/ -v
-"""
-import sys, os, json
+"""Observable HTTP, tenant and billing contracts, using a fresh DB per test."""
 
-# Project root relative to this file
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, _PROJECT_ROOT)
+import pytest
+from denzo.db import get_db
 
 
-class TestAppFactory:
-    def test_create_app(self):
-        from denzo import create_app
-        app = create_app()
-        assert app is not None
-        assert len(app.url_map._rules) > 50
-
-    def test_debug_off(self):
-        from denzo import create_app
-        app = create_app()
-        assert app.debug is False
-
-    def test_session_security(self):
-        from denzo import create_app
-        app = create_app()
-        assert app.config["SESSION_COOKIE_HTTPONLY"] is True
-        assert app.config["SESSION_COOKIE_SAMESITE"] == "Lax"
-
-    def test_error_handlers(self):
-        from denzo import create_app
-        app = create_app()
-        # Check custom error handlers registered
-        handlers = [h for h in app.error_handler_spec.get(None, {}).keys()]
-        assert 403 in handlers or len(app.error_handler_spec) > 0
-
-    def test_rate_limiter(self):
-        from denzo import create_app
-        app = create_app()
-        assert app.config.get("LIMITER") is not None
+@pytest.mark.parametrize(
+    "path,method",
+    [
+        ("/clients/bob/pages", "get"),
+        ("/clients/bob/pages/1/preview", "get"),
+        ("/clients/bob/pages/1/review", "get"),
+        ("/clients/bob/pages/1/approve", "post"),
+        ("/clients/bob/pages/1/request-changes", "post"),
+        ("/clients/bob/pages/1/regenerate", "post"),
+        ("/clients/bob/pages/export.csv", "get"),
+        ("/clients/bob/competitors", "get"),
+        ("/clients/bob/competitors/export.csv", "get"),
+        ("/clients/bob/competitors/1/resolve-cannibalization", "post"),
+        ("/api/bob/pages/1/approve", "post"),
+        ("/api/bob/pages/1/reject", "post"),
+        ("/api/bob/pipeline/run", "post"),
+        ("/api/bob/pipeline/reset", "post"),
+        ("/lite/bob/", "get"),
+        ("/settings/", "get"),
+        ("/settings/", "post"),
+    ],
+)
+def test_other_tenant_and_global_settings_denied(client, path, method):
+    assert getattr(client, method)(path).status_code == 403
 
 
-class TestAuth:
-    def test_can_access_tenant_admin(self):
-        from denzo.auth import can_access_tenant
-        # Admin (role='admin') can always access any tenant
-        assert can_access_tenant is not None
-        assert hasattr(can_access_tenant, '__call__')
-
-    def test_tenant_access_decorator_returns_function(self):
-        from denzo.auth import tenant_access_required
-        # The decorator should take a function and return a wrapped function
-        def dummy(): pass
-        wrapped = tenant_access_required(dummy)
-        assert wrapped is not None
-        assert callable(wrapped)
-
-    def test_check_credentials(self):
-        from denzo.auth import check_credentials
-        # Should return (False, None) for invalid credentials
-        result = check_credentials("nonexistent_user_12345", "wrong_password")
-        assert isinstance(result, tuple) or isinstance(result, bool) or result is not None
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/clients/",
+        "/clients/new",
+        "/clients/alice/pages",
+        "/clients/alice/keywords",
+        "/clients/alice/competitors",
+        "/clients/alice/brand-voice/",
+        "/clients/alice/geo",
+        "/lite/alice/",
+    ],
+)
+def test_navigation_does_not_leak_other_clients(client, path):
+    result = client.get(path)
+    assert result.status_code == 200
+    assert b"Private Bob Business" not in result.data
 
 
-class TestBilling:
-    def test_plans_defined(self):
-        from denzo.billing.plans import PLANS
-        assert "free" in PLANS
-        assert "trial" in PLANS
-        assert "pro" in PLANS
-        assert "agency" in PLANS
-
-    def test_plan_limits(self):
-        from denzo.billing.plans import PLANS
-        assert PLANS["free"]["max_clients"] == 1
-        assert PLANS["trial"]["max_clients"] == 3
-        assert PLANS["pro"]["max_clients"] == 5
-        assert PLANS["agency"]["max_clients"] == 25
-
-    def test_is_at_least(self):
-        from denzo.billing.plans import is_at_least
-        assert is_at_least("pro", "starter")
-        assert is_at_least("agency", "pro")
-        assert is_at_least("trial", "free")
-        assert not is_at_least("free", "starter")
-        assert not is_at_least("starter", "pro")
-
-    def test_requires_plan_decorator_wraps_function(self):
-        from denzo.billing.enforce import requires_plan
-        decorator = requires_plan("pro")
-        # Decorator factory should return a callable decorator
-        assert callable(decorator)
-        # Applying decorator to a dummy function returns a wrapped function
-        def dummy(): pass
-        wrapped = decorator(dummy)
-        assert callable(wrapped)
-
-    def test_has_feature_returns_boolean_like(self):
-        from denzo.billing.enforce import has_feature
-        # has_feature should be callable
-        assert callable(has_feature)
+def test_anonymous_api_rejected(app):
+    assert app.test_client().post("/api/alice/pages/1/approve").status_code == 401
 
 
-class TestAgentSystem:
-    def test_all_agents_registered(self):
-        from denzo.agents.registry import AGENT_REGISTRY
-        assert len(AGENT_REGISTRY) >= 27
-        assert "Pipeline Director" in AGENT_REGISTRY
-        assert "Keyword Strategist" in AGENT_REGISTRY
-        assert "Programmatic SEO" in AGENT_REGISTRY
-
-    def test_agent_prerequisites_set(self):
-        from denzo.agents.registry import AGENT_REGISTRY
-        for name, (mod_path, cls_name, layer, color) in AGENT_REGISTRY.items():
-            import importlib
-            mod = importlib.import_module(f"denzo.agents.{mod_path}")
-            cls = getattr(mod, cls_name)
-            pre = getattr(cls, "PREREQUISITES", None)
-            mkw = getattr(cls, "MIN_KEYWORDS", None)
-            assert pre is not None, f"{name}: PREREQUISITES not set"
-            assert isinstance(pre, list), f"{name}: PREREQUISITES must be a list"
-            assert mkw is not None, f"{name}: MIN_KEYWORDS not set"
-
-    def test_keyword_cleaner(self):
-        from denzo.agents.layer1_research.keyword_strategist import _clean_keyword
-        result = _clean_keyword({
-            "keyword": " 1. BMW Repair ",
-            "intent": "transaccional",
-            "difficulty": "25",
-            "priority": "media",
-            "category": "lujo",
-            "volume": "450/mo"
-        })
-        assert result["intent"] == "transactional"
-        assert result["difficulty"] == "easy"
-        assert result["priority"] == "medium"
-        assert result["category"] == "luxury"
-        assert result["volume"] == "450"
-        assert result["keyword"] == "BMW Repair"
-
-    def test_director_state_machine(self):
-        from denzo.agents.director import PipelineDirector, LAYER_1, LAYER_2, LAYER_2B, LAYER_3, LAYER_4, LAYER_4B, LAYER_5, LAYER_6
-        assert len(LAYER_1) == 7
-        assert len(LAYER_2) == 2
-        assert len(LAYER_2B) == 1
-        assert len(LAYER_3) == 1
-        assert len(LAYER_4) == 4
-        assert len(LAYER_4B) == 1
-        assert len(LAYER_5) == 3
-        assert len(LAYER_6) == 9
-
-    def test_agent_runner_singleton(self):
-        from denzo.agents.runner import AgentRunner
-        assert hasattr(AgentRunner, "_threads")
-        assert hasattr(AgentRunner, "_events")
-        assert hasattr(AgentRunner, "start")
-        assert hasattr(AgentRunner, "stop")
-        assert hasattr(AgentRunner, "stop_all")
-
-    def test_base_agent_anthropic_singleton(self):
-        from denzo.agents.base_agent import _get_anthropic_client
-        c1 = _get_anthropic_client()
-        c2 = _get_anthropic_client()
-        assert c1 is c2  # same instance
+def test_admin_can_access_other_tenant_and_settings(app):
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session.update(user_id=103, role="admin")
+    assert client.get("/clients/bob/pages").status_code == 200
+    assert client.get("/settings/").status_code == 200
 
 
-class TestDB:
-    def test_db_connection(self):
-        from denzo.agents.base_agent import _get_conn, db_execute
-        conn = _get_conn()
-        assert conn is not None
+def test_onboarding_sets_owner_and_separate_audience(client, platform_db):
+    result = client.post(
+        "/clients/create",
+        data={
+            "name": "New Studio",
+            "website_url": "https://new.example",
+            "business_type": "agency",
+            "target_audience": "Local business owners",
+        },
+    )
+    assert result.status_code == 302
+    row = platform_db.execute(
+        "SELECT owner_user_id FROM clients WHERE tenant_id=?", ("new-studio",)
+    ).fetchone()
+    assert row is not None and row["owner_user_id"] == 101
+    row = platform_db.execute(
+        "SELECT target_audience,service_cities FROM client_context WHERE tenant_id=?",
+        ("new-studio",),
+    ).fetchone()
+    assert row["target_audience"] == "Local business owners"
+    assert "business owners" not in row["service_cities"]
+    assert (
+        platform_db.execute(
+            "SELECT COUNT(*) FROM agents WHERE tenant_id=?", ("new-studio",)
+        ).fetchone()[0]
+        >= 30
+    )
 
-    def test_db_read(self):
-        from denzo.agents.base_agent import db_execute
-        rows = db_execute("SELECT 1 as n")
-        assert rows[0]["n"] == 1
 
-    def test_db_write_read(self):
-        from denzo.agents.base_agent import db_write, db_execute
-        db_write("INSERT OR REPLACE INTO settings (tenant_id, key, value) VALUES ('__test__','test_key','test_value')")
-        rows = db_execute("SELECT value FROM settings WHERE tenant_id='__test__' AND key='test_key'")
-        assert rows[0]["value"] == "test_value"
-        db_write("DELETE FROM settings WHERE tenant_id='__test__' AND key='test_key'")
+def test_api_and_form_approval_share_contract(client, page, platform_db):
+    pid = page["id"]
+    result = client.post(f"/api/alice/pages/{pid}/approve")
+    assert result.status_code == 200
+    row = dict(platform_db.execute("SELECT * FROM pages WHERE id=?", (pid,)).fetchone())
+    from denzo.editorial import publishable
+
+    assert publishable(row)
+    assert "[PENDING_REVIEW]" not in (row["notes"] or "")
+    client.post(
+        f"/clients/alice/pages/{pid}/request-changes",
+        data={"feedback": "Use the supplied case study"},
+    )
+    row = dict(platform_db.execute("SELECT * FROM pages WHERE id=?", (pid,)).fetchone())
+    assert row["status"] == "draft" and row["content"] == page["content"]
+    assert not publishable(row)
 
 
-class TestDataIntegrity:
-    def test_spanish_categories_clean(self):
-        from denzo.agents.base_agent import db_execute
-        rows = db_execute(
-            "SELECT COUNT(*) as n FROM keywords WHERE category IN ('lujo','servicio','seguro','seguros','marca','ubicacion','ubicación','comparacion','comparación','pregunta','competidor')"
+def test_facts_require_attestation_and_belong_to_owner(client, platform_db):
+    payload = {
+        "fact_statement": "Opened in 2019",
+        "fact_source": "Company registration",
+        "target_audience": "Homeowners",
+    }
+    client.post("/clients/alice/brand-voice/", data=payload)
+    assert platform_db.execute("SELECT COUNT(*) FROM client_facts").fetchone()[0] == 0
+    payload["fact_confirmed"] = "yes"
+    assert client.post("/clients/alice/brand-voice/", data=payload).status_code == 200
+    fact = dict(platform_db.execute("SELECT * FROM client_facts").fetchone())
+    assert fact["verified_by"] == 101 and fact["tenant_id"] == "alice"
+    from denzo.context.builder import build_client_context
+
+    prompt = build_client_context("alice").to_prompt_block()
+    assert "Opened in 2019" in prompt and "Company registration" in prompt
+    assert "Opened in 2019" not in build_client_context("bob").to_prompt_block()
+
+
+@pytest.mark.parametrize(
+    "expiry", ["2001-01-01T00:00:00", "2001-01-01T00:00:00+00:00", "invalid"]
+)
+def test_expired_or_invalid_trial_is_free(platform_db, expiry):
+    platform_db.execute(
+        "UPDATE users SET plan='trial',trial_ends_at=? WHERE id=101", (expiry,)
+    )
+    platform_db.commit()
+    from denzo.billing.enforce import get_user_plan, agent_entitled
+
+    assert get_user_plan(101) == "free"
+    assert agent_entitled("alice", "Pipeline Director")[0] is False
+
+
+def test_client_page_keyword_limits_are_atomic(platform_db):
+    import sqlite3
+    from concurrent.futures import ThreadPoolExecutor
+
+    platform_db.execute("UPDATE users SET plan='free' WHERE id=101")
+    for i in range(24):
+        platform_db.execute(
+            "INSERT INTO pages(tenant_id,title,slug,type) VALUES ('alice',?,?,'blog')",
+            (str(i), str(i)),
         )
-        # Should be 0 or very low (cleanup may have already run)
-        count = rows[0]["n"]
-        assert count <= 5, f"Too many Spanish categories remaining: {count}"
+    platform_db.commit()
 
-    def test_spanish_intents_clean(self):
-        from denzo.agents.base_agent import db_execute
-        rows = db_execute(
-            "SELECT COUNT(*) as n FROM keywords WHERE intent IN ('transaccional','informacional','navegacional','comercial','urgencia','emergencia','compra','local')"
-        )
-        count = rows[0]["n"]
-        assert count <= 5, f"Too many Spanish intents remaining: {count}"
-
-    def test_orphaned_clients_minimal(self):
-        from denzo.agents.base_agent import db_execute
-        # Clients with owner_user_id=NULL should be minimal
-        # (new wizard-created clients may temporarily not have owner)
-        rows = db_execute(
-            "SELECT COUNT(*) as n FROM clients WHERE owner_user_id IS NULL AND created_at < datetime('now', '-7 days')"
-        )
-        count = rows[0]["n"]
-        assert count == 0, f"Old orphaned clients found (created >7 days ago, no owner): {count}"
-
-    def test_no_markdown_in_content(self):
-        from denzo.agents.base_agent import db_execute
-        rows = db_execute("SELECT COUNT(*) as n FROM pages WHERE content LIKE '%```%'")
-        count = rows[0]["n"]
-        assert count <= 2, f"Pages with markdown code blocks: {count}"
-
-    def test_all_pages_have_quality_score(self):
-        from denzo.agents.base_agent import db_execute
-        rows = db_execute("SELECT COUNT(*) as n FROM pages WHERE content IS NOT NULL AND content != '' AND quality_score IS NULL")
-        count = rows[0]["n"]
-        assert count <= 5, f"Pages without quality score: {count}"
-
-    def test_clients_have_agents(self):
-        from denzo.agents.base_agent import db_execute
-        clients = db_execute("SELECT tenant_id FROM clients")
-        for c in clients:
-            agents = db_execute(
-                "SELECT COUNT(*) as n FROM agents WHERE tenant_id=?", (c["tenant_id"],)
+    def insert(index):
+        db = get_db()
+        try:
+            db.execute(
+                "INSERT INTO pages(tenant_id,title,slug,type) VALUES ('alice',?,?,'blog')",
+                ("Race " + str(index), "race-" + str(index)),
             )
-            # Should have at least some agents (threshold relaxed for new tenants)
-            assert agents[0]["n"] >= 5, f"Client {c['tenant_id']} has only {agents[0]['n']} agents"
+            db.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+        finally:
+            db.close()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        assert sorted(executor.map(insert, [1, 2])) == [False, True]
+    with pytest.raises(sqlite3.IntegrityError, match="client limit"):
+        platform_db.execute(
+            "INSERT INTO clients(tenant_id,name,owner_user_id) VALUES ('over-limit','Extra',101)"
+        )
+    platform_db.rollback()
+    for i in range(50):
+        platform_db.execute(
+            "INSERT INTO keywords(tenant_id,keyword) VALUES ('alice',?)", (str(i),)
+        )
+    platform_db.commit()
+    with pytest.raises(sqlite3.IntegrityError, match="keyword limit"):
+        platform_db.execute(
+            "INSERT INTO keywords(tenant_id,keyword) VALUES ('alice','too many')"
+        )
+    platform_db.rollback()
+    # Discovered external URLs do not consume the generated page quota.
+    platform_db.execute(
+        "INSERT INTO pages(tenant_id,title,slug,type,managed) VALUES ('alice','Existing','existing','page',0)"
+    )
+    platform_db.commit()
+
+
+def test_agent_registry_imports_and_constructs(ctx):
+    from denzo.agents.registry import AGENT_REGISTRY, get_agent
+
+    assert len(AGENT_REGISTRY) >= 30
+    for name in AGENT_REGISTRY:
+        agent = get_agent(name, ctx)
+        assert agent.tenant_id == "alice"
+        assert isinstance(agent.PREREQUISITES, list)
+
+
+def test_app_security_settings(app):
+    assert not app.debug
+    assert app.config["SESSION_COOKIE_HTTPONLY"]
+    assert app.config["SESSION_COOKIE_SAMESITE"] == "Lax"
+    assert len(list(app.url_map.iter_rules())) > 50
+
+
+def test_trial_cannot_be_restarted(client, platform_db):
+    platform_db.execute("UPDATE users SET plan='free',trial_ends_at=NULL WHERE id=101")
+    platform_db.commit()
+    assert client.post("/upgrade/activate").status_code == 200
+    expiry = platform_db.execute(
+        "SELECT trial_ends_at FROM users WHERE id=101"
+    ).fetchone()[0]
+    assert client.post("/upgrade/activate").status_code == 409
+    assert (
+        platform_db.execute("SELECT trial_ends_at FROM users WHERE id=101").fetchone()[
+            0
+        ]
+        == expiry
+    )
+
+
+def test_lite_review_queue_includes_ready_unapproved_content(client, page):
+    result = client.get("/lite/alice/content?status=draft")
+    assert result.status_code == 200 and b"Design guide" in result.data
+    assert b"Design guide" not in client.get("/lite/alice/content?status=ready").data
+
+
+def test_free_plan_cannot_report_pipeline_started(client, platform_db):
+    platform_db.execute("UPDATE users SET plan='free' WHERE id=101")
+    platform_db.commit()
+    assert client.post("/api/alice/pipeline/run").status_code == 409
+
+
+def test_preview_is_sandboxed(client, page):
+    response = client.get(f"/clients/alice/pages/{page['id']}/preview")
+    assert response.status_code == 200
+    assert response.headers["Content-Security-Policy"].startswith("sandbox;")

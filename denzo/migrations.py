@@ -3,18 +3,30 @@
 
 def migrate_platform(conn):
     additions = {
-        'pages': {'approval_hash': 'TEXT', 'approved_at': 'TEXT', 'approved_by': 'INTEGER',
-                  'deployment_status': "TEXT DEFAULT 'unknown'"},
-        'keywords': {'source': "TEXT DEFAULT 'unknown'", 'measured_at': 'TEXT'},
-        'competitors': {'evidence_source': "TEXT DEFAULT 'unknown'", 'observed_at': 'TEXT'},
-        'geo_queries': {'citation_verified': 'INTEGER DEFAULT 0', 'citations_json': "TEXT DEFAULT '[]'", 'query_mode': "TEXT DEFAULT 'legacy_unverified'"},
-        'client_context': {'target_audience': "TEXT DEFAULT ''"},
+        "pages": {
+            "approval_hash": "TEXT",
+            "approved_at": "TEXT",
+            "approved_by": "INTEGER",
+            "deployment_status": "TEXT DEFAULT 'unknown'",
+        },
+        "keywords": {"source": "TEXT DEFAULT 'unknown'", "measured_at": "TEXT"},
+        "competitors": {
+            "evidence_source": "TEXT DEFAULT 'unknown'",
+            "observed_at": "TEXT",
+        },
+        "geo_queries": {
+            "baseline": "INTEGER DEFAULT 0",
+            "citation_verified": "INTEGER DEFAULT 0",
+            "citations_json": "TEXT DEFAULT '[]'",
+            "query_mode": "TEXT DEFAULT 'legacy_unverified'",
+        },
+        "client_context": {"target_audience": "TEXT DEFAULT ''"},
     }
     for table, fields in additions.items():
-        existing = {r[1] for r in conn.execute(f'PRAGMA table_info({table})')}
+        existing = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
         for field, definition in fields.items():
             if field not in existing:
-                conn.execute(f'ALTER TABLE {table} ADD COLUMN {field} {definition}')
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {field} {definition}")
     conn.executescript("""
     CREATE TABLE IF NOT EXISTS agent_jobs (
         id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, agent_name TEXT NOT NULL,
@@ -29,7 +41,7 @@ def migrate_platform(conn):
         id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, page_id INTEGER NOT NULL,
         publisher TEXT NOT NULL, revision TEXT NOT NULL, status TEXT NOT NULL,
         url TEXT, error TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        completed_at TEXT,
+        completed_at TEXT, last_checked_at TEXT,
         FOREIGN KEY(tenant_id) REFERENCES clients(tenant_id) ON DELETE CASCADE
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_publication_active
@@ -54,6 +66,8 @@ def migrate_platform(conn):
       OR OLD.slug IS NOT NEW.slug OR OLD.type IS NOT NEW.type
     BEGIN
       UPDATE pages SET approval_hash=NULL,approved_at=NULL,approved_by=NULL,quality_score=NULL,
+        status=CASE WHEN status='published' THEN 'ready' ELSE status END,
+        deployment_status=CASE WHEN status='published' THEN 'pending_review' ELSE deployment_status END,
         notes=TRIM(REPLACE(REPLACE(REPLACE(COALESCE(notes,''),'[APPROVED]',''),'[PENDING_REVIEW]',''),'[SUBMITTED]',''))
           || ' [PENDING_REVIEW]' WHERE id=NEW.id;
     END;
@@ -65,20 +79,36 @@ def migrate_platform(conn):
       VALUES(OLD.tenant_id,OLD.id,OLD.content,OLD.quality_score);
     END;
     """)
+    if "last_checked_at" not in {
+        r[1] for r in conn.execute("PRAGMA table_info(publication_attempts)")
+    }:
+        conn.execute("ALTER TABLE publication_attempts ADD COLUMN last_checked_at TEXT")
     migrate_limits(conn)
     # Recover orphan regeneration states; old content remains available for review.
-    conn.execute("UPDATE pages SET status='draft' WHERE status IN ('pending','needs_fix')")
-    conn.execute("UPDATE pages SET notes=REPLACE(notes,'[INDEXED]','[LEGACY_SUBMISSION_UNVERIFIED]') WHERE notes LIKE '%[INDEXED]%'")
+    conn.execute(
+        "UPDATE pages SET status='draft' WHERE status IN ('pending','needs_fix')"
+    )
+    conn.execute(
+        "UPDATE pages SET notes=REPLACE(notes,'[INDEXED]','[LEGACY_SUBMISSION_UNVERIFIED]') WHERE notes LIKE '%[INDEXED]%'"
+    )
     conn.commit()
 
 
 def migrate_limits(conn):
     """Database gates protect inserts from every API/agent, including concurrent jobs."""
     from denzo.billing.plans import PLANS
-    conn.execute('CREATE TABLE IF NOT EXISTS plan_limits(plan TEXT PRIMARY KEY,max_clients INTEGER,max_pages INTEGER,max_keywords INTEGER)')
-    conn.executemany('INSERT OR REPLACE INTO plan_limits VALUES (?,?,?,?)',
-                     [(key,p['max_clients'],p['max_pages'],p['max_keywords']) for key,p in PLANS.items()])
-    conn.executescript('''
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS plan_limits(plan TEXT PRIMARY KEY,max_clients INTEGER,max_pages INTEGER,max_keywords INTEGER)"
+    )
+    conn.executemany(
+        "INSERT OR REPLACE INTO plan_limits VALUES (?,?,?,?)",
+        [
+            (key, p["max_clients"], p["max_pages"], p["max_keywords"])
+            for key, p in PLANS.items()
+        ],
+    )
+    conn.executescript("""
     CREATE VIEW IF NOT EXISTS account_limits AS
       SELECT u.id, p.max_clients,p.max_pages,p.max_keywords FROM users u
       JOIN plan_limits p ON p.plan=COALESCE(
@@ -101,5 +131,5 @@ def migrate_limits(conn):
        AND (SELECT COUNT(*) FROM keywords k JOIN clients kc ON kc.tenant_id=k.tenant_id
             WHERE kc.owner_user_id=a.id)>=a.max_keywords)
     BEGIN SELECT RAISE(ABORT,'Account keyword limit reached'); END;
-    ''')
+    """)
     conn.commit()

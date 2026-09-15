@@ -133,7 +133,7 @@ def preview(tenant_id, page_id):
         ).fetchone()
         _cdb.close()
         client_name  = _esc(client_row["name"]  if client_row else "")
-        client_phone = _esc(client_row["phone"] if client_row else "")
+        client_phone = _esc((client_row["phone"] if client_row else "") or "")
 
         # Extract brand colors from style guide, fall back to clean indigo
         brand_color = "#6366f1"
@@ -577,3 +577,11 @@ def export_pages_csv(tenant_id):
         mimetype="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+
+@bp.after_request
+def isolate_preview(response):
+    if request.endpoint == 'pages.preview':
+        response.headers['Content-Security-Policy'] = "sandbox; default-src 'none'; img-src https: http: data:; style-src 'unsafe-inline' https:; font-src https: data:"
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response

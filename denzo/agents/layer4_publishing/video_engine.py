@@ -82,7 +82,9 @@ class VideoEngine(TenantAwareBaseAgent):
             "SELECT plan FROM users u JOIN clients c ON c.owner_user_id = u.id WHERE c.tenant_id=?",
             (self.tenant_id,)
         )
-        return rows[0]["plan"] if rows else "free"
+        from denzo.billing.enforce import get_user_plan
+        owners = db_execute("SELECT owner_user_id FROM clients WHERE tenant_id=?", (self.tenant_id,))
+        return get_user_plan(owners[0]["owner_user_id"]) if owners and owners[0]["owner_user_id"] else "free"
 
     def _count_monthly_videos(self) -> int:
         from denzo.agents.base_agent import db_execute

@@ -48,7 +48,9 @@ def get_user_plan(user_id: int | None = None) -> str:
     db.close()
     if user and user["plan"]:
         # Check if trial expired
-        if user["plan"] == "trial" and user["trial_ends_at"]:
+        if user["plan"] == "trial":
+            if not user["trial_ends_at"]:
+                return PLAN_FREE
             from datetime import datetime, timezone
             try:
                 expiry = datetime.fromisoformat(user["trial_ends_at"])

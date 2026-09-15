@@ -51,6 +51,7 @@
       <option value="" style="background:#1a1a1a;">All Statuses</option>
       <option value="draft"     {% if filters.status == 'draft'     %}selected{% endif %} style="background:#1a1a1a;">Draft</option>
       <option value="ready"     {% if filters.status == 'ready'     %}selected{% endif %} style="background:#1a1a1a;">Ready</option>
+      <option value="publishing" {% if filters.status == 'publishing' %}selected{% endif %}>Awaiting deployment</option>
       <option value="published" {% if filters.status == 'published' %}selected{% endif %} style="background:#1a1a1a;">Published</option>
     </select>
 
@@ -149,7 +150,7 @@
               {% elif p.status == 'ready' %}background:#818cf8;
               {% elif p.status == 'error' %}background:#ef4444;
               {% else %}background:rgba(255,255,255,0.3);{% endif %}"></span>
-            {{ p.status | title }}
+            {{ 'Awaiting deployment' if p.status == 'publishing' else 'Needs review' if p.status == 'ready' and not p.approval_hash else p.status | title }}
           </span>
         </td>
         <td style="padding:12px 20px;color:rgba(255,255,255,0.3);font-size:12px;white-space:nowrap;">{{ p.created_at[:10] if p.created_at else '—' }}</td>

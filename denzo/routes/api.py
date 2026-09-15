@@ -29,6 +29,8 @@ def run_pipeline(tenant_id):
         return jsonify({"error": "Director already running"}), 409
     if result["status"] == "error":
         return jsonify({"error": result.get("message", "Unknown error")}), 500
+    if result["status"] == "prereq_failed":
+        return jsonify({"error": result.get("message", "Prerequisites not met")}), 409
     return jsonify({"status": "director_started"})
 
 
@@ -56,12 +58,12 @@ def reset_pipeline(tenant_id):
     db = get_db()
     db.execute(
         "INSERT INTO activity (tenant_id, type, message, agent, level) VALUES (?,?,?,?,?)",
-        (tenant_id, "system", "Pipeline reset by user — all agents set to idle.", "System", "warning")
+        (tenant_id, "system", "Pipeline reset by user — cancellation requested; running work stops cooperatively.", "System", "warning")
     )
     db.commit()
     db.close()
 
-    return jsonify({"status": "reset", "stopped": count, "message": "All agents reset to idle"})
+    return jsonify({"status": "reset", "stopped": count, "message": "Cancellation requested; running work stops cooperatively"})
 
 
 # ── Agent control endpoints ────────────────────────────────────────────────────

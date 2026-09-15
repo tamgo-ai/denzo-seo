@@ -115,7 +115,8 @@ class WordPressPublisher(TenantAwareBaseAgent):
                 self.log(f'Protected pre-existing WordPress content: {slug}','warning');continue
             if existing:
                 page['publish_url']=existing.get('link') or public_page_url(page,ctx)
-            content=strip_html_wrappers(page['content'])
+            from denzo.html_content import sanitize_fragment
+            content=sanitize_fragment(page['content'])
             try:
                 schema=schema_json(page.get('schema_markup'))
                 url=public_page_url(page,ctx)
@@ -133,6 +134,7 @@ class WordPressPublisher(TenantAwareBaseAgent):
                      'meta':{'denzo_title':page.get('meta_title') or page['title'],
                              'denzo_description':page.get('meta_description') or '',
                              'denzo_schema':schema,'denzo_revision':revision_hash(page),'denzo_tenant':ctx.tenant_id}}
+            remote_url=None
             try:
                 if self.should_stop():
                     failed(attempt,'Cancelled before provider write');break
@@ -141,14 +143,16 @@ class WordPressPublisher(TenantAwareBaseAgent):
                 if response.status_code not in (200,201):
                     failed(attempt,f'WordPress HTTP {response.status_code}');errors+=1;continue
                 result=response.json()
-                committed(attempt,result['link'],str(result['id']))
+                remote_url=result['link']
+                committed(attempt,remote_url,str(result['id']))
                 db_write("INSERT OR REPLACE INTO managed_paths(tenant_id,publisher,path,page_id,managed,content_hash) VALUES (?,'wordpress',?,?,1,?)",
                          (ctx.tenant_id,path,page['id'],revision_hash(page)))
                 verify_publication(attempt)
                 processed+=1
             except Exception as exc:
                 # An ambiguous provider timeout must be verified, not retried as a new create.
-                committed(attempt,url)
+                if remote_url is None:
+                    committed(attempt,url)
                 self.log(f'Publication needs verification: {type(exc).__name__}','warning');errors+=1
         self.set_status('error' if errors else 'done',f'{processed} sent; {errors} issues; live status requires revision verification')
 

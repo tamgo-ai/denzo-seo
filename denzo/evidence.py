@@ -1,4 +1,5 @@
 """Provenance requirements shared by research and content agents."""
+
 import json
 from denzo.db import get_db
 
@@ -18,7 +19,14 @@ when using external evidence. Do not invent source URLs. No word count guarantee
 def facts_block(tenant_id):
     db = get_db()
     try:
-        rows = db.execute('SELECT statement,source,verified_at FROM client_facts WHERE tenant_id=? ORDER BY id LIMIT 60', (tenant_id,)).fetchall()
-        return FACTUAL_RULES + '\nCLIENT-VERIFIED FACTS:\n' + json.dumps([dict(r) for r in rows], ensure_ascii=False)
+        rows = db.execute(
+            "SELECT statement,source,verified_at FROM client_facts WHERE tenant_id=? ORDER BY id LIMIT 60",
+            (tenant_id,),
+        ).fetchall()
+        return (
+            FACTUAL_RULES
+            + "\nCLIENT-VERIFIED FACTS:\n"
+            + json.dumps([dict(r) for r in rows], ensure_ascii=False)
+        )
     finally:
         db.close()

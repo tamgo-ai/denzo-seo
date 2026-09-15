@@ -1032,20 +1032,9 @@ def _analyze_website(url: str) -> dict:
     return result
 
 
-def _get_plan(user_id: int) -> str:
-    db = get_db()
-    row = db.execute("SELECT plan, trial_ends_at FROM users WHERE id=?", (user_id,)).fetchone()
-    db.close()
-    if not row:
-        return "free"
-    plan = row["plan"] or "free"
-    if plan == "trial" and row["trial_ends_at"]:
-        try:
-            if datetime.now(timezone.utc) > datetime.fromisoformat(row["trial_ends_at"]):
-                return "expired"
-        except Exception as e:
-            logger.warning("Error: %s", e)
-    return plan
+def _get_plan(user_id):
+    from denzo.billing.enforce import get_user_plan
+    return get_user_plan(user_id)
 
 
 # ── Public landing ─────────────────────────────────────────────────────────────
@@ -1424,11 +1413,12 @@ def activate_trial():
     user_id    = session["user_id"]
     trial_ends = datetime.now(timezone.utc) + timedelta(days=14)
     db = get_db()
-    db.execute(
-        "UPDATE users SET plan='trial', trial_ends_at=? WHERE id=?",
-        (trial_ends.isoformat(), user_id)
-    )
+    db.execute('BEGIN IMMEDIATE')
+    changed = db.execute("UPDATE users SET plan='trial',trial_ends_at=? WHERE id=? AND trial_ends_at IS NULL AND COALESCE(plan,'free')='free' AND NOT EXISTS (SELECT 1 FROM subscriptions WHERE user_id=? AND status IN ('active','trialing'))", (trial_ends.isoformat(),user_id,user_id)).rowcount
     db.commit()
+    if not changed:
+        db.close()
+        return jsonify({'error':'This account has already used its trial or has a paid plan.'}), 409
 
     # Find their tenant to redirect
     client = db.execute(

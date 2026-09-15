@@ -33,7 +33,7 @@ def _stats(db, tenant_id):
     counts = db.execute("""
         SELECT
             SUM(CASE WHEN status='published' THEN 1 ELSE 0 END) AS published,
-            SUM(CASE WHEN status='ready'     THEN 1 ELSE 0 END) AS ready,
+            SUM(CASE WHEN status='ready' AND approval_hash IS NOT NULL THEN 1 ELSE 0 END) AS ready,
             SUM(CASE WHEN status IN ('ready','draft') AND approval_hash IS NULL AND content IS NOT NULL AND content != '' THEN 1 ELSE 0 END) AS draft,
             SUM(CASE WHEN status='pending'   THEN 1 ELSE 0 END) AS pending
         FROM pages WHERE tenant_id=?
@@ -167,8 +167,12 @@ def content(tenant_id):
 
     conditions = ["tenant_id=?"]
     params = [tenant_id]
-    if current_status:
-        conditions.append("status=?")
+    if current_status == 'draft':
+        conditions.append("status IN ('draft','ready') AND approval_hash IS NULL AND COALESCE(content,'')!=''")
+    elif current_status == 'ready':
+        conditions.append("status='ready' AND approval_hash IS NOT NULL")
+    elif current_status:
+        conditions.append('status=?')
         params.append(current_status)
 
     where = " AND ".join(conditions)
@@ -182,7 +186,7 @@ def content(tenant_id):
         SELECT
             COUNT(*) AS total,
             SUM(CASE WHEN status IN ('ready','draft') AND approval_hash IS NULL AND content IS NOT NULL AND content != '' THEN 1 ELSE 0 END) AS draft,
-            SUM(CASE WHEN status='ready'     THEN 1 ELSE 0 END) AS ready,
+            SUM(CASE WHEN status='ready' AND approval_hash IS NOT NULL THEN 1 ELSE 0 END) AS ready,
             SUM(CASE WHEN status='published' THEN 1 ELSE 0 END) AS published
         FROM pages WHERE tenant_id=?
     """, (tenant_id,)).fetchone()

@@ -270,59 +270,36 @@ def strip_h1_tags(content: str) -> str:
     return cleaned
 
 
-def validate_page_quality(content: str, page_type: str = "service", base_url: str = None, domain: str = None) -> list[str]:
-    """Pre-publish quality gate using the Site Auditor engine.
-    Runs technical + GEO audit on the generated HTML content.
-    Returns list of issues (empty = passes)."""
+def validate_page_quality(content, page_type='service', base_url=None, domain=None):
+    """Deterministic rendered-page gate. No fabricated score or word-count claim."""
+    import json
+    from urllib.parse import urlsplit
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(content or '', 'html.parser')
     issues = []
-
-    if not content or len(content.strip()) < 200:
-        issues.append("Content too short (<200 chars)")
-        return issues
-
-    # Use actual domain for validation, not localhost
-    target_url = base_url or "https://localhost/page"
-    target_domain = domain or "localhost"
-
-    # Run actual audit modules on the generated content
-    try:
-        from denzo.auditor.technical_scanner import scan_technical
-        from denzo.auditor.geo_visibility import analyze_geo_visibility
-
-        tech = scan_technical(target_url, content, target_domain, None, 200)
-        geo = analyze_geo_visibility(target_url, content, target_domain)
-
-        # Extract actionable issues from audit findings
-        # Only critical severity blocks publishing; high are logged but don't block
-        for f in tech.get('findings', []):
-            if f['severity'] == 'critical':
-                issues.append(f"[Technical] {f['title']}")
-
-        for f in geo.get('findings', []):
-            # GEO findings are advisory only — don't block publishing
-            # Programmatic local pages naturally lack FAQ sections, etc.
-            pass
-
-        # Also check basic structural requirements
-        tech_score = tech.get('score', 0)
-        geo_score = geo.get('score', 0)
-        if tech_score < 20:
-            issues.append(f"Technical SEO score critically low: {tech_score}/100")
-        if geo_score < 0:
-            issues.append(f"GEO/AI visibility score critically low: {geo_score}/100")
-
-    except Exception as e:
-        # Fallback to basic checks if audit modules unavailable
-        import re as _re
-        text = _re.sub(r'<[^>]+>', ' ', content)
-        text = _re.sub(r'\s+', ' ', text).strip()
-        word_count = len(text.split())
-        min_words = 500 if page_type in ("service", "location", "inventory", "financing") else 400
-        if word_count < min_words:
-            issues.append(f"Thin content: {word_count} words (min {min_words})")
-        if not _re.search(r'<h2[^>]*>', content, _re.IGNORECASE):
-            issues.append("Missing H2 heading")
-
+    if not soup.title or not soup.title.get_text(strip=True):
+        issues.append('Missing page title')
+    desc = soup.find('meta',attrs={'name':'description'})
+    if not desc or not desc.get('content','').strip():
+        issues.append('Missing meta description')
+    if len(soup.find_all('h1'))!=1:
+        issues.append('Exactly one main heading is required')
+    canonical = soup.find('link',rel='canonical')
+    href = canonical.get('href','') if canonical else ''
+    if urlsplit(href).scheme not in ('https','http') or (base_url and href.rstrip('/')!=base_url.rstrip('/')):
+        issues.append('Canonical URL does not match this page')
+    for robots in soup.find_all('meta',attrs={'name':['robots','googlebot']}):
+        if 'noindex' in robots.get('content','').lower():
+            issues.append('Page is marked noindex')
+    for node in soup.find_all('script',type='application/ld+json'):
+        try:
+            if not isinstance(json.loads(node.string or node.get_text()),(dict,list)):
+                raise ValueError()
+        except (ValueError,TypeError):
+            issues.append('Invalid structured data')
+    body = soup.body or soup
+    if len(body.get_text(' ',strip=True))<100:
+        issues.append('Page has no substantive text')
     return issues
 
 
@@ -362,7 +339,7 @@ def build_llms_txt(ctx: "ClientContext", base_url: str = "") -> str:
 {cities_list or f'- {primary_city}'}
 
 ## Certifications & Credentials
-{certs_list or '- Licensed and insured'}
+{certs_list or '- No verified credentials supplied'}
 
 ## Why Choose Us
 {diffs_list or '- Quality service'}

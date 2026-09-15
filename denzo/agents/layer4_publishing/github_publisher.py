@@ -25,6 +25,10 @@ def _build_html_page(title, meta_description, content, style_guide=None, ctx=Non
     Uses style_guide (from site_style_guide setting) for brand colors/fonts.
     Falls back to sensible defaults if no style guide.
     """
+    from html import escape
+    import re
+    title = escape(title or "", quote=True)
+    meta_description = escape(meta_description or "", quote=True)
     sg = style_guide or {}
     primary_colors = sg.get("primary_colors") or []
     accent_colors  = sg.get("accent_colors") or []
@@ -35,11 +39,12 @@ def _build_html_page(title, meta_description, content, style_guide=None, ctx=Non
     c3  = primary_colors[2] if len(primary_colors) > 2 else "#6f42c1"  # accent
     ca  = accent_colors[0]  if len(accent_colors)  > 0 else c2
 
+    c1,c2,c3,ca = [v if re.fullmatch(r'#[0-9a-fA-F]{3,8}',str(v)) else '#101330' for v in (c1,c2,c3,ca)]
     domain      = (ctx.domain if ctx else "").rstrip("/")
-    client_name = ctx.client_name if ctx else "Denzo Studios"
-    phone       = ctx.phone if ctx else ""
+    client_name = escape(ctx.client_name if ctx else "Denzo Studios")
+    phone       = escape(ctx.phone if ctx else "",quote=True)
     phone_raw   = phone.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
-    tagline     = ctx.tagline if ctx else ""
+    tagline     = escape(ctx.tagline if ctx else "")
     certifications = getattr(ctx, "certifications", []) or []
 
     # Build logo text (e.g. "Denzo <span>Studios</span>")
@@ -62,9 +67,9 @@ def _build_html_page(title, meta_description, content, style_guide=None, ctx=Non
     nav_links=''.join(links[:4])
     footer_services=''.join(links)
     # Certifications line for footer bottom
-    certs_line = " · ".join(certifications[:3]) if certifications else ""
+    certs_line = escape(" · ".join(certifications[:3])) if certifications else ""
 
-    canonical = canonical_url or ""
+    canonical = escape(canonical_url or "",quote=True)
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -241,7 +246,10 @@ class GitHubPublisher(TenantAwareBaseAgent):
                 "SELECT content_hash FROM managed_paths WHERE tenant_id=? AND publisher='github' AND path=?",
                 (self.ctx.tenant_id, path)
             )
-            if existing_hash and existing_hash[0]['content_hash'] == content_hash:
+            import hashlib
+            intended = base64.b64decode(content_b64)
+            remote_matches = sha == hashlib.sha1(b'blob '+str(len(intended)).encode()+b'\0'+intended).hexdigest()
+            if existing_hash and existing_hash[0]['content_hash'] == content_hash and remote_matches:
                 self.log(f"⚡ SKIP {path}: content unchanged (hash match)", "info")
                 return True  # not an error — already published
 
@@ -297,9 +305,9 @@ class GitHubPublisher(TenantAwareBaseAgent):
         session=requests.Session()
         session.headers.update({'Authorization':f'Bearer {ctx.github_token}','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
         if fmt=='nextjs':
-            check=session.get(f'https://api.github.com/repos/{repo}/contents/{prefix}app',params={'ref':branch},timeout=20)
+            check=session.get(f'https://api.github.com/repos/{repo}/contents/{prefix}app/[locale]',params={'ref':branch},timeout=20)
             if check.status_code!=200:
-                self.set_status('error','Configured Next.js app directory was not found; check path prefix');return
+                self.set_status('error','Configured Next.js app/[locale] directory was not found; check path prefix and locale routing');return
         reconcile_publications(ctx.tenant_id)
         self._load_velocity_settings()
         styles=self.load_output('site_style_guide') or {}
@@ -318,7 +326,8 @@ class GitHubPublisher(TenantAwareBaseAgent):
                     quality_html=quality_document(page['content'],page,ctx)
                 else:
                     path=f'{prefix}{folder}/{slug}.html'
-                    rendered=_build_html_page(page.get('meta_title') or page['title'],page.get('meta_description') or '',page['content'],styles,ctx,url)
+                    from denzo.html_content import sanitize_fragment
+                    rendered=_build_html_page(page.get('meta_title') or page['title'],page.get('meta_description') or '',sanitize_fragment(page['content']),styles,ctx,url)
                     soup=BeautifulSoup(rendered,'html.parser')
                     marker=soup.new_tag('meta',attrs={'name':'denzo-revision','content':revision_hash(page)})
                     soup.head.append(marker)

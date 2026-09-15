@@ -129,7 +129,7 @@ class IndexationAccelerator(TenantAwareBaseAgent):
             if self.ctx.publisher_type=='wordpress':
                 response = requests.post(self.ctx.wp_url.rstrip('/')+'/wp-json/denzo-seo/v1/resources',
                     auth=(self.ctx.wp_user,self.ctx.wp_app_password),
-                    json={'indexnow_key':key,'llms':build_llms_txt(self.ctx,base_url=base)},timeout=20)
+                    json={'indexnow_key':key,'llms_text':build_llms_txt(self.ctx,base_url=base)},timeout=20)
                 response.raise_for_status()
             elif self.ctx.github_repo and self.ctx.github_token:
                 import base64

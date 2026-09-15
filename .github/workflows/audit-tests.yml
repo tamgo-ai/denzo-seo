@@ -1,7 +1,9 @@
-name: Audit reliability
+name: Platform reliability
 on: [push, pull_request]
+permissions:
+  contents: read
 jobs:
-  audit:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -9,5 +11,11 @@ jobs:
         with:
           python-version: '3.11'
           cache: pip
-      - run: pip install -r requirements.txt pytest
-      - run: python -m pytest tests/test_audit_reliability.py tests/test_droppin_audit_json.py tests/test_audit_evidence.py -q
+      - run: pip install -r requirements.txt pytest ruff
+      - run: python -m compileall -q denzo
+      - run: python -m ruff check denzo --select F821
+      - run: python -m pytest tests -q
+      - name: Validate WordPress connector
+        run: |
+          php -l integrations/wordpress/denzo-seo/denzo-seo.php
+          php tests/wordpress_connector_contract.php

@@ -8,8 +8,9 @@ Type=simple
 User=root
 WorkingDirectory=/root/denzo-seo
 Environment=DENZO_EXECUTOR=rq
+Environment=REDIS_URL=redis://localhost:6379/0
 EnvironmentFile=/root/denzo-seo/.env
-ExecStart=/root/denzo-seo/.venv/bin/rq worker denzo-director --url redis://localhost:6379/0
+ExecStart=/root/denzo-seo/.venv/bin/rq worker denzo-director --url ${REDIS_URL}
 Restart=always
 RestartSec=10
 StandardOutput=journal

@@ -72,6 +72,7 @@ class GEOBaselineAgent(TenantAwareBaseAgent):
                 except Exception as e:
                     self.log(f"ChatGPT baseline error: {e}", "warning")
 
+            engine_results={name:value for name,value in engine_results.items() if value.get('success')}
             if engine_results:
                 results.append({
                     "query": query,
@@ -131,73 +132,37 @@ class GEOBaselineAgent(TenantAwareBaseAgent):
 
         return queries[:self.BASELINE_QUERIES]
 
-    def _get_api_key(self, env_var: str) -> str:
+    def _get_api_key(self, env_var):
         import os
-        return os.getenv(env_var, "").strip()
+        from denzo.agents.layer5_monitoring.geo_monitor import _get_setting
+        return _get_setting(self.tenant_id,env_var.lower()) or os.getenv(env_var,'').strip()
 
-    def _query_perplexity(self, query: str) -> dict:
-        import requests
-        key = self._get_api_key("PERPLEXITY_API_KEY")
-        if not key:
-            return {"cited": False, "error": "no_api_key"}
+    def _query_perplexity(self, query):
+        from denzo.agents.layer5_monitoring.geo_monitor import _query_perplexity, _analyze_citation
+        result = _query_perplexity(self._get_api_key('PERPLEXITY_API_KEY'), query)
+        if not result.get('success') or not result.get('response'):
+            return {'success':False}
+        analyzed = _analyze_citation(result['response'],self.ctx.client_name,self.ctx.website_url or self.ctx.domain,[],result.get('citations',[]))
+        return {'success':True,'cited':analyzed['citation_verified'],'mentioned':analyzed['mentioned'],
+                 'citations':result.get('citations',[]),'text_snippet':result['response'][:2000]}
 
-        r = requests.post(
-            "https://api.perplexity.ai/chat/completions",
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            json={"model": "sonar", "messages": [{"role": "user", "content": query}], "max_tokens": 300},
-            timeout=25,
-        )
-        if r.status_code == 200:
-            data = r.json()
-            text = data["choices"][0]["message"]["content"] if data.get("choices") else ""
-            cited = self._check_citation(text)
-            return {"cited": cited, "text_snippet": text[:200]}
-        return {"cited": False, "status": r.status_code}
+    def _query_gemini(self, query):
+        from denzo.agents.layer5_monitoring.geo_monitor import _query_gemini, _analyze_citation
+        result = _query_gemini(self._get_api_key('GEMINI_API_KEY'), query)
+        if not result.get('success') or not result.get('response'):
+            return {'success':False}
+        analyzed = _analyze_citation(result['response'],self.ctx.client_name,self.ctx.website_url or self.ctx.domain,[],result.get('citations',[]))
+        return {'success':True,'cited':analyzed['citation_verified'],'mentioned':analyzed['mentioned'],
+                 'citations':result.get('citations',[]),'text_snippet':result['response'][:2000]}
 
-    def _query_gemini(self, query: str) -> dict:
-        import requests
-        key = self._get_api_key("GEMINI_API_KEY")
-        if not key:
-            return {"cited": False, "error": "no_api_key"}
-
-        r = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={key}",
-            json={"contents": [{"parts": [{"text": query}]}],
-                  "generationConfig": {"maxOutputTokens": 300, "temperature": 0.3}},
-            timeout=20,
-        )
-        if r.status_code == 200:
-            data = r.json()
-            text = ""
-            try:
-                text = data["candidates"][0]["content"]["parts"][0]["text"]
-            except (KeyError, IndexError):
-                pass
-            cited = self._check_citation(text)
-            return {"cited": cited, "text_snippet": text[:200]}
-        return {"cited": False, "status": r.status_code}
-
-    def _query_chatgpt(self, query: str) -> dict:
-        import requests
-        key = self._get_api_key("OPENAI_API_KEY")
-        if not key:
-            return {"cited": False, "error": "no_api_key"}
-
-        r = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            json={"model": "gpt-4o-mini", "messages": [
-                {"role": "system", "content": "You are a helpful local search assistant. Answer concisely."},
-                {"role": "user", "content": query}
-            ], "max_tokens": 300, "temperature": 0.3},
-            timeout=20,
-        )
-        if r.status_code == 200:
-            data = r.json()
-            text = data["choices"][0]["message"]["content"] if data.get("choices") else ""
-            cited = self._check_citation(text)
-            return {"cited": cited, "text_snippet": text[:200]}
-        return {"cited": False, "status": r.status_code}
+    def _query_chatgpt(self, query):
+        from denzo.agents.layer5_monitoring.geo_monitor import _query_openai, _analyze_citation
+        result = _query_openai(self._get_api_key('OPENAI_API_KEY'), query)
+        if not result.get('success') or not result.get('response'):
+            return {'success':False}
+        analyzed = _analyze_citation(result['response'],self.ctx.client_name,self.ctx.website_url or self.ctx.domain,[],result.get('citations',[]))
+        return {'success':True,'cited':analyzed['citation_verified'],'mentioned':analyzed['mentioned'],
+                 'citations':result.get('citations',[]),'text_snippet':result['response'][:2000]}
 
     def _check_citation(self, text: str) -> bool:
         """Check if the business name or domain appears in the response."""
@@ -212,20 +177,10 @@ class GEOBaselineAgent(TenantAwareBaseAgent):
             return True
         return False
 
-    def _save_baseline_results(self, results: list):
-        """Save baseline results to geo_queries table."""
+    def _save_baseline_results(self, results):
         from denzo.agents.base_agent import db_write
-
-        for r in results:
-            for engine, data in r.get("engines", {}).items():
-                try:
-                    db_write(
-                        """INSERT INTO geo_queries
-                           (tenant_id, query, engine, cited, baseline, checked_at)
-                           VALUES (?, ?, ?, ?, 1, ?)""",
-                        (self.tenant_id, r["query"], engine,
-                         1 if data.get("cited") else 0,
-                         r.get("checked_at", datetime.now(timezone.utc).isoformat()))
-                    )
-                except Exception:
-                    pass  # duplicate or schema miss — non-critical
+        for result in results:
+            for engine,data in result.get('engines',{}).items():
+                db_write("""INSERT INTO geo_queries(tenant_id,query,ai_model,response,client_mentioned,citation_verified,citations_json,query_mode,baseline,checked_at)
+                    VALUES (?,?,?,?,?,?,?,?,1,?)""", (self.tenant_id,result['query'],engine,data.get('text_snippet',''),int(data.get('mentioned',False)),int(data.get('cited',False)),json.dumps(data.get('citations',[])),
+                    'retrieved_answer' if engine=='perplexity' else 'model_response',result['checked_at']))
