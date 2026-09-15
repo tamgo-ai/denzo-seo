@@ -12,6 +12,7 @@ Esta actualización parte del PR #3 ya fusionado. Está en `codex/agent-runtime-
 - Los tiempos de espera del lector web se ignoraban. Ahora se aplican durante redirecciones y descarga, con comprobaciones de cancelación. El inventario conserva sus URLs y el avance cada cinco páginas.
 - Lighthouse podía dejar procesos de Chrome tras un timeout. Se limita a un navegador por instalación y se terminan los descendientes conocidos al finalizar o interrumpirse el proceso. Los servicios usan `OOMPolicy=kill` y `KillMode=control-group` para limpiar su grupo cuando se agota memoria o se detienen.
 - Apify convertía todo el dataset en una lista antes de recortarla. Ahora se consume el iterador hasta el límite solicitado. GSC detecta páginas repetidas y tiene un máximo de paginación por ejecución.
+- Director, programador, publicadores y enlazador cargaban cuerpos HTML de páginas que no iban a procesar. Ahora el estado se consulta mediante recuentos/existencia; los publicadores solo cargan un lote aprobado y el enlazador separa metadatos de destinos y texto a modificar.
 
 ## Valores iniciales
 

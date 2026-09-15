@@ -89,10 +89,12 @@ Return ONLY valid JSON array. Max 3 links per page. Use natural anchor text rele
     def run(self):
         from bs4 import BeautifulSoup, NavigableString
         from denzo.urls import public_page_url
+        from denzo.runtime_limits import setting
         self.set_status('working','Planning links to canonical page URLs')
-        pages = [dict(r) for r in db_execute("SELECT * FROM pages WHERE tenant_id=? AND status IN ('ready','published','live_external')", (self.tenant_id,))]
+        pages = [dict(r) for r in db_execute("SELECT id,title,slug,type,target_keyword,status,managed,publish_url,source_url FROM pages WHERE tenant_id=? AND status IN ('ready','published','live_external') ORDER BY id LIMIT 10000", (self.tenant_id,))]
         by_id = {p['id']:p for p in pages}
-        eligible = [p for p in pages if p.get('managed') and p.get('content') and p['status']!='live_external']
+        eligible = [dict(r) for r in db_execute("SELECT * FROM pages WHERE tenant_id=? AND managed=1 AND status IN ('ready','published') AND content IS NOT NULL AND content!='' ORDER BY updated_at,id LIMIT ?", (self.tenant_id,setting('DENZO_PAGE_BATCH_SIZE',10,1,50)))]
+        by_id.update({p['id']:p for p in eligible})
         plan = []
         for i in range(0,len(eligible),15):
             if self.should_stop():

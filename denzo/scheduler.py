@@ -54,30 +54,39 @@ def _run_due(tenant_id):
         ).fetchone()
         if blocked:
             return "blocked"
-        pages = [
-            dict(r)
-            for r in db.execute("SELECT * FROM pages WHERE tenant_id=?", (tenant_id,))
-        ]
+
+        def has_page(clause):
+            return (
+                db.execute(
+                    "SELECT 1 FROM pages WHERE tenant_id=? AND " + clause + " LIMIT 1",
+                    (tenant_id,),
+                ).fetchone()
+                is not None
+            )
+
+        approved = any(
+            publishable(row)
+            for row in db.execute(
+                "SELECT * FROM pages WHERE tenant_id=? AND status='ready' AND approval_hash IS NOT NULL AND quality_score>=70 AND managed=1",
+                (tenant_id,),
+            )
+        )
         client = db.execute(
             "SELECT publisher_type FROM clients WHERE tenant_id=?", (tenant_id,)
         ).fetchone()
-        if any(publishable(p) for p in pages):
+        if approved:
             agent = (
                 "WordPress Publisher"
                 if client["publisher_type"] == "wordpress"
                 else "GitHub Publisher"
             )
-        elif any(p["status"] == "publishing" for p in pages):
+        elif has_page("status='publishing'"):
             return "awaiting_deployment"
-        elif any(
-            p["status"] == "ready"
-            and p.get("content")
-            and p.get("quality_score") is None
-            and "[CO_MAX_RETRIES]" not in (p.get("notes") or "")
-            for p in pages
+        elif has_page(
+            "status='ready' AND managed=1 AND content IS NOT NULL AND content!='' AND quality_score IS NULL AND COALESCE(notes,'') NOT LIKE '%[CO_MAX_RETRIES]%'"
         ):
             agent = "Content Optimizer"
-        elif any(p["status"] == "ready" and p.get("content") for p in pages):
+        elif has_page("status='ready' AND content IS NOT NULL AND content!=''"):
             return "awaiting_review"
         else:
             agent = "Pipeline Director"

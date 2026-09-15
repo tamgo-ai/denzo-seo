@@ -585,3 +585,35 @@ def test_real_rq_worker_lifecycle(platform_db, monkeypatch, outcome):
         job.delete()
         queue.delete(delete_jobs=True)
         connection.close()
+
+
+@pytest.mark.parametrize("operation", ["director", "scheduler", "linker"])
+def test_large_site_html_is_not_loaded_for_every_page(
+    ctx, platform_db, monkeypatch, operation
+):
+    import tracemalloc
+    from denzo.agents.director import PipelineDirector
+    from denzo.agents.layer3_production.internal_linker import InternalLinker
+    from denzo.scheduler import _run_due
+
+    body = "<p>" + ("Existing page content. " * 10000) + "</p>"
+    platform_db.executemany(
+        "INSERT INTO pages(tenant_id,title,slug,type,status,content,quality_score,managed) VALUES ('alice','Large page',?,'blog','ready',?,80,1)",
+        [(f"large-{i}", body) for i in range(30)],
+    )
+    platform_db.commit()
+    linker = InternalLinker(ctx)
+    monkeypatch.setattr(linker, "_plan_batch", lambda *args: [])
+    run = {
+        "director": lambda: PipelineDirector(ctx)._assess_state(),
+        "scheduler": lambda: _run_due("alice"),
+        "linker": linker.run,
+    }[operation]
+    tracemalloc.start()
+    try:
+        run()
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+    # The fixture has >6 MiB of HTML; state queries need none, linking needs one batch.
+    assert peak < (4 * 1024 * 1024 if operation == "linker" else 2 * 1024 * 1024)

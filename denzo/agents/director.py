@@ -18,7 +18,6 @@ from denzo.agents.base_agent import (
     strip_json_fences,
 )
 
-from denzo.editorial import publishable
 
 # ── Agent names by layer ──────────────────────────────────────────────────────
 
@@ -121,7 +120,7 @@ class PipelineDirector(TenantAwareBaseAgent):
         return {
             "keywords": {"total": kw_count, "high_priority": kw_high},
             "pages": {"total": page_total, "draft": page_draft, "ready": page_ready, "published": page_pub,
-                      "approved": sum(publishable(r) for r in db_execute("SELECT * FROM pages WHERE tenant_id=? AND status='ready'", (tid,)))},
+                      "approved": db_execute("SELECT COUNT(*) n FROM pages WHERE tenant_id=? AND status='ready' AND approval_hash IS NOT NULL AND quality_score>=70 AND COALESCE(managed,1)=1", (tid,))[0]['n']},
             "quality": quality,
             "competitors": comp_count,
             "agents": agents,

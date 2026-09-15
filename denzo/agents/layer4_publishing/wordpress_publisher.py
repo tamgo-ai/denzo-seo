@@ -94,7 +94,8 @@ class WordPressPublisher(TenantAwareBaseAgent):
             return
         reconcile_publications(ctx.tenant_id)
         self._load_velocity_settings()
-        pages=[dict(r) for r in db_execute("SELECT * FROM pages WHERE tenant_id=? AND status='ready'",(ctx.tenant_id,)) if publishable(r)]
+        from denzo.runtime_limits import setting
+        pages=[dict(r) for r in db_execute("SELECT * FROM pages WHERE tenant_id=? AND status='ready' AND approval_hash IS NOT NULL AND quality_score>=70 AND managed=1 ORDER BY id LIMIT ?",(ctx.tenant_id,setting('DENZO_PAGE_BATCH_SIZE',10,1,50))) if publishable(r)]
         processed=errors=0
         for page in pages:
             if self.should_stop():

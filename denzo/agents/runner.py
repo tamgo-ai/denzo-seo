@@ -10,12 +10,15 @@ _EXECUTOR_MODE = os.getenv("DENZO_EXECUTOR", "rq")
 
 def redis_connection():
     from redis import Redis
+    from redis.backoff import NoBackoff
+    from redis.retry import Retry
 
     return Redis.from_url(
         os.getenv("REDIS_URL", "redis://localhost:6379/0"),
         socket_connect_timeout=3,
         socket_timeout=5,
         retry_on_timeout=False,
+        retry=Retry(NoBackoff(), 0),
     )
 
 
