@@ -74,13 +74,14 @@ def actual_report(monkeypatch, *, performance=95):
     monkeypatch.setattr(robots_analyzer,'fetch_html',fetch)
     monkeypatch.setattr(sitemap_analyzer,'fetch_html',fetch)
     monkeypatch.setattr(performance_estimator,'get_lighthouse_performance',lambda _:dict(score=performance,lab_data={},field_data={},final_url='https://www.example.com/'))
+    monkeypatch.setattr(analyzer,'analyze_authority',lambda *a,**k:dict(score=50,status='completed',findings=[]))
     return analyzer.SiteAnalyzer('http://example.com/','example.com').run_full_analysis()
 
 
 def test_actual_analyzer_uses_redirect_destination_and_reports_only_measured_evidence(monkeypatch):
     report=actual_report(monkeypatch)
     assert report['methodology_version']==METHODOLOGY_VERSION
-    assert report['commercial_ready'] and report['coverage']==120
+    assert report['commercial_ready'] and report['coverage']==130
     assert report['overall_score']==49
     assert report['results']['technical']['score']==0
     # The analyzer must use the redirect destination (https), not the requested http URL.

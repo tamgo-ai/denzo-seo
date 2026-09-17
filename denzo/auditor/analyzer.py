@@ -15,6 +15,7 @@ from denzo.auditor.technical_scanner import scan_technical
 from denzo.auditor.content_quality import analyze_content_quality
 from denzo.auditor.image_auditor import deep_image_audit
 from denzo.auditor.local_business import check_local_business
+from denzo.auditor.authority import analyze_authority
 from denzo.auditor.robots_analyzer import analyze_robots
 from denzo.auditor.sitemap_analyzer import analyze_sitemap
 from denzo.auditor.performance_estimator import estimate_performance
@@ -79,6 +80,7 @@ class SiteAnalyzer:
         results['content'] = run_module('content', analyze_content_quality, final_url, html, domain, geo_profile)
         results['images'] = run_module('images', deep_image_audit, final_url, html, domain)
         results['geo_visibility'] = run_module('geo_visibility', analyze_geo_visibility, final_url, html, domain, geo_profile)
+        results['authority'] = run_module('authority', analyze_authority, final_url, domain)
         if is_local:
             results['local_seo'] = run_module('local_seo', check_local_business, final_url, html, domain, geo_profile)
         else:

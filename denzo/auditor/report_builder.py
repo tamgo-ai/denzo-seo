@@ -331,6 +331,7 @@ def _build_body(result, audit_id, mode, inline_assets):
         ('images', 'Images', weights.get('images', 5), module_scores.get('images', 0)),
         ('sitemap', 'Sitemap', weights.get('sitemap', 5), module_scores.get('sitemap', 0)),
         ('robots', 'Crawler access', weights.get('robots', 10), module_scores.get('robots', 0)),
+        ('authority', 'Domain authority', weights.get('authority', 10), module_scores.get('authority', 0)),
     ]
     if weights.get('local_seo', 0) > 0:
         mods.append(('local_seo', 'Local SEO', 10, module_scores.get('local_seo', 0)))
