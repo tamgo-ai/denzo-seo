@@ -108,11 +108,15 @@ def finish(job, result):
               ('failed' if failed else 'completed', time.time(), job['audit_id'], job['lease_token'], time.time())).rowcount
         if updated:
             db.execute("""UPDATE site_audits SET status=?,progress=100,current_step=?,report_json=?,
-               overall_score=?,module_scores=?,error_message=?,updated_at=CURRENT_TIMESTAMP WHERE audit_id=?""",
+               overall_score=?,module_scores=?,error_message=?,updated_at=CURRENT_TIMESTAMP,
+               fetch_method=?,page_status=?,page_title=?,html_size_kb=?,analysis_time_ms=? WHERE audit_id=?""",
                ('error' if failed else 'completed', 'Incomplete' if failed or not result.get('commercial_ready') else 'Complete',
                 json.dumps(result, ensure_ascii=False, allow_nan=False),
                 None if failed else result.get('overall_score'), json.dumps(result.get('module_scores', {})),
-                result.get('error'), job['audit_id']))
+                result.get('error'),
+                result.get('fetch_method'), result.get('page_status'), result.get('page_title'),
+                result.get('html_size_kb'), round((result.get('duration_seconds') or 0) * 1000),
+                job['audit_id']))
         db.commit()
         return bool(updated)
 

@@ -323,19 +323,21 @@ def _build_body(result, audit_id, mode, inline_assets):
 
     # ── scorecard ──
     mods = [
-        ('technical', 'Technical foundations', weights.get('technical', 30), module_scores.get('technical', 0)),
-        ('geo', 'Structured content', weights.get('geo', 22), module_scores.get('geo', 0)),
-        ('performance', 'Page speed', weights.get('performance', 15), module_scores.get('performance', 0)),
-        ('content', 'Content quality', weights.get('content', 10), module_scores.get('content', 0)),
-        ('images', 'Images', weights.get('images', 8), module_scores.get('images', 0)),
-        ('sitemap', 'Sitemap', weights.get('sitemap', 8), module_scores.get('sitemap', 0)),
-        ('robots', 'Crawler access', weights.get('robots', 7), module_scores.get('robots', 0)),
+        ('technical', 'Technical foundations', weights.get('technical', 40), module_scores.get('technical', 0)),
+        ('geo', 'Structured content', weights.get('geo', 0), module_scores.get('geo', 0)),
+        ('performance', 'Page speed', weights.get('performance', 35), module_scores.get('performance', 0)),
+        ('content', 'Content quality', weights.get('content', 5), module_scores.get('content', 0)),
+        ('images', 'Images', weights.get('images', 5), module_scores.get('images', 0)),
+        ('sitemap', 'Sitemap', weights.get('sitemap', 5), module_scores.get('sitemap', 0)),
+        ('robots', 'Crawler access', weights.get('robots', 10), module_scores.get('robots', 0)),
     ]
     if weights.get('local_seo', 0) > 0:
         mods.append(('local_seo', 'Local SEO', 10, module_scores.get('local_seo', 0)))
     bar_rows = ''
     for _, label, wt, s in mods:
-        if wt == 0 and s == 0:
+        # Skip modules with zero weight — they don't contribute to the score, so
+        # rendering a bar (e.g. "0% weight · 100 score") would be misleading.
+        if wt == 0:
             continue
         if s is None:
             bar_rows += f'<div class="bar-row"><span>{html.escape(label)}</span><span>Not measured</span></div>'
@@ -415,7 +417,7 @@ def _build_body(result, audit_id, mode, inline_assets):
   </div>
 </section>'''
     else:
-        brief_lines = [f'SEO AUDIT — {domain}', f'Score {overall}/100 ({grade_letter}) · {len(findings)} issues · 12 modules checked', '']
+        brief_lines = [f'SEO AUDIT — {domain}', f'Score {overall}/100 ({grade_letter}) · {len(findings)} issues · 8 modules checked', '']
         current_sev = None
         for f in findings:
             sev = f.get('severity', 'info')

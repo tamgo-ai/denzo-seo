@@ -37,7 +37,7 @@ class SiteAnalyzer:
             if any(marker in lowered for marker in ('id="challenge-form"', '/cdn-cgi/challenge-platform/', 'cf-chl-widget')):
                 raise ValueError('Homepage is an automated-access challenge')
         except Exception as exc:
-            logging.getLogger(__name__).warning('Homepage fetch unavailable: %s', type(exc).__name__)
+            logging.getLogger(__name__).warning('Homepage fetch unavailable (%s): %s', type(exc).__name__, exc)
             return dict(url=self.url, error='The homepage could not be reliably read', overall_score=None,
                         status='failed', commercial_ready=False, methodology_version=METHODOLOGY_VERSION,
                         coverage=0, module_scores={}, findings=[], checked_at=datetime.now(timezone.utc).isoformat())
@@ -58,7 +58,7 @@ class SiteAnalyzer:
             _sqlite_local.job_token=parent_token
             try: return fn()
             except Exception as exc:
-                logging.getLogger(__name__).warning('Audit module %s unavailable: %s', name, type(exc).__name__)
+                logging.getLogger(__name__).warning('Audit module %s unavailable (%s): %s', name, type(exc).__name__, exc)
                 return dict(score=None, status='unavailable', findings=[], error=f'{name} could not be measured')
             finally:
                 _sqlite_local.job_token=None

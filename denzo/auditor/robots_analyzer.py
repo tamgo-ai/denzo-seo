@@ -64,7 +64,7 @@ def analyze_robots(url, html, domain):
     parsed = urlsplit(url)
     robots_url = f'{parsed.scheme}://{parsed.netloc}/robots.txt'
     try:
-        res = fetch_html(robots_url)
+        res = fetch_html(robots_url, allow_jina=False)
         status = res.get('status')
         if status in (404, 410):
             text = ''

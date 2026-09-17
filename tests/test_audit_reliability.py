@@ -58,7 +58,8 @@ def audit_db(tmp_path, monkeypatch):
     with connect() as db:
         db.execute('''CREATE TABLE site_audits (audit_id TEXT PRIMARY KEY,url TEXT,domain TEXT,status TEXT,
           progress INTEGER,current_step TEXT,error_message TEXT,overall_score REAL,report_json TEXT,
-          module_scores TEXT,updated_at TEXT)''')
+          module_scores TEXT,updated_at TEXT,fetch_method TEXT,page_status TEXT,page_title TEXT,
+          html_size_kb INTEGER,analysis_time_ms INTEGER)''')
     monkeypatch.setattr(queue, 'get_db', connect)
     return connect
 

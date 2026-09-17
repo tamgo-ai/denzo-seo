@@ -7,7 +7,7 @@ from denzo.auditor.robots_analyzer import parse_robots
 
 
 def _fetch(url):
-    result = fetch_html(url)
+    result = fetch_html(url, allow_jina=False)
     if result.get('status') in (404, 410): return None
     if not result.get('ok'): raise ValueError('Sitemap response could not be verified')
     return result.get('html', '')

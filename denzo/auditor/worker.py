@@ -21,8 +21,9 @@ def execute(job):
 
 
 def main():
-    if not os.environ.get('PAGESPEED_API_KEY'):
-        raise SystemExit('PAGESPEED_API_KEY is required before processing commercial audits')
+    # NOTE: performance is measured via local Lighthouse (get_lighthouse_performance),
+    # which does NOT require PAGESPEED_API_KEY. The PSI API path (get_real_performance)
+    # is unused, so we no longer gate the worker on that key.
     ctx = multiprocessing.get_context('spawn')
     worker_id = f'{socket.gethostname()}:{os.getpid()}'
     while True:
