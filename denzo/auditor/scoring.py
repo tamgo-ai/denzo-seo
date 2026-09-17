@@ -27,8 +27,13 @@ def score_results(results, is_local=False):
         statuses[name] = 'completed' if valid else 'unavailable'
     coverage = sum(weight for name, weight in weights.items() if scores[name] is not None)
     overall = math.floor(sum((scores[name] or 0) * weight for name, weight in weights.items()) / coverage + 0.5) if coverage else None
-    # commercial_ready = every weighted module produced a valid score.
-    ready = coverage > 0 and coverage == sum(weights.values())
+    # commercial_ready = every REQUIRED module produced a valid score. `authority`
+    # is an optional off-page enhancement: if the Ahrefs API is down or the plan
+    # quota is exhausted, the audit must still complete and only report authority
+    # as "not measured" — it must not block the whole audit.
+    required_total = sum(w for n, w in weights.items() if w > 0 and n != 'authority')
+    required_coverage = sum(w for n, w in weights.items() if w > 0 and n != 'authority' and scores[n] is not None)
+    ready = required_total > 0 and required_coverage == required_total
     return {'methodology_version': METHODOLOGY_VERSION, 'scoring_weights': weights,
             'module_scores': scores, 'module_status': statuses, 'coverage': coverage,
             'overall_score': overall, 'commercial_ready': ready,

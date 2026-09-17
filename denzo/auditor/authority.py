@@ -83,5 +83,8 @@ def analyze_authority(url, domain):
               'findings': findings, 'domain_rating': score, 'live_backlinks': live,
               'live_refdomains': refdomains, 'all_time_backlinks': all_time,
               'all_time_refdomains': all_time_refdomains}
-    _cache[domain] = (now + _CACHE_TTL, result)
+    # Only cache successful measurements. A transient API failure (quota/rate-limit/
+    # outage) must be retried on the next audit, not remembered as "unmeasured" for 48h.
+    if score is not None:
+        _cache[domain] = (now + _CACHE_TTL, result)
     return result
