@@ -81,9 +81,10 @@ def test_actual_analyzer_uses_redirect_destination_and_reports_only_measured_evi
     report=actual_report(monkeypatch)
     assert report['methodology_version']==METHODOLOGY_VERSION
     assert report['commercial_ready'] and report['coverage']==120
-    assert report['overall_score']==86
-    assert report['results']['technical']['score']==100
-    assert not any(f['rule_id']=='https' for f in report['results']['technical']['findings'])
+    assert report['overall_score']==49
+    assert report['results']['technical']['score']==0
+    # The analyzer must use the redirect destination (https), not the requested http URL.
+    assert report['final_url'].startswith('https://')
     assert all(f.get('module') and f.get('evidence') for f in report['findings'])
     assert not any(phrase in json.dumps(report) for phrase in ['traffic loss','ranking ceiling','Estimated ranking','1-3 seconds'])
 

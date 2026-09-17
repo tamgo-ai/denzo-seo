@@ -11,6 +11,10 @@ from denzo.auditor.framework_detector import detect_framework
 from denzo.auditor.industry_detector import quick_detect, determine_is_local
 from denzo.auditor.onpage_evidence import analyze_onpage
 from denzo.auditor.geo_visibility import analyze_geo_visibility
+from denzo.auditor.technical_scanner import scan_technical
+from denzo.auditor.content_quality import analyze_content_quality
+from denzo.auditor.image_auditor import deep_image_audit
+from denzo.auditor.local_business import check_local_business
 from denzo.auditor.robots_analyzer import analyze_robots
 from denzo.auditor.sitemap_analyzer import analyze_sitemap
 from denzo.auditor.performance_estimator import estimate_performance
@@ -50,23 +54,36 @@ class SiteAnalyzer:
         industry = quick_detect(html) or {}
         is_local = determine_is_local(industry.get('primary_industry',''), industry.get('schema_info',{}).get('schema_types',[]), html)
         industry['is_local_business'] = is_local
-        results = analyze_onpage(final_url, html, headers, is_local)
-        results['_industry'] = industry
-        # GEO / AI-visibility analysis (on-page signals only, no external APIs).
-        try:
-            geo_profile = {
-                'industry': industry.get('primary_industry', 'general_business'),
-                'business_name': domain,
-                'is_local_business': is_local,
-            }
-            geo_vis = analyze_geo_visibility(final_url, html, domain, geo_profile)
-            for _f in geo_vis.get('findings', []):
-                _f.setdefault('evidence', {'source': 'fetched_homepage_html', 'url': final_url})
-            geo_vis['status'] = 'completed'
-            results['geo_visibility'] = geo_vis
-        except Exception as exc:
-            logging.getLogger(__name__).warning('GEO visibility unavailable (%s): %s', type(exc).__name__, exc)
-            results['geo_visibility'] = {'score': None, 'status': 'unavailable', 'findings': []}
+        # Structured-data syntax (from the shallow on-page pass) + industry context.
+        onpage = analyze_onpage(final_url, html, headers, is_local)
+        results = {'geo': onpage['geo'], '_industry': industry}
+
+        geo_profile = {
+            'industry': industry.get('primary_industry', 'general_business'),
+            'business_name': domain,
+            'is_local_business': is_local,
+        }
+
+        def run_module(name, fn, *args):
+            try:
+                r = fn(*args)
+                for _f in r.get('findings', []):
+                    _f.setdefault('evidence', {'source': 'fetched_homepage_html', 'url': final_url})
+                r['status'] = 'completed'
+                return r
+            except Exception as exc:
+                logging.getLogger(__name__).warning('Audit module %s unavailable (%s): %s', name, type(exc).__name__, exc)
+                return {'score': None, 'status': 'unavailable', 'findings': []}
+
+        results['technical'] = run_module('technical', scan_technical, final_url, html, domain, headers, fetched.get('status'), fetched.get('redirect_chain', []), framework)
+        results['content'] = run_module('content', analyze_content_quality, final_url, html, domain, geo_profile)
+        results['images'] = run_module('images', deep_image_audit, final_url, html, domain)
+        results['geo_visibility'] = run_module('geo_visibility', analyze_geo_visibility, final_url, html, domain, geo_profile)
+        if is_local:
+            results['local_seo'] = run_module('local_seo', check_local_business, final_url, html, domain, geo_profile)
+        else:
+            results['local_seo'] = {'score': None, 'status': 'unavailable', 'findings': [], 'not_applicable': True}
+
         self.progress(25, 'Checking crawler access, sitemaps and measured mobile performance')
         from denzo.agents.base_agent import _sqlite_local,close_thread_connection
         parent_token=getattr(_sqlite_local,'job_token',None)
