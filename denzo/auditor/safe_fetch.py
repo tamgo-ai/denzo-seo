@@ -41,6 +41,70 @@ def validate_url(url):
     return urlunsplit((p.scheme, p.netloc, p.path or '/', p.query, '')), addresses[0]
 
 
+def _curl_fetch(url, max_bytes=MAX_BYTES, timeout=15):
+    """Fetch via system curl — its TLS fingerprint (JA3) is not blocked by most
+    WAFs, unlike Python's http.client/ssl. Redirects are followed manually so
+    each hop is re-validated for SSRF. Returns a result dict or None."""
+    import subprocess
+    try:
+        chain = []
+        current = url
+        for _ in range(6):
+            normalized, address = validate_url(current)
+            p = urlsplit(normalized)
+            port = p.port or (443 if p.scheme == 'https' else 80)
+            chain.append(normalized)
+            result = subprocess.run(
+                ['curl', '--silent', '--show-error', '--max-time', str(int(timeout)),
+                 '--connect-timeout', '10', '-A', 'Droppin-Auditor/2.0',
+                 '--resolve', f'{p.hostname}:{port}:{address}',
+                 '--max-filesize', str(max_bytes),
+                 '-D', '-',
+                 '-w', '\n__CURL_STATUS__%{http_code}\n',
+                 normalized],
+                capture_output=True, timeout=int(timeout) + 5,
+            )
+            if result.returncode == 63:
+                raise ValueError('Website response exceeded audit size limit')
+            if result.returncode != 0:
+                return None
+            out = result.stdout.decode('utf-8', errors='replace')
+            if '__CURL_STATUS__' in out:
+                body_part, status_part = out.rsplit('__CURL_STATUS__', 1)
+            else:
+                body_part, status_part = out, ''
+            tokens = status_part.strip().split()
+            status = int(tokens[0]) if tokens and tokens[0].isdigit() else 0
+            if '\r\n\r\n' in body_part:
+                header_block, body_str = body_part.split('\r\n\r\n', 1)
+            elif '\n\n' in body_part:
+                header_block, body_str = body_part.split('\n\n', 1)
+            else:
+                header_block, body_str = '', body_part
+            headers = {}
+            for line in header_block.splitlines():
+                if ':' in line:
+                    k, v = line.split(':', 1)
+                    headers[k.strip()] = v.strip()
+            location = next((v for k, v in headers.items() if k.lower() == 'location'), '')
+            if status in (301, 302, 303, 307, 308) and location:
+                current = urljoin(normalized, location)
+                continue
+            if status in _TRANSIENT_STATUSES or status >= 500:
+                raise ValueError('Website temporarily unavailable or blocking automated analysis')
+            body = body_str.encode('utf-8', errors='replace')
+            if len(body) > max_bytes:
+                raise ValueError('Website response exceeded audit size limit')
+            return {'ok': 200 <= status < 300, 'body': body, 'status': status,
+                    'headers': headers, 'final_url': normalized,
+                    'redirect_chain': chain, 'method': 'curl'}
+        raise ValueError('Website has too many redirects')
+    except ValueError:
+        raise
+    except Exception:
+        return None
+
+
 def _attempt_direct(url, max_bytes=MAX_BYTES, timeout=15):
     """Single strict direct fetch. Returns result dict or raises."""
     from denzo.runtime_limits import check_cancelled
@@ -158,6 +222,17 @@ def fetch_bytes(url, max_bytes=MAX_BYTES, timeout=15, attempts=2, allow_jina=Tru
             # bad-URL, oversized and redirect-limit errors must propagate at once.
             if 'temporarily unavailable or blocking' not in str(e):
                 raise
+            # http.client was blocked (WAF / non-browser TLS fingerprint). curl's
+            # TLS fingerprint is accepted by most WAFs — try it before backing off.
+            curl = None
+            try:
+                curl = _curl_fetch(url, max_bytes=max_bytes, timeout=timeout)
+            except ValueError as ce:
+                if 'temporarily unavailable or blocking' not in str(ce):
+                    raise
+                curl = None  # curl was also blocked → fall through
+            if curl is not None:
+                return curl
             last_err = e
             time.sleep(0.4 * (i + 1))
         except socket.gaierror:
