@@ -35,7 +35,7 @@ def test_unavailable_is_never_a_bad_score():
     result = scoring.score_results(data)
     assert result['overall_score'] == 95
     assert result['module_scores']['technical'] is None
-    assert result['coverage'] == 60
+    assert result['coverage'] == 80
     assert not result['commercial_ready']
 
 

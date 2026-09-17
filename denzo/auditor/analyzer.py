@@ -10,6 +10,7 @@ from denzo.auditor.scoring import score_results, METHODOLOGY_VERSION, BASE_WEIGH
 from denzo.auditor.framework_detector import detect_framework
 from denzo.auditor.industry_detector import quick_detect, determine_is_local
 from denzo.auditor.onpage_evidence import analyze_onpage
+from denzo.auditor.geo_visibility import analyze_geo_visibility
 from denzo.auditor.robots_analyzer import analyze_robots
 from denzo.auditor.sitemap_analyzer import analyze_sitemap
 from denzo.auditor.performance_estimator import estimate_performance
@@ -51,6 +52,21 @@ class SiteAnalyzer:
         industry['is_local_business'] = is_local
         results = analyze_onpage(final_url, html, headers, is_local)
         results['_industry'] = industry
+        # GEO / AI-visibility analysis (on-page signals only, no external APIs).
+        try:
+            geo_profile = {
+                'industry': industry.get('primary_industry', 'general_business'),
+                'business_name': domain,
+                'is_local_business': is_local,
+            }
+            geo_vis = analyze_geo_visibility(final_url, html, domain, geo_profile)
+            for _f in geo_vis.get('findings', []):
+                _f.setdefault('evidence', {'source': 'fetched_homepage_html', 'url': final_url})
+            geo_vis['status'] = 'completed'
+            results['geo_visibility'] = geo_vis
+        except Exception as exc:
+            logging.getLogger(__name__).warning('GEO visibility unavailable (%s): %s', type(exc).__name__, exc)
+            results['geo_visibility'] = {'score': None, 'status': 'unavailable', 'findings': []}
         self.progress(25, 'Checking crawler access, sitemaps and measured mobile performance')
         from denzo.agents.base_agent import _sqlite_local,close_thread_connection
         parent_token=getattr(_sqlite_local,'job_token',None)

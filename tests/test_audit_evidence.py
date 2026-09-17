@@ -80,8 +80,8 @@ def actual_report(monkeypatch, *, performance=95):
 def test_actual_analyzer_uses_redirect_destination_and_reports_only_measured_evidence(monkeypatch):
     report=actual_report(monkeypatch)
     assert report['methodology_version']==METHODOLOGY_VERSION
-    assert report['commercial_ready'] and report['coverage']==100
-    assert report['overall_score']==98
+    assert report['commercial_ready'] and report['coverage']==120
+    assert report['overall_score']==86
     assert report['results']['technical']['score']==100
     assert not any(f['rule_id']=='https' for f in report['results']['technical']['findings'])
     assert all(f.get('module') and f.get('evidence') for f in report['findings'])

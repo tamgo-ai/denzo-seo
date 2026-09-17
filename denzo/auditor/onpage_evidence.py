@@ -135,7 +135,7 @@ def analyze_onpage(url, html, headers=None, is_local=False):
         phones = [a for a in visible.find_all('a', href=True) if str(a['href']).lower().startswith('tel:')]
         if not phones and not re.search(r'(?:\+?1[ .-]?)?\(?[2-9]\d{2}\)?[ .-]\d{3}[ .-]\d{4}', text):
             local.add('local_contact_review', 'A telephone contact was not detected on this page', 'Contact details may be on another page or use a format this check does not recognize. No Google Business Profile comparison was performed.',
-                      'Confirm that visitors can find the preferred contact method.')
+                      'Confirm that visitors can find the preferred contact method.', 15, 'medium')
         local.add('local_scope', 'Local-business signals need confirmation', 'This check does not verify address accuracy, reviews, business ownership or map rankings.', detected_phone_links=len(phones))
     else:
         local.add('local_not_applicable', 'Local-business checks are not weighted', 'This page was not classified as a local business.')

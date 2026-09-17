@@ -324,7 +324,8 @@ def _build_body(result, audit_id, mode, inline_assets):
     # ── scorecard ──
     mods = [
         ('technical', 'Technical foundations', weights.get('technical', 40), module_scores.get('technical', 0)),
-        ('geo', 'Structured content', weights.get('geo', 0), module_scores.get('geo', 0)),
+        ('geo', 'Structured data', weights.get('geo', 5), module_scores.get('geo', 0)),
+        ('geo_visibility', 'AI visibility (GEO)', weights.get('geo_visibility', 15), module_scores.get('geo_visibility', 0)),
         ('performance', 'Page speed', weights.get('performance', 35), module_scores.get('performance', 0)),
         ('content', 'Content quality', weights.get('content', 5), module_scores.get('content', 0)),
         ('images', 'Images', weights.get('images', 5), module_scores.get('images', 0)),
@@ -471,7 +472,10 @@ def _build_body(result, audit_id, mode, inline_assets):
 
 def build_report_html(result: dict, audit_id: str, mode: str = 'full', inline_assets: bool = False) -> str:
     """Render a standalone report. mode: 'droppin' | 'full'."""
-    if result.get('overall_score') is None or (str(result.get('methodology_version', '')).startswith('droppin-audit-') and not result.get('commercial_ready')):
+    # No grade at all → show the incomplete page. For the lead-gen (droppin) mode
+    # we also hide a partial grade: a report that isn't "commercial ready" must
+    # not advertise a score. In full mode a partial audit still shows its grade.
+    if result.get('overall_score') is None or (mode == 'droppin' and not result.get('commercial_ready')):
         reason = html.escape(str(result.get('error') or 'Some checks could not be completed. No reliable overall grade is available.'))
         return '<!doctype html><html lang="en"><meta name="viewport" content="width=device-width"><title>Audit incomplete</title><body><h1>Audit incomplete</h1><p>' + reason + '</p><p>This does not imply that the website is poor. Please retry the analysis.</p></body></html>'
     overall = int(result['overall_score'])

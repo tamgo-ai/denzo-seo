@@ -97,7 +97,7 @@ def check_local_business(url: str, html: str, domain: str, industry_profile: dic
     has_review_widget = bool(soup.find_all(['div', 'section'], class_=lambda c: c and any(w in str(c).lower() for w in ['review', 'testimonial', 'rating'])))
 
     if not review_signals and not has_review_widget:
-        findings.append({"severity":"high","module":"local","title":"No review or testimonial signals on page","detail":"Reviews are the #1 local ranking factor after GBP completeness. Pages without review signals are at a severe disadvantage vs competitors who showcase their reviews.","fix":"Add to your page:\n• Google review widget/embed\n• 3-5 customer testimonials with full names and locations\n• Aggregate rating (e.g., '4.9/5 from 247 reviews')\n• Link to your Google Business Profile for new reviews\n• Structured data: Review and AggregateRating schema"})
+        findings.append({"severity":"high","module":"local","title":"No review or testimonial signals on page","detail":"Reviews are an important local ranking signal. Pages without review signals are at a disadvantage vs competitors who showcase their reviews.","fix":"Add to your page:\n• Google review widget/embed\n• 3-5 customer testimonials with full names and locations\n• Aggregate rating (e.g., '4.9/5 from 247 reviews')\n• Link to your Google Business Profile for new reviews\n• Structured data: Review and AggregateRating schema"})
         score -= 15
 
     # ── 3. GBP Optimization Checklist (things the business SHOULD have) ──

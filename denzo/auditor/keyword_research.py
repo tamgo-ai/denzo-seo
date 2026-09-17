@@ -106,7 +106,7 @@ Be specific. Use real keywords that actual customers would search. For local key
             "severity": "medium",
             "module": "keyword_research",
             "title": "Limited keyword strategy — AI couldn't identify enough target keywords",
-            "detail": "The site content doesn't clearly signal a keyword strategy. Competitors with well-defined keyword targets rank 3-5x better.",
+            "detail": "The site content doesn't clearly signal a keyword strategy. Competitors with well-defined keyword targets tend to rank better.",
             "fix": "Build a keyword strategy:\n1. Target 10-15 primary keywords across your pages\n2. Each page should target 1 primary + 2-3 secondary keywords\n3. Use keywords naturally in titles, H1s, H2s, and body text\n4. Create dedicated pages for high-value service+city combinations"
         })
         score -= 10

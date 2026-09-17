@@ -2,8 +2,9 @@
 import math
 
 METHODOLOGY_VERSION = 'droppin-audit-v3'
-BASE_WEIGHTS = {'technical': 40, 'geo': 0, 'performance': 35, 'sitemap': 5,
+BASE_WEIGHTS = {'technical': 40, 'geo': 5, 'performance': 35, 'sitemap': 5,
                 'robots': 10, 'images': 5, 'content': 5, 'local_seo': 0,
+                'geo_visibility': 15,
                 'keywords': 0, 'llms': 0, 'ai_citations': 0, 'keyword_research': 0, 'indexation': 0}
 
 
@@ -13,6 +14,9 @@ def valid_score(value):
 
 def score_results(results, is_local=False):
     weights = dict(BASE_WEIGHTS)
+    # Local businesses get a weighted local-SEO signal; national brands/SaaS don't.
+    if is_local:
+        weights['local_seo'] = 10
     scores, statuses = {}, {}
     for name in weights:
         module = results.get(name) or {}
@@ -23,7 +27,8 @@ def score_results(results, is_local=False):
         statuses[name] = 'completed' if valid else 'unavailable'
     coverage = sum(weight for name, weight in weights.items() if scores[name] is not None)
     overall = math.floor(sum((scores[name] or 0) * weight for name, weight in weights.items()) / coverage + 0.5) if coverage else None
-    ready = coverage == 100
+    # commercial_ready = every weighted module produced a valid score.
+    ready = coverage > 0 and coverage == sum(weights.values())
     return {'methodology_version': METHODOLOGY_VERSION, 'scoring_weights': weights,
             'module_scores': scores, 'module_status': statuses, 'coverage': coverage,
             'overall_score': overall, 'commercial_ready': ready,

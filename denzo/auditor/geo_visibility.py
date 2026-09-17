@@ -37,6 +37,32 @@ def _generate_faq_examples(business_name, industry, services, faq_topics, locati
     return '\n'.join(f"• {q}" for q in base_faqs[:12])
 
 
+def _detect_spanish(soup, text_lower: str) -> bool:
+    """Detect Spanish by <html lang> first, then word-frequency of function words.
+
+    The old check (`any(word in text)` for 'de','la','el',…) misclassified English
+    pages that mention Spanish place names ("Los Angeles", "La Jolla", "El Paso",
+    "de la Peña"). Word frequency is far more robust.
+    """
+    html_tag = soup.find('html')
+    lang = (html_tag.get('lang') or '') if html_tag else ''
+    if lang.lower().startswith('es'):
+        return True
+    if lang.lower().startswith('en'):
+        return False
+
+    words = text_lower.split()
+    _es = {'que', 'como', 'está', 'están', 'son', 'para', 'por', 'una', 'los', 'las', 'del', 'al', 'más',
+           'muy', 'servicio', 'servicios', 'empresa', 'negocio', 'también', 'pero', 'sí', 'usted',
+           'nosotros', 'somos', 'estamos', 'hay', 'cómo', 'cuándo', 'dónde', 'porque', 'calidad', 'nuestro'}
+    _en = {'the', 'and', 'for', 'with', 'are', 'you', 'your', 'our', 'we', 'they', 'this', 'that',
+           'from', 'have', 'has', 'was', 'were', 'service', 'services', 'business', 'company',
+           'also', 'but', 'very', 'is', 'not', 'will', 'can'}
+    es_score = sum(1 for w in words if w in _es)
+    en_score = sum(1 for w in words if w in _en)
+    return es_score > en_score
+
+
 def analyze_geo_visibility(url: str, html: str, domain: str, industry_profile: dict = None) -> dict:
     findings = []
     score = 100
@@ -79,10 +105,10 @@ def analyze_geo_visibility(url: str, html: str, domain: str, industry_profile: d
     if not faq_visible and not faq_schema:
         # Generate industry-relevant FAQ examples from profile
         faq_examples = _generate_faq_examples(business_name, industry, services, faq_topics, locations, certs)
-        findings.append({"severity":"critical","module":"geo","title":"Zero FAQ content — invisible to AI-generated answers","detail":f"AI engines (Google AI Overviews, ChatGPT, Perplexity, Claude, Gemini) primarily cite content that directly answers user questions. With zero Q&A content, the site has near-zero chance of appearing in AI-generated answers.","fix":f"Add 10-15 FAQ questions with detailed, authoritative answers (40-80 words each). Structure each as <h3>Question?</h3><p>Answer.</p>. Example questions for this business:\n{faq_examples}","impact":"AI citation rate estimated at 5-15% without FAQ content vs 40-60% with well-structured FAQ. Missing out on 25-45% of potential AI-driven traffic."})
+        findings.append({"severity":"critical","module":"geo","title":"Zero FAQ content — invisible to AI-generated answers","detail":f"AI engines (Google AI Overviews, ChatGPT, Perplexity, Claude, Gemini) primarily cite content that directly answers user questions. With zero Q&A content, the site has near-zero chance of appearing in AI-generated answers.","fix":f"Add 10-15 FAQ questions with detailed, authoritative answers (40-80 words each). Structure each as <h3>Question?</h3><p>Answer.</p>. Example questions for this business:\n{faq_examples}","impact":"AI engines cite content that directly answers user questions; without visible Q&A content the site is unlikely to appear in AI-generated answers."})
         score -= 30
     elif faq_schema and not faq_visible:
-        findings.append({"severity":"high","module":"geo","title":"FAQ exists only in JSON-LD schema — invisible to DOM-scraping AI models","detail":"FAQPage schema has questions but they are NOT rendered as visible HTML. Most AI models (ChatGPT Browse, Perplexity, Claude) scrape the DOM, not JSON-LD. This means the FAQ content is effectively hidden from AI. Additionally, Google considers schema without visible content a form of cloaking.","fix":"Render all FAQ questions and answers as visible HTML in an <section> or accordion at the bottom of the page. Use <h3> for questions and <p> for answers. Keep the schema if desired but know it won't generate rich results for commercial sites. The HTML FAQ is what matters for AI/GEO.","impact":"FAQ content invisible to ~70% of AI extraction methods. Wasted content investment."})
+        findings.append({"severity":"high","module":"geo","title":"FAQ exists only in JSON-LD schema — invisible to DOM-scraping AI models","detail":"FAQPage schema has questions but they are NOT rendered as visible HTML. Most AI models (ChatGPT Browse, Perplexity, Claude) scrape the DOM, not JSON-LD. This means the FAQ content is effectively hidden from AI. Additionally, Google considers schema without visible content a form of cloaking.","fix":"Render all FAQ questions and answers as visible HTML in an <section> or accordion at the bottom of the page. Use <h3> for questions and <p> for answers. Keep the schema if desired but know it won't generate rich results for commercial sites. The HTML FAQ is what matters for AI/GEO.","impact":"Most AI models read the visible DOM, not JSON-LD, so schema-only FAQ content is effectively hidden from them."})
         score -= 20
     elif faq_visible and len(faq_matches) < 5:
         findings.append({"severity":"medium","module":"geo","title":f"Moderate FAQ content: {len(faq_matches)} questions — need more","detail":f"Questions found: {faq_matches[:5]}. 10-15 questions is the competitive benchmark.","fix":f"Expand to 10-15 questions relevant to {industry.replace('_', ' ')}. Cover: services, pricing, availability, locations, certifications, process, guarantees, and comparisons vs alternatives."})
@@ -98,7 +124,7 @@ def analyze_geo_visibility(url: str, html: str, domain: str, industry_profile: d
     li_count = len(soup.find_all('li'))
 
     if li_count == 0:
-        findings.append({"severity":"high","module":"geo","title":"Zero structured lists — AI can't extract scannable data","detail":"Bullet points and numbered lists are the #1 most cited format in Google AI Overviews and ChatGPT. A page with zero <li> elements is virtually invisible for any query that can be answered with a list.","fix":f"Add structured lists relevant to {industry.replace('_', ' ')}: services, locations, certifications, process steps, differentiators. Lists appear in 40%+ of AI Overviews.","impact":"Directly impacts AI Overview visibility. Estimated traffic opportunity: 15-25%."})
+        findings.append({"severity":"high","module":"geo","title":"Zero structured lists — AI can't extract scannable data","detail":"Bullet points and numbered lists are the #1 most cited format in Google AI Overviews and ChatGPT. A page with zero <li> elements is virtually invisible for any query that can be answered with a list.","fix":f"Add structured lists relevant to {industry.replace('_', ' ')}: services, locations, certifications, process steps, differentiators. Lists are a commonly cited format in AI-generated answers.","impact":"Improves the page's extractability for list-style queries."})
         score -= 15
     elif li_count < 10:
         findings.append({"severity":"medium","module":"geo","title":f"Few structured lists: only {li_count} list items","detail":f"{ul_count} unordered + {ol_count} ordered lists. AI models extract lists with 15+ items for comprehensive citation. Competitors with more structured data will be cited over you.","fix":"Add at least 3-4 more lists with 5+ items each. Prioritize: locations, services, certifications, and FAQs as lists."})
@@ -120,7 +146,7 @@ def analyze_geo_visibility(url: str, html: str, domain: str, industry_profile: d
     ]
     has_definition = any(re.search(p, first_200_words, re.IGNORECASE) for p in def_patterns)
     if not has_definition:
-        findings.append({"severity":"high","module":"geo","title":"Missing authoritative definition block — AI can't identify the business","detail":f"AI models look for a clear 'what/who/where' statement in the first 300-500 visible characters. Without it, AI may not confidently identify or cite {business_name}.","fix":f"Add as the FIRST content block after the hero/H1 (visible text, not an image): a 1-2 sentence paragraph stating what {business_name} is, what it does, and where it operates. Example: '<strong>{business_name}</strong> is a {industry.replace('_', ' ')} provider{f' serving {locations[0]}' if locations else ''}. {business_name} specializes in {', '.join(services[:3]) if services else 'professional services'}.' This single paragraph is the highest-ROI GEO improvement.","impact":f"Without this, AI may refuse to cite {business_name} for brand queries. Estimated AI citation improvement: +20-40%."})
+        findings.append({"severity":"high","module":"geo","title":"Missing authoritative definition block — AI can't identify the business","detail":f"AI models look for a clear 'what/who/where' statement in the first 300-500 visible characters. Without it, AI may not confidently identify or cite {business_name}.","fix":f"Add as the FIRST content block after the hero/H1 (visible text, not an image): a 1-2 sentence paragraph stating what {business_name} is, what it does, and where it operates. Example: '<strong>{business_name}</strong> is a {industry.replace('_', ' ')} provider{f' serving {locations[0]}' if locations else ''}. {business_name} specializes in {', '.join(services[:3]) if services else 'professional services'}.' This single paragraph is the highest-ROI GEO improvement.","impact":f"Without a clear definition, AI may not confidently identify or cite {business_name} for brand queries."})
         score -= 15
 
     # ═════════════════════════════════════════════
@@ -149,7 +175,7 @@ def analyze_geo_visibility(url: str, html: str, domain: str, industry_profile: d
     # ═════════════════════════════════════════════
     # Detect page language first
     text_lower = text.lower()
-    is_spanish = any(w in text_lower.split() for w in ['de', 'la', 'el', 'los', 'las', 'en', 'del', 'al', 'una', 'por', 'para', 'con', 'su', 'sus', 'más', 'como', 'servicio', 'servicios'])
+    is_spanish = _detect_spanish(soup, text_lower)
 
     if is_spanish:
         entity = {
@@ -259,13 +285,11 @@ def analyze_geo_visibility(url: str, html: str, domain: str, industry_profile: d
         findings.append({"severity":"medium","module":"geo","title":f"Content quality gaps found ({len(quality_notes)} areas)","detail":"Based on analysis of what ranks in 2026:\n" + '\n'.join(f'• {n}' for n in quality_notes),"fix":"Address each gap above. These are real patterns seen in top-ranking pages — not fabricated averages, but concrete areas where your content falls short of competitive norms."})
         score -= len(quality_notes) * 5
 
-    # ── Actual competitive benchmarks (what top-10 pages actually have) ──
-    # These are based on analysis of 10,000+ SERPs. We present them as
-    # "what winners do", not as "industry averages".
+    # ── Competitive context (qualitative, no fabricated statistics) ──
     competitive_context = {
-        'faq_present_in_top10': '76% of top-10 results have visible FAQ content',
-        'lists_in_top10': 'Structured lists appear in 41% of AI Overviews and 38% of featured snippets',
-        'definition_in_top10': 'Pages with a clear definition block in first 300 words rank 2.3x better for informational queries',
+        'faq_present_in_top10': 'Pages that answer user questions directly are more likely to be cited in AI-generated answers',
+        'lists_in_top10': 'Structured lists are a commonly cited format in AI Overviews and featured snippets',
+        'definition_in_top10': 'A clear definition block near the top helps AI identify and cite the business',
         'eeat_matters': 'E-E-A-T is evaluated primarily through external signals (backlinks, citations, reviews) — not on-page keywords',
     }
 

@@ -41,7 +41,7 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
 
     # 0a. HTTP status code
     if status_code and status_code >= 400:
-        findings.append({"severity":"critical","module":"technical","title":f"Page returns HTTP {status_code} — not indexable","detail":f"The URL responded with {status_code}. Search engines drop 4xx/5xx pages from the index. Any SEO work on this URL is wasted until the status is fixed.","fix":"Return HTTP 200 for canonical content URLs. Fix server errors (5xx) or broken routes (4xx). If the page moved, 301 to the new location instead of serving an error.","impact":"Complete deindexation. 100% organic traffic loss for this URL."})
+        findings.append({"severity":"critical","module":"technical","title":f"Page returns HTTP {status_code} — not indexable","detail":f"The URL responded with {status_code}. Search engines drop 4xx/5xx pages from the index. Any SEO work on this URL is wasted until the status is fixed.","fix":"Return HTTP 200 for canonical content URLs. Fix server errors (5xx) or broken routes (4xx). If the page moved, 301 to the new location instead of serving an error.","impact":"Complete deindexation. This URL is effectively invisible in organic search."})
         score -= 40
     elif status_code and 300 <= status_code < 400:
         findings.append({"severity":"high","module":"technical","title":f"Page returns a {status_code} redirect at the canonical URL","detail":f"The requested URL responded with {status_code} instead of serving content directly. The audited HTML is from the redirect target.","fix":"Serve 200 content at the canonical URL. Reserve redirects for URLs that genuinely moved.","impact":"Redirect latency + potential signal dilution."})
@@ -86,13 +86,13 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
     title_len = len(title)
 
     if not title:
-        findings.append({"severity":"critical","module":"technical","title":"Missing <title> tag — most critical on-page element","detail":"No title tag found. This is the #1 on-page ranking factor. Without it, Google will auto-generate a title, often poorly.","fix":"Add to <head>: <title>[Primary Service] | [City] | [Business Name]</title>. Include primary keyword near the beginning, business name, and location.","impact":"Direct ranking loss for ALL target keywords. Estimated traffic impact: -20 to -40%."})
+        findings.append({"severity":"critical","module":"technical","title":"Missing <title> tag — most critical on-page element","detail":"No title tag found. This is one of the most important on-page ranking factors. Without it, Google will auto-generate a title, often poorly.","fix":"Add to <head>: <title>[Primary Service] | [City] | [Business Name]</title>. Include primary keyword near the beginning, business name, and location.","impact":"Direct ranking loss for all target keywords."})
         score -= 30
     elif title_len < 30:
-        findings.append({"severity":"high","module":"technical","title":f"Title too short: {title_len} chars — wasting SERP real estate","detail":f'Current: "{title}". Google displays 50-60 characters in desktop SERPs and 55-65 on mobile. At {title_len} chars, you are using less than half the available space.','fix':f'Expand to 50-60 chars. Recommended: "[Primary Service] | [City], CA | [Business Name]". Front-load primary keyword.','impact':'Reduced CTR in SERPs. Less keyword coverage. Estimated traffic loss: 10-15%.'})
+        findings.append({"severity":"high","module":"technical","title":f"Title too short: {title_len} chars — wasting SERP real estate","detail":f'Current: "{title}". Google displays 50-60 characters in desktop SERPs and 55-65 on mobile. At {title_len} chars, you are using less than half the available space.','fix':f'Expand to 50-60 chars. Recommended: "[Primary Service] | [City], CA | [Business Name]". Front-load primary keyword.','impact':'Reduced CTR in SERPs and less keyword coverage.'})
         score -= 12
     elif title_len > 70:
-        findings.append({"severity":"medium","module":"technical","title":f"Title too long: {title_len} chars — will be truncated","detail":f'Current: "{title[:100]}...". Google truncates titles at ~600px (55-65 chars on mobile, 65-75 on desktop). Excess characters are replaced with "...".','fix':'Trim to 50-60 characters. Remove filler words. Put the most important keywords first.','impact':'Truncated titles lose keywords and CTR. Estimated traffic loss: 3-8%.'})
+        findings.append({"severity":"medium","module":"technical","title":f"Title too long: {title_len} chars — will be truncated","detail":f'Current: "{title[:100]}...". Google truncates titles at ~600px (55-65 chars on mobile, 65-75 on desktop). Excess characters are replaced with "...".','fix':'Trim to 50-60 characters. Remove filler words. Put the most important keywords first.','impact':'Truncated titles lose keywords and CTR.'})
         score -= 5
     else:
         findings.append({"severity":"pass","module":"technical","title":f"Title tag: {title_len} chars — optimal length","detail":f'"{title}"','fix':None})
@@ -118,10 +118,10 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
     desc_len = len(desc)
 
     if not desc:
-        findings.append({"severity":"high","module":"technical","title":"Missing meta description","detail":"No meta description tag. Google will auto-generate a snippet from page content, which may be poorly formatted, cut off mid-sentence, or lack a call to action.","fix":"Add: <meta name=\"description\" content=\"[150-160 char description with keyword, value proposition, and CTA]\">. Front-load key info — mobile truncates at ~120 chars.","impact":"Reduced CTR from SERPs. Estimated click loss: 5-15%."})
+        findings.append({"severity":"high","module":"technical","title":"Missing meta description","detail":"No meta description tag. Google will auto-generate a snippet from page content, which may be poorly formatted, cut off mid-sentence, or lack a call to action.","fix":"Add: <meta name=\"description\" content=\"[150-160 char description with keyword, value proposition, and CTA]\">. Front-load key info — mobile truncates at ~120 chars.","impact":"Reduced CTR from SERPs."})
         score -= 12
     elif desc_len < 120:
-        findings.append({"severity":"medium","module":"technical","title":f"Meta description too short: {desc_len} chars","detail":f'Current: "{desc}". Wasting ~35% of available SERP space.','fix':'Expand to 150-160 characters. Include: primary keyword, 2-3 value propositions, location, and a CTA like "Call [phone]" or "Free estimate".'})
+        findings.append({"severity":"medium","module":"technical","title":f"Meta description too short: {desc_len} chars","detail":f'Current: "{desc}". Underusing the available SERP space.','fix':'Expand to 150-160 characters. Include: primary keyword, 2-3 value propositions, location, and a CTA like "Call [phone]" or "Free estimate".'})
         score -= 6
     elif desc_len > 165:
         findings.append({"severity":"low","module":"technical","title":f"Meta description too long: {desc_len} chars — truncated in SERPs","detail":'Google truncates at ~155-160 chars on desktop and ~120 on mobile. Content after the cutoff is invisible.','fix':'Trim to 150-160 chars. Ensure the CTA and key value proposition are in the first 120 characters for mobile visibility.'})
@@ -129,7 +129,7 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
                   # Spanish CTAs
                   'agendá','agenda','llama','whatsapp','gratis','cotización','presupuesto','reserva','cita','consulta','pedir','solicitar','comprar','probar','contacto','descargar')
     if desc and not any(w in desc.lower() for w in _cta_words):
-        findings.append({"severity":"low","module":"technical","title":"Meta description lacks a call-to-action","detail":"A CTA in the meta description increases CTR by 2-5%. The current description has no action-oriented language.","fix":'Add a clear CTA appropriate to your business (e.g. "Get started", "Book a demo", "Shop now", "Request a quote").'})
+        findings.append({"severity":"low","module":"technical","title":"Meta description lacks a call-to-action","detail":"A CTA in the meta description can improve CTR. The current description has no action-oriented language.","fix":'Add a clear CTA appropriate to your business (e.g. "Get started", "Book a demo", "Shop now", "Request a quote").'})
 
     # ═════════════════════════════════════════════
     # 3. CANONICAL
@@ -138,7 +138,7 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
     canonical_url = canonical['href'].strip() if canonical and canonical.get('href') else None
     current_url = url.rstrip('/')
     if not canonical_url:
-        findings.append({"severity":"high","module":"technical","title":"No canonical URL tag — duplicate content risk","detail":"Without a canonical, Google may index multiple URL variations (http/https, www/non-www, with/without trailing slash, with/without parameters) as separate pages. This splits ranking signals.","fix":'Add to <head>: <link rel="canonical" href="https://www.' + domain + parsed.path.rstrip('/') + '">. Ensure ALL internal links, sitemap URLs, and the canonical tag use the SAME domain format (www or non-www).','impact':'Potential duplicate content. Diluted PageRank across multiple URL versions. Estimated ranking dilution: 10-25%.'})
+        findings.append({"severity":"high","module":"technical","title":"No canonical URL tag — duplicate content risk","detail":"Without a canonical, Google may index multiple URL variations (http/https, www/non-www, with/without trailing slash, with/without parameters) as separate pages. This splits ranking signals.","fix":'Add to <head>: <link rel="canonical" href="https://www.' + domain + parsed.path.rstrip('/') + '">. Ensure ALL internal links, sitemap URLs, and the canonical tag use the SAME domain format (www or non-www).','impact':'Potential duplicate content. Ranking signals may be diluted across multiple URL versions.'})
         score -= 15
     elif canonical_url.rstrip('/') != current_url:
         c_domain = urlparse(canonical_url).netloc.replace('www.','')
@@ -155,7 +155,7 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
     h3_tags = soup.find_all('h3')
 
     if h1_count == 0:
-        findings.append({"severity":"high","module":"technical","title":"Missing H1 tag","detail":"Every page should have exactly one H1 containing the primary keyword. H1 is a top-3 on-page ranking signal.","fix":"Add a single <h1> containing primary keyword + location. Include your primary keyword + location (if local): <h1>[Primary Service] — [City], CA</h1>. Place it above the fold.","impact":"Weakened topical relevance signal. Estimated ranking impact: 5-15% for primary keywords."})
+        findings.append({"severity":"high","module":"technical","title":"Missing H1 tag","detail":"Every page should have exactly one H1 containing the primary keyword. The H1 is an important on-page relevance signal.","fix":"Add a single <h1> containing primary keyword + location. Include your primary keyword + location (if local): <h1>[Primary Service] — [City], CA</h1>. Place it above the fold.","impact":"Weakened topical relevance signal."})
         score -= 15
     elif h1_count > 1:
         h1_texts = [h.get_text(strip=True) for h in h1_tags]
@@ -246,7 +246,7 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
             schema_issues.append(f"Block #{i+1}: invalid JSON — {str(e)[:100]}")
 
     if len(schema_scripts) == 0:
-        findings.append({"severity":"critical","module":"technical","title":"ZERO structured data — invisible to rich results & AI","detail":"No JSON-LD schema found. The site cannot appear in: Google Local Pack, rich snippets, Knowledge Panel, AI Overviews citations, or voice search results. For a multi-location business, this is devastating.","fix":"Implement: (1) Organization schema on homepage, (2) LocalBusiness schema for EACH location with full NAP + geo coordinates, (3) Service schema for each service, (4) BreadcrumbList, (5) WebSite schema for Sitelinks Searchbox.","impact":"Estimated traffic loss from rich results: 30-50%. Each location missing LocalBusiness schema is invisible in Google Maps search."})
+        findings.append({"severity":"critical","module":"technical","title":"ZERO structured data — invisible to rich results & AI","detail":"No JSON-LD schema found. The site cannot appear in: Google Local Pack, rich snippets, Knowledge Panel, AI Overviews citations, or voice search results. For a multi-location business, this is devastating.","fix":"Implement: (1) Organization schema on homepage, (2) LocalBusiness schema for EACH location with full NAP + geo coordinates, (3) Service schema for each service, (4) BreadcrumbList, (5) WebSite schema for Sitelinks Searchbox.","impact":"The site may miss out on rich results. Each location missing LocalBusiness schema is invisible in Google Maps search."})
         score -= 30
     else:
         if schema_issues:
@@ -275,7 +275,7 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
 
     missing_og = [k for k,v in og_tags.items() if not v]
     if 'title' in missing_og or 'image' in missing_og:
-        findings.append({"severity":"high","module":"technical","title":f"Critical Open Graph tags missing: {', '.join(missing_og)}","detail":"Without og:title and og:image, links shared on Facebook, LinkedIn, WhatsApp, iMessage, and Slack display as plain text with no preview. Social shares drive brand visibility and indirect SEO signals.","fix":"Add in <head>:\n<meta property=\"og:title\" content=\"[Business Name] | [Tagline]\">\n<meta property=\"og:description\" content=\"[150-160 char description]\">\n<meta property=\"og:image\" content=\"https://www.[domain]/og-image.jpg\">\n<meta property=\"og:url\" content=\"[canonical URL]\">\n<meta property=\"og:type\" content=\"website\">\n\nCreate a 1200×630px JPG social share image.","impact":"Links shared on social platforms appear as plain text — no image, no description. Estimated indirect traffic loss: 3-8%."})
+        findings.append({"severity":"high","module":"technical","title":f"Critical Open Graph tags missing: {', '.join(missing_og)}","detail":"Without og:title and og:image, links shared on Facebook, LinkedIn, WhatsApp, iMessage, and Slack display as plain text with no preview. Social shares drive brand visibility and indirect SEO signals.","fix":"Add in <head>:\n<meta property=\"og:title\" content=\"[Business Name] | [Tagline]\">\n<meta property=\"og:description\" content=\"[150-160 char description]\">\n<meta property=\"og:image\" content=\"https://www.[domain]/og-image.jpg\">\n<meta property=\"og:url\" content=\"[canonical URL]\">\n<meta property=\"og:type\" content=\"website\">\n\nCreate a 1200×630px JPG social share image.","impact":"Links shared on social platforms appear as plain text — no image, no description."})
         score -= 15
     elif og_tags.get('image'):
         findings.append({"severity":"pass","module":"technical","title":"Open Graph tags: complete","detail":f"og:image = {og_tags['image'][:80]}","fix":None})
@@ -296,10 +296,10 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
             findings.append({"severity":"info","module":"technical","title":f"Text-to-HTML ratio {text_ratio}% — typical of {_fw.get('label','a JS framework')} hydration/markup","detail":f"HTML: {html_size/1024:.0f}KB | Visible text: {text_bytes/1024:.1f}KB. The ratio includes framework hydration payload and generated markup, so it is not treated as a thin-content signal here. Word count is used instead.","fix":None})
     else:
         if text_ratio < 5:
-            findings.append({"severity":"high","module":"technical","title":f"Severely low text-to-HTML ratio: {text_ratio}%","detail":f"HTML: {html_size/1024:.0f}KB | Visible text: {text_bytes/1024:.1f}KB | Ratio: {text_ratio}%. Google expects 10-25% for a content-rich page. Below 5% triggers thin content filters regardless of actual word count.","fix":"Reduce inline JavaScript (move to external files with defer/async). Remove unnecessary wrapper divs. Increase visible text content by 50-100%.","impact":"Risk of being classified as thin content. Estimated ranking suppression: 5-15% across all terms."})
+            findings.append({"severity":"high","module":"technical","title":f"Severely low text-to-HTML ratio: {text_ratio}%","detail":f"HTML: {html_size/1024:.0f}KB | Visible text: {text_bytes/1024:.1f}KB | Ratio: {text_ratio}%. A content-rich page typically has a higher text-to-HTML ratio. Below 5% can trigger thin content filters regardless of actual word count.","fix":"Reduce inline JavaScript (move to external files with defer/async). Remove unnecessary wrapper divs. Increase visible text content.","impact":"Risk of being classified as thin content."})
             score -= 15
         elif text_ratio < 10:
-            findings.append({"severity":"medium","module":"technical","title":f"Below-average text-to-HTML ratio: {text_ratio}%","detail":f"Target 10-25%. At {text_ratio}%, the page is markup-heavy. This is common in React/Next.js SPAs due to hydration payloads.","fix":"Enable code splitting in Next.js. Use Partial Prerendering (PPR). Reduce RSC payload size. Increase text content."})
+            findings.append({"severity":"medium","module":"technical","title":f"Below-average text-to-HTML ratio: {text_ratio}%","detail":f"A content-rich page typically has a higher ratio. At {text_ratio}%, the page is markup-heavy. This is common in React/Next.js SPAs due to hydration payloads.","fix":"Enable code splitting in Next.js. Use Partial Prerendering (PPR). Reduce RSC payload size. Increase text content."})
             score -= 6
 
     # Semantic tags
@@ -341,7 +341,7 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
         score -= 8
 
     if len(imgs_png) >= 5 and len(imgs_png) > len(images) * 0.3:
-        findings.append({"severity":"medium","module":"technical","title":f"{len(imgs_png)} images still in PNG format — convert to WebP","detail":f"PNG images: {[i['src'][:50] for i in imgs_png[:5]]}. WebP is 30-50% smaller than PNG with equivalent quality. Large PNGs are the #1 cause of excessive page weight.","fix":"Convert PNG images to WebP/AVIF. In Next.js, the <Image> component auto-converts. For static images, use tools like cwebp or Sharp. Serve responsive sizes via srcSet.","impact":"Estimated page weight savings: 40-60% on image payload. Direct LCP improvement."})
+        findings.append({"severity":"medium","module":"technical","title":f"{len(imgs_png)} images still in PNG format — convert to WebP","detail":f"PNG images: {[i['src'][:50] for i in imgs_png[:5]]}. WebP is typically smaller than PNG with equivalent quality. Large PNGs are a common cause of excessive page weight.","fix":"Convert PNG images to WebP/AVIF. In Next.js, the <Image> component auto-converts. For static images, use tools like cwebp or Sharp. Serve responsive sizes via srcSet.","impact":"Page weight on the image payload can be significantly reduced, which improves LCP."})
         score -= 8
 
     if len(images) >= 3 and len(imgs_lazy) / len(images) < 0.6:
@@ -390,7 +390,7 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
 
         cache = headers_lower.get('cache-control','')
         if 'no-store' in cache:
-            findings.append({"severity":"high","module":"technical","title":"Cache-Control: no-store — zero browser caching","detail":f"Current: {cache}. Every visit re-downloads the full page. This disables browser cache, CDN edge cache, and Back/Forward cache (bfcache).","fix":"For content pages, use: Cache-Control: public, s-maxage=60, stale-while-revalidate=3600. For static assets, use longer max-age. This alone can reduce LCP by 1-2 seconds on repeat visits.","impact":"Every page load is a cold load. TTFB inflated by 500-700ms. bfcache disabled. Estimated LCP penalty: 1-3s."})
+            findings.append({"severity":"high","module":"technical","title":"Cache-Control: no-store — zero browser caching","detail":f"Current: {cache}. Every visit re-downloads the full page. This disables browser cache, CDN edge cache, and Back/Forward cache (bfcache).","fix":"For content pages, use: Cache-Control: public, s-maxage=60, stale-while-revalidate=3600. For static assets, use longer max-age. This alone can improve LCP on repeat visits.","impact":"Every page load is a cold load. TTFB is inflated and bfcache is disabled."})
             score -= 12
 
         for header_key, (display_name, description) in security_checks.items():
@@ -418,7 +418,7 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
     if len(inline_js) > 5:
         inline_js_size = sum(len(s.string or '') for s in inline_js)
         if inline_js_size > 100000:
-            findings.append({"severity":"high","module":"technical","title":f"Massive inline JavaScript: {inline_js_size/1024:.0f}KB in {len(inline_js)} blocks","detail":"This is Next.js RSC (React Server Components) hydration payload. It blocks rendering and increases TBT (Total Blocking Time) significantly.","fix":"Enable Partial Prerendering (PPR) in Next.js 14+. This serves static HTML shells with dynamic 'holes' that hydrate progressively. Lazy-load below-fold components.","impact":"Estimated TBT impact: +500-1500ms. Direct LCP and INP penalty in Core Web Vitals."})
+            findings.append({"severity":"high","module":"technical","title":f"Massive inline JavaScript: {inline_js_size/1024:.0f}KB in {len(inline_js)} blocks","detail":"This is Next.js RSC (React Server Components) hydration payload. It blocks rendering and increases TBT (Total Blocking Time) significantly.","fix":"Enable Partial Prerendering (PPR) in Next.js 14+. This serves static HTML shells with dynamic 'holes' that hydrate progressively. Lazy-load below-fold components.","impact":"Direct LCP and INP penalty in Core Web Vitals."})
             score -= 10
 
     # ═════════════════════════════════════════════
@@ -426,10 +426,10 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
     # ═════════════════════════════════════════════
     words = len(text.split())
     if words < 500:
-        findings.append({"severity":"high","module":"technical","title":f"Severely thin content: {words} words","detail":"Pages with <500 words are considered 'thin content' by Google and struggle to rank. The average top-10 result has 1,500-2,500 words.","fix":"Expand to 1,500+ words. Structure with H2 sections covering: detailed service/product descriptions, FAQ, about/credentials, testimonials, process, and location info if local.","impact":"Cannot compete for mid-to-high difficulty keywords. Estimated ranking ceiling: position 20+."})
+        findings.append({"severity":"high","module":"technical","title":f"Severely thin content: {words} words","detail":"Pages with <500 words are often treated as thin content and struggle to rank. Competitive pages tend to be substantially longer.","fix":"Expand to 1,500+ words. Structure with H2 sections covering: detailed service/product descriptions, FAQ, about/credentials, testimonials, process, and location info if local.","impact":"Cannot compete for mid-to-high difficulty keywords."})
         score -= 15
     elif words < 1500:
-        findings.append({"severity":"medium","module":"technical","title":f"Below-competitive word count: {words}","detail":f"Top-ranking pages average 1,500-2,500 words. At {words}, you are below the competitive threshold.","fix":"Add 500-1,000 more words. Best ROI: FAQ section, detailed service/product descriptions, location-specific content, and credentials/certifications."})
+        findings.append({"severity":"medium","module":"technical","title":f"Below-competitive word count: {words}","detail":f"Competitive pages tend to be substantially longer. At {words}, you are below the competitive threshold.","fix":"Add 500-1,000 more words. Best ROI: FAQ section, detailed service/product descriptions, location-specific content, and credentials/certifications."})
         score -= 6
 
     # ═════════════════════════════════════════════
@@ -456,7 +456,7 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
     ol_count = len(soup.find_all('ol'))
     li_count = len(soup.find_all('li'))
     if li_count == 0:
-        findings.append({"severity":"high","module":"technical","title":"Zero HTML list elements (ul/ol) — poor scannability","detail":"Structured lists improve readability and are one of the most commonly cited formats in Google AI Overviews. 0 list items = near-zero chance of appearing in featured snippets or AI Overviews for list-type queries.","fix":"Add structured lists: (1) services/products with short descriptions, (2) locations if multi-site, (3) certifications/credentials, (4) process steps in <ol>, (5) key differentiators.","impact":"Missed opportunity for featured snippets. Estimated traffic loss from quick-answer queries: 10-20%."})
+        findings.append({"severity":"high","module":"technical","title":"Zero HTML list elements (ul/ol) — poor scannability","detail":"Structured lists improve readability and are one of the most commonly cited formats in Google AI Overviews. 0 list items = near-zero chance of appearing in featured snippets or AI Overviews for list-type queries.","fix":"Add structured lists: (1) services/products with short descriptions, (2) locations if multi-site, (3) certifications/credentials, (4) process steps in <ol>, (5) key differentiators.","impact":"Missed opportunity for featured snippets."})
         score -= 12
 
     # ═════════════════════════════════════════════
