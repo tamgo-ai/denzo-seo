@@ -25,8 +25,8 @@ def score_results(results, is_local=False):
             valid = valid and module.get('source') == 'lighthouse_local'
         scores[name] = module.get('score') if valid else None
         statuses[name] = 'completed' if valid else 'unavailable'
-    coverage = sum(weight for name, weight in weights.items() if scores[name] is not None)
-    overall = math.floor(sum((scores[name] or 0) * weight for name, weight in weights.items()) / coverage + 0.5) if coverage else None
+    denominator = sum(weight for name, weight in weights.items() if scores[name] is not None)
+    overall = math.floor(sum((scores[name] or 0) * weight for name, weight in weights.items()) / denominator + 0.5) if denominator else None
     # commercial_ready = every REQUIRED module produced a valid score. `authority`
     # is an optional off-page enhancement: if the Ahrefs API is down or the plan
     # quota is exhausted, the audit must still complete and only report authority
@@ -34,6 +34,9 @@ def score_results(results, is_local=False):
     required_total = sum(w for n, w in weights.items() if w > 0 and n != 'authority')
     required_coverage = sum(w for n, w in weights.items() if w > 0 and n != 'authority' and scores[n] is not None)
     ready = required_total > 0 and required_coverage == required_total
+    # `coverage` is a 0-100 completeness percentage (100 = every required module
+    # measured), NOT the raw weight sum. Droppin's audit contract requires 100.
+    coverage = round(100 * required_coverage / required_total) if required_total else 0
     return {'methodology_version': METHODOLOGY_VERSION, 'scoring_weights': weights,
             'module_scores': scores, 'module_status': statuses, 'coverage': coverage,
             'overall_score': overall, 'commercial_ready': ready,

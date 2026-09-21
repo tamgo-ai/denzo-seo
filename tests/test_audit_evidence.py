@@ -83,7 +83,7 @@ def actual_report(monkeypatch, *, performance=95):
 def test_actual_analyzer_uses_redirect_destination_and_reports_only_measured_evidence(monkeypatch):
     report=actual_report(monkeypatch)
     assert report['methodology_version']==METHODOLOGY_VERSION
-    assert report['commercial_ready'] and report['coverage']==145
+    assert report['commercial_ready'] and report['coverage']==100
     assert report['overall_score']==37
     assert report['results']['technical']['score']==0
     # The analyzer must use the redirect destination (https), not the requested http URL.
