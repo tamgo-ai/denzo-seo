@@ -28,6 +28,15 @@ def deep_image_audit(url: str, html: str, domain: str, base_page_url: str = None
     parsed = urlparse(url)
     base = f"{parsed.scheme}://{parsed.netloc}"
 
+    # Framework-aware advice — avoid telling a WordPress site to use Next.js <Image>.
+    fw_label = ((framework or {}).get('label') or '').lower()
+    if 'wordpress' in fw_label:
+        fw_note = 'In WordPress, use an image-optimization plugin (Smush, ShortPixel, EWWW) or your theme\'s image settings.'
+    elif 'next' in fw_label:
+        fw_note = 'In Next.js, use the <Image> component.'
+    else:
+        fw_note = 'Set it directly on the <img> tag (or your framework\'s image component).'
+
     if not images:
         return {"score": 100, "findings": [{"severity":"pass","module":"images","title":"No images on page","detail":"Nothing to audit.","fix":None}],
                 "total":0, "with_alt":0, "with_dims":0, "lazy":0, "webp":0, "png":0, "jpg":0, "svg":0,
@@ -96,7 +105,7 @@ def deep_image_audit(url: str, html: str, domain: str, base_page_url: str = None
     if alt_missing:
         pct = round(len(alt_missing)/total*100)
         examples = [m['src'].split('/')[-1][:40] for m in alt_missing[:3]]
-        findings.append({"severity":"high","module":"images","title":f"{len(alt_missing)}/{total} images ({pct}%) missing alt text","detail":f"Examples: {examples}. Alt text is an important signal for Google Images. Missing alt text also fails WCAG 2.1 accessibility requirements (Level A).","fix":"Add descriptive alt text to every <img>. For Next.js: <Image alt=\"[descriptive text]\" .../>. Alt text should describe WHAT is in the image, not stuff keywords. Good: 'Team meeting at [Business Name] headquarters in [City]'. Bad: 'business meeting'. Describe what is IN the image specifically.","impact": f"Invisible to Google Images for {len(alt_missing)} images. Accessibility violation."})
+        findings.append({"severity":"high","module":"images","title":f"{len(alt_missing)}/{total} images ({pct}%) missing alt text","detail":f"Examples: {examples}. Alt text is an important signal for Google Images. Missing alt text also fails WCAG 2.1 accessibility requirements (Level A).","fix":("Add descriptive alt text to every image. " + fw_note + " Alt text should describe WHAT is in the image, not stuff keywords. Good: 'Team meeting at [Business Name] headquarters in [City]'. Bad: 'business meeting'."),"impact": f"Invisible to Google Images for {len(alt_missing)} images. Accessibility violation."})
         score -= 15
 
     if alt_generic:
@@ -110,32 +119,32 @@ def deep_image_audit(url: str, html: str, domain: str, base_page_url: str = None
         examples = [m['src'].split('/')[-1][:40] for m in no_dims[:3]]
         sev = 'high' if pct >= 15 else 'low'
         pen = 12 if pct >= 15 else 3
-        findings.append({"severity":sev,"module":"images","title":f"{len(no_dims)}/{total} images ({pct}%) missing explicit width/height — CLS risk","detail":f"Examples: {examples}. Images without dimensions are a common cause of Cumulative Layout Shift (CLS). Google penalizes CLS > 0.1 in Core Web Vitals. Every image without dimensions pushes content around as it loads.","fix":"Add width/height to every <img>. In Next.js, use <Image width={800} height={600} src=\"...\" alt=\"...\"/> or <Image fill sizes=\"...\" /> with a positioned parent. For HTML: <img width=\"800\" height=\"600\" ...>. This reserves space before the image loads.","impact":"CLS penalty in Core Web Vitals."})
+        findings.append({"severity":sev,"module":"images","title":f"{len(no_dims)}/{total} images ({pct}%) missing explicit width/height — CLS risk","detail":f"Examples: {examples}. Images without dimensions are a common cause of Cumulative Layout Shift (CLS). Google penalizes CLS > 0.1 in Core Web Vitals. Every image without dimensions pushes content around as it loads.","fix":("Add width/height to every image (e.g. <img width=\"800\" height=\"600\" ...>). " + fw_note + " This reserves space before the image loads."),"impact":"CLS penalty in Core Web Vitals."})
         score -= pen
 
     # 3. Format optimization
     if png_imgs and len(png_imgs) > total * 0.2:
         png_pct = round(len(png_imgs)/total*100)
-        findings.append({"severity":"high","module":"images","title":f"{len(png_imgs)} images ({png_pct}%) still in PNG — convert to WebP/AVIF","detail":f"PNG is typically much larger than WebP for photographic images.","fix":"Convert all PNG photos to WebP (lossy, quality 80%) or AVIF (smaller but slower to encode). In Next.js, next/image auto-converts if using the built-in optimizer. For static images: cwebp input.png -o output.webp -q 80. SVG/logo PNGs can stay as-is.","impact": f"Page weight can be significantly reduced, improving LCP on mobile."})
+        findings.append({"severity":"high","module":"images","title":f"{len(png_imgs)} images ({png_pct}%) still in PNG — convert to WebP/AVIF","detail":f"PNG is typically much larger than WebP for photographic images.","fix":("Convert PNG photos to WebP (lossy, quality 80%) or AVIF. " + fw_note + " For static images: cwebp input.png -o output.webp -q 80. SVG/logo PNGs can stay as-is."),"impact": f"Page weight can be significantly reduced, improving LCP on mobile."})
         score -= 12
 
     if jpg_imgs and len(jpg_imgs) > total * 0.3:
-        findings.append({"severity":"medium","module":"images","title":f"{len(jpg_imgs)} JPEG images — consider WebP/AVIF conversion","detail":"WebP is typically smaller than JPEG at equivalent quality. Converting JPEGs to WebP is a quick win for page weight reduction.","fix":"Convert JPEGs to WebP. Most CDNs (Cloudflare, Vercel, Netlify) can auto-convert. Next.js Image component handles this automatically."})
+        findings.append({"severity":"medium","module":"images","title":f"{len(jpg_imgs)} JPEG images — consider WebP/AVIF conversion","detail":"WebP is typically smaller than JPEG at equivalent quality. Converting JPEGs to WebP is a quick win for page weight reduction.","fix":"Convert JPEGs to WebP. Most CDNs (Cloudflare, Vercel, Netlify) can auto-convert."})
         score -= 6
 
     # 4. LCP optimization
     if lcp_img:
         if not lcp_img['fetchpriority']:
-            findings.append({"severity":"high","module":"images","title":"LCP image not prioritized — add fetchpriority='high'","detail":f"LCP candidate: {lcp_img['src'][:80]}. The Largest Contentful Paint image should be preloaded or have fetchpriority='high' so the browser prioritizes it over other resources. Without this, LCP can be delayed.","fix":"Add fetchpriority='high' to the LCP image. Also add <link rel='preload' as='image' href='...' imagesrcset='...'> in <head> for the critical hero image. In Next.js: <Image priority fetchPriority='high' .../>.","impact":"Improves LCP on mobile — a key Core Web Vital."})
+            findings.append({"severity":"high","module":"images","title":"LCP image not prioritized — add fetchpriority='high'","detail":f"LCP candidate: {lcp_img['src'][:80]}. The Largest Contentful Paint image should be preloaded or have fetchpriority='high' so the browser prioritizes it over other resources. Without this, LCP can be delayed.","fix":("Add fetchpriority='high' to the LCP image. Also add <link rel='preload' as='image' href='...' imagesrcset='...'> in <head> for the critical hero image. " + fw_note),"impact":"Improves LCP on mobile — a key Core Web Vital."})
             score -= 10
         if not lcp_img['has_srcset']:
-            findings.append({"severity":"medium","module":"images","title":"LCP image missing responsive srcset","detail":"Without srcset, mobile devices may download the desktop-size image, which is larger than needed. The LCP image should have multiple sizes for different viewports.","fix":"Add srcset with at least 3 sizes: 640w, 1024w, 1920w. Next.js Image component generates these automatically."})
+            findings.append({"severity":"medium","module":"images","title":"LCP image missing responsive srcset","detail":"Without srcset, mobile devices may download the desktop-size image, which is larger than needed. The LCP image should have multiple sizes for different viewports.","fix":"Add srcset with at least 3 sizes: 640w, 1024w, 1920w."})
             score -= 5
 
     # 5. Lazy loading audit
     lazy_pct = round(len(lazy_imgs)/total*100) if total else 0
     if lazy_pct < 60 and total > 5:
-        findings.append({"severity":"medium","module":"images","title":f"Only {lazy_pct}% of images lazy-loaded — should be 70%+","detail":f"{total - len(lazy_imgs)} images load eagerly, including potentially off-screen images. This wastes bandwidth and delays LCP.","fix":"Add loading='lazy' to all below-fold images. In Next.js: <Image loading='lazy' .../> for non-hero images. Keep loading='eager' only for the LCP/first-viewport image."})
+        findings.append({"severity":"medium","module":"images","title":f"Only {lazy_pct}% of images lazy-loaded — should be 70%+","detail":f"{total - len(lazy_imgs)} images load eagerly, including potentially off-screen images. This wastes bandwidth and delays LCP.","fix":("Add loading='lazy' to all below-fold images. " + fw_note + " Keep loading='eager' only for the LCP/first-viewport image.")})
         score -= 5
     elif lazy_pct > 90:
         findings.append({"severity":"pass","module":"images","title":f"Excellent lazy loading: {lazy_pct}% of images lazy-loaded","detail":"Only critical above-fold images load eagerly. This is optimal for performance.","fix":None})

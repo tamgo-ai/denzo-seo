@@ -98,7 +98,7 @@ def analyze_geo_visibility(url: str, html: str, domain: str, industry_profile: d
     # ── Industry context ────────────────────────────────────────────────
     profile = industry_profile or {}
     industry = profile.get('industry', 'general_business')
-    business_name = profile.get('business_name', domain)
+    business_name = _humanize_business_name(profile.get('business_name') or domain)
     services = profile.get('services', [])
     locations = profile.get('locations', [])
     is_local = profile.get('is_local_business', False)
@@ -181,8 +181,6 @@ def analyze_geo_visibility(url: str, html: str, domain: str, industry_profile: d
     if total_semantic == 0:
         findings.append({"severity":"medium","module":"geo","title":"Zero semantic HTML5 elements — poor AI content extraction","detail":"Semantic tags (<main>, <article>, <section>, <nav>, <header>, <footer>) help AI models identify content regions. Without them, AI must guess what is content vs. navigation vs. boilerplate.","fix":"Wrap main content in <main>, use <section> for content blocks (services, locations, about, FAQ), <nav> for navigation menus, <article> for blog posts or detailed content pieces."})
         score -= 8
-    if semantic['article'] == 0:
-        findings.append({"severity":"low","module":"geo","title":"No <article> tags — missing self-contained content markers","detail":"<article> tags tell AI models that content is a complete, self-contained piece suitable for citation. Blog posts, service descriptions, and location profiles benefit from <article> wrapping."})
 
     # ═════════════════════════════════════════════
     # 5. CITATION-READY ELEMENTS
@@ -238,12 +236,10 @@ def analyze_geo_visibility(url: str, html: str, domain: str, industry_profile: d
     missing_entity = [k for k,v in considered.items() if not v]
     pass_threshold = max(3, total_considered - 2)
 
-    if entity_count >= pass_threshold:
-        findings.append({"severity":"pass","module":"geo","title":f"Strong entity signals: {entity_count}/{total_considered} present","detail":f"Present: {[k for k,v in considered.items() if v]}. AI models have multiple confidence signals to identify and cite this business.","fix":None})
-    elif entity_count < max(2, total_considered // 2):
-        _hint = "phone, certifications/credentials, founding year, guarantees" + (", number of locations, physical address" if is_local else "")
-        findings.append({"severity":"high","module":"geo","title":f"Weak entity signals: only {entity_count}/{total_considered} — AI may not trust this entity","detail":f"Missing: {missing_entity}. AI models need clear, structured signals to confidently cite an organization.","fix":f"Ensure these appear in visible body text (not only schema or footer): {_hint}."})
-        score -= 15
+    # Entity/authority signal strength is reported once, below, in the E-E-A-T
+    # scoring section (section 8) — it uses the same `entity` dict. Reporting it
+    # here too would duplicate the same "missing certifications/founded_year/…"
+    # finding with two different denominators (3/9 vs 2/11).
 
     # ═════════════════════════════════════════════
     # 7. AI CRAWLER CONTENT FRESHNESS

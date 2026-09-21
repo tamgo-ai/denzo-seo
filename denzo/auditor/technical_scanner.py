@@ -347,21 +347,10 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
     imgs_png = [i for i in img_data if i['fmt'] == 'png']
     imgs_jpg = [i for i in img_data if i['fmt'] == 'jpg']
 
-    if imgs_no_alt:
-        pct = round(len(imgs_no_alt)/len(images)*100) if images else 0
-        findings.append({"severity":"medium","module":"technical","title":f"{len(imgs_no_alt)}/{len(images)} images ({pct}%) missing alt text","detail":f"Examples: {[i['src'][:60] for i in imgs_no_alt[:3]]}. Alt text is essential for accessibility (WCAG), image SEO, and Google Images traffic.","fix":"Add descriptive alt text to every <img>. For Next.js: <Image alt=\"Descriptive text\" .../>. Alt text should describe the image content, not keyword stuff."})
-        score -= 8
-
-    if len(imgs_png) >= 5 and len(imgs_png) > len(images) * 0.3:
-        findings.append({"severity":"medium","module":"technical","title":f"{len(imgs_png)} images still in PNG format — convert to WebP","detail":f"PNG images: {[i['src'][:50] for i in imgs_png[:5]]}. WebP is typically smaller than PNG with equivalent quality. Large PNGs are a common cause of excessive page weight.","fix":"Convert PNG images to WebP/AVIF. In Next.js, the <Image> component auto-converts. For static images, use tools like cwebp or Sharp. Serve responsive sizes via srcSet.","impact":"Page weight on the image payload can be significantly reduced, which improves LCP."})
-        score -= 8
-
-    if len(images) >= 3 and len(imgs_lazy) / len(images) < 0.6:
-        findings.append({"severity":"low","module":"technical","title":f"Only {len(imgs_lazy)}/{len(images)} images lazy-loaded","detail":"Lazy loading defers off-screen images, reducing initial page weight and improving LCP.","fix":"Add loading=\"lazy\" to below-fold <img> tags. In Next.js: <Image loading=\"lazy\" .../>. Above-fold and logo images should NOT be lazy-loaded (harms LCP)."})
-
-    if len(imgs_no_dims) > 5:
-        findings.append({"severity":"medium","module":"technical","title":f"{len(imgs_no_dims)} images missing explicit width/height — CLS risk","detail":f"Without dimensions: {[i['src'][:50] for i in imgs_no_dims[:5]]}. Images without width/height cause Cumulative Layout Shift as they load and push content around.","fix":"Add width/height attributes. In Next.js, use <Image width={...} height={...}> or fill mode with parent container sizing.","impact":"CLS (Cumulative Layout Shift) penalty. Google penalizes CLS > 0.1 in Core Web Vitals."})
-        score -= 7
+    # Image defects (alt text, PNG/WebP, lazy-loading, dimensions/CLS, LCP) are
+    # scored by the dedicated `images` module, not here — reporting them in both
+    # would duplicate the same findings. `img_data` is still built above for the
+    # return metrics (image_count, images_no_alt, …).
 
     # ═════════════════════════════════════════════
     # 9. INTERNAL LINKS

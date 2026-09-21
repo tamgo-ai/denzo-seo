@@ -97,7 +97,7 @@ class SiteAnalyzer:
         results['technical'] = run_module('technical', scan_technical, final_url, html, domain, headers, fetched.get('status'), fetched.get('redirect_chain', []), framework)
         results['content'] = run_module('content', analyze_content_quality, final_url, html, domain, geo_profile)
         results['e_e_a_t'] = run_module('e_e_a_t', analyze_e_e_a_t, final_url, html, domain, geo_profile)
-        results['images'] = run_module('images', deep_image_audit, final_url, html, domain)
+        results['images'] = run_module('images', deep_image_audit, final_url, html, domain, None, framework)
         results['geo_visibility'] = run_module('geo_visibility', analyze_geo_visibility, final_url, html, domain, geo_profile)
         results['authority'] = run_module('authority', analyze_authority, final_url, domain)
         if is_local:
