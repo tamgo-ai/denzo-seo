@@ -79,7 +79,7 @@ class SiteAnalyzer:
 
         geo_profile = {
             'industry': industry.get('primary_industry', 'general_business'),
-            'business_name': domain,
+            'business_name': industry.get('business_name') or domain,
             'is_local_business': is_local,
         }
 

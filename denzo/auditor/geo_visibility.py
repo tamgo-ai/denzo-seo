@@ -8,8 +8,25 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 
 
+def _humanize_business_name(name):
+    """Fallback: turn a bare domain/URL into a readable name when no real business
+    name was extracted (e.g. morenovalleyclinicamedica.com → morenovalleyclinicamedica)."""
+    n = (name or '').strip()
+    if not n:
+        return 'your business'
+    n = re.sub(r'^https?://', '', n).split('/')[0].replace('www.', '')
+    if '.' in n and not re.fullmatch(r'\d+\.\d+\.\d+\.\d+', n):
+        n = n.split('.')[0]
+    if not n:
+        return 'your business'
+    if re.search(r'[-_]', n):
+        return ' '.join(p.title() for p in re.split(r'[-_]+', n))
+    return n
+
+
 def _generate_faq_examples(business_name, industry, services, faq_topics, locations, certs):
     """Generate industry-relevant FAQ examples."""
+    business_name = _humanize_business_name(business_name)
     industry_name = industry.replace('_', ' ').title()
 
     base_faqs = [
@@ -26,13 +43,20 @@ def _generate_faq_examples(business_name, industry, services, faq_topics, locati
         for topic in faq_topics[:5]:
             base_faqs.append(topic if '?' in topic else f"What is {business_name}'s approach to {topic.lower()}?")
 
-    # Ensure at least 8 questions
-    while len(base_faqs) < 8:
-        q = f"What makes {business_name} different from other {industry_name.lower()} providers?"
+    # Ensure at least 8 DISTINCT questions — never repeat the same fallback.
+    fallbacks = [
+        f"What makes {business_name} different from other {industry_name.lower()} providers?",
+        f"What should I look for when choosing a {industry_name.lower()} provider?",
+        f"How does {business_name} handle appointments or scheduling?",
+        f"Is {business_name} accepting new clients?",
+        f"What areas does {business_name} serve?",
+        f"Does {business_name} accept insurance?",
+    ]
+    for q in fallbacks:
+        if len(base_faqs) >= 8:
+            break
         if q not in base_faqs:
             base_faqs.append(q)
-        else:
-            base_faqs.append(f"What should I look for when choosing a {industry_name.lower()} provider?")
 
     return '\n'.join(f"• {q}" for q in base_faqs[:12])
 
