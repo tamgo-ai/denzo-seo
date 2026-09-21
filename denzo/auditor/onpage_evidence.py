@@ -39,6 +39,9 @@ GENERIC_SCHEMA = frozenset({
     'WebSite', 'WebPage', 'BreadcrumbList', 'Organization', 'Person',
     'ImageObject', 'ListItem', 'SearchAction', 'Thing', 'CreativeWork',
     'CollectionPage', 'AboutPage', 'ContactPage', 'ProfilePage', 'Intangible',
+    # WebSite/WebPage `potentialAction` boilerplate (Yoast & most WP @graph)
+    'EntryPoint', 'Action', 'ReadAction', 'PotentialAction',
+    'PropertyValueSpecification',
 })
 
 
