@@ -23,6 +23,22 @@ from denzo.auditor.performance_estimator import estimate_performance
 MODULE_WEIGHTS = dict(BASE_WEIGHTS)
 
 
+def _describe_fetch_error(exc):
+    """Translate a fetch failure into a clear, honest error message. The default
+    'homepage could not be read' hides the real cause (e.g. a redirect loop on
+    the client's server), which reads like a platform bug."""
+    msg = str(exc)
+    if 'too many redirects' in msg.lower() or 'redirect' in msg.lower():
+        return 'The website redirects in a loop (often www ↔ non-www or http ↔ https). Check the server redirect configuration, or try auditing the non-www version.'
+    if 'temporarily unavailable or blocking' in msg.lower():
+        return 'The website is blocking automated analysis (WAF or bot protection). The site may need to allow the auditor.'
+    if 'exceeded audit size limit' in msg.lower():
+        return 'The homepage response is too large to analyze.'
+    if 'resolve' in msg.lower() or 'nxdomain' in msg.lower() or 'name or service' in msg.lower() or 'gaierror' in msg.lower():
+        return 'The domain could not be resolved (DNS). Check that the URL is correct.'
+    return 'The homepage could not be reliably read'
+
+
 class SiteAnalyzer:
     def __init__(self, url, domain, progress_callback=None):
         self.url, self.domain = url, domain
@@ -44,7 +60,8 @@ class SiteAnalyzer:
                 raise ValueError('Homepage is an automated-access challenge')
         except Exception as exc:
             logging.getLogger(__name__).warning('Homepage fetch unavailable (%s): %s', type(exc).__name__, exc)
-            return dict(url=self.url, error='The homepage could not be reliably read', overall_score=None,
+            error = _describe_fetch_error(exc)
+            return dict(url=self.url, error=error, overall_score=None,
                         status='failed', commercial_ready=False, methodology_version=METHODOLOGY_VERSION,
                         coverage=0, module_scores={}, findings=[], checked_at=datetime.now(timezone.utc).isoformat())
         # All checks describe the final page, including HTTP→HTTPS and www redirects.

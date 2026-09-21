@@ -87,11 +87,13 @@ def analyze_robots(url, html, domain):
             fix=None if allowed else 'Review whether the restriction is intentional before changing robots.txt.',
             evidence=evidence, deduction=0 if allowed else 50)]
         if blocked_ai:
-            findings.append(dict(rule_id='ai_crawler_policy', module='robots', severity='info',
+            findings.append(dict(rule_id='ai_crawler_policy', module='robots', severity='medium' if allowed else 'info',
                 title='Some AI crawlers are restricted for this URL',
-                detail='This can be an intentional access policy and does not change the Googlebot result or score.',
-                fix=None, deduction=0, evidence=dict(source='robots_txt', url=robots_url, agents=blocked_ai)))
-        return dict(score=100 if allowed else 50, status='completed', findings=findings, robots_url=robots_url,
+                detail='AI crawlers (GPTBot, ClaudeBot, PerplexityBot, etc.) are blocked, which reduces the site\'s visibility in AI answers.',
+                fix='Allow AI crawlers if you want the site to appear in AI search results.',
+                deduction=15 if allowed else 0, evidence=dict(source='robots_txt', url=robots_url, agents=blocked_ai)))
+        score = 50 if not allowed else (85 if blocked_ai else 100)
+        return dict(score=score, status='completed', findings=findings, robots_url=robots_url,
                     sitemap_refs=sitemaps, ai_crawlers_blocked=blocked_ai,
                     ai_crawlers_allowed=[a for a in AI_CRAWLERS if a not in blocked_ai],
                     total_rules=sum(len(rules) for _, rules in groups), googlebot_allowed=allowed)

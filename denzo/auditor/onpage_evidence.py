@@ -32,6 +32,16 @@ class Module:
                     findings=self.findings, deductions=self.deductions, **metrics)
 
 
+# Schema.org types that are boilerplate and do NOT indicate meaningful business
+# or rich-result structured data. A site whose only structured data is these
+# generic types scores as "present but weak", not "good".
+GENERIC_SCHEMA = frozenset({
+    'WebSite', 'WebPage', 'BreadcrumbList', 'Organization', 'Person',
+    'ImageObject', 'ListItem', 'SearchAction', 'Thing', 'CreativeWork',
+    'CollectionPage', 'AboutPage', 'ContactPage', 'ProfilePage', 'Intangible',
+})
+
+
 def analyze_onpage(url, html, headers=None, is_local=False):
     soup, visible = BeautifulSoup(html, 'html.parser'), visible_soup(html)
     text = (visible.body or visible).get_text(' ', strip=True)
@@ -107,10 +117,17 @@ def analyze_onpage(url, html, headers=None, is_local=False):
         except (ValueError, TypeError): schema_errors += 1
     if schema_errors:
         geo.add('schema_json', 'Some structured-data blocks are invalid JSON', 'These JSON-LD blocks could not be parsed. This is a syntax check, not rich-result eligibility validation.',
-                'Validate and repair the JSON-LD syntax.', 25, 'medium', invalid_blocks=schema_errors)
+                'Validate and repair the JSON-LD syntax.', 75, 'high', invalid_blocks=schema_errors)
     elif not schema_blocks:
-        geo.add('schema_absent', 'No JSON-LD structured data was found', 'Other formats may be present. Structured data is optional and its absence does not establish an indexing or AI visibility problem.',
-                'Consider relevant structured data if it accurately describes the business.')
+        geo.add('schema_absent', 'No JSON-LD structured data was found', 'Structured data (Schema.org) enables rich results and AI visibility. Its absence is a real gap for a commercial site.',
+                'Add relevant Schema.org JSON-LD for the business (LocalBusiness subtype, Product, Service, FAQPage, etc.).', 100, 'high')
+    else:
+        meaningful = schema_types - GENERIC_SCHEMA
+        if not meaningful:
+            geo.add('schema_generic', 'Only generic structured data found',
+                    f'Found only boilerplate types ({", ".join(sorted(schema_types)) or "none"}). No business-specific or rich-result schema such as LocalBusiness, Product, Service or FAQPage.',
+                    'Add a business-relevant Schema.org type with its key properties (name, address, telephone, etc.).', 45, 'medium',
+                    types=sorted(schema_types))
     geo.add('schema_scope', 'Structured-content check scope', 'This module checks on-page structure. It does not measure AI citations, backlinks or authority.', types=sorted(schema_types))
 
     words = len(text.split())

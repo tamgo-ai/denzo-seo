@@ -16,7 +16,9 @@ PAGE = '''<!doctype html><html lang="en"><head><title>Example Studio</title>
 def test_short_content_decorative_images_and_http_links_are_not_fabricated_defects():
     result = analyze_onpage('https://example.com/', PAGE)
     assert result['technical']['word_count'] < 80
-    assert all(result[n]['score']==100 for n in ('technical','images','content','geo'))
+    assert all(result[n]['score']==100 for n in ('technical','images','content'))
+    # No JSON-LD in PAGE → structured data is correctly flagged as absent (not 100).
+    assert result['geo']['score'] == 0
     assert not any('ranking' in f['title'].lower() for r in result.values() for f in r['findings'])
 
 
@@ -46,11 +48,11 @@ def test_robots_group_and_longest_rule_precedence(text, agent, path, allowed):
     assert robots_analyzer.can_fetch(groups,agent,path) is allowed
 
 
-def test_missing_sitemap_is_informational_and_counts_are_never_extrapolated(monkeypatch):
+def test_missing_sitemap_is_a_real_gap_and_counts_are_never_extrapolated(monkeypatch):
     monkeypatch.setattr(sitemap_analyzer,'_fetch',lambda _:None)
     missing = sitemap_analyzer.analyze_sitemap('https://example.com/', PAGE,'example.com')
-    assert missing['score']==100
-    assert missing['findings'][0]['severity']=='info'
+    assert missing['score']==0
+    assert missing['findings'][0]['severity']=='medium'
     docs = {
       'https://example.com/robots.txt':None,
       'https://example.com/sitemap.xml':'<sitemapindex><sitemap><loc>https://example.com/a.xml</loc></sitemap><sitemap><loc>https://example.com/b.xml</loc></sitemap></sitemapindex>',
@@ -82,7 +84,7 @@ def test_actual_analyzer_uses_redirect_destination_and_reports_only_measured_evi
     report=actual_report(monkeypatch)
     assert report['methodology_version']==METHODOLOGY_VERSION
     assert report['commercial_ready'] and report['coverage']==130
-    assert report['overall_score']==49
+    assert report['overall_score']==41
     assert report['results']['technical']['score']==0
     # The analyzer must use the redirect destination (https), not the requested http URL.
     assert report['final_url'].startswith('https://')

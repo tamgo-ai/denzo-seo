@@ -58,13 +58,13 @@ def analyze_sitemap(url, html, domain, robots_result=None):
                 invalid.append(candidate)
     if root is None:
         found_invalid = bool(invalid)
-        return dict(score=75 if found_invalid else 100, status='completed', sitemap_url=None, total_urls=0,
+        return dict(score=30 if found_invalid else 0, status='completed', sitemap_url=None, total_urls=0,
             is_index=False, is_sample=True, tried_locations=tried,
-            findings=[dict(rule_id='sitemap_discovery', module='sitemap', severity='medium' if found_invalid else 'info',
+            findings=[dict(rule_id='sitemap_discovery', module='sitemap', severity='high' if found_invalid else 'medium',
                 title='A declared sitemap could not be parsed' if found_invalid else 'No sitemap found at the checked locations',
-                detail='Sitemaps are optional. This check does not establish whether Google can discover or index the pages.',
-                fix='Validate the declared XML sitemap.' if found_invalid else 'Consider a sitemap when discovery of many or recently changed pages is important.',
-                deduction=25 if found_invalid else 0, evidence=dict(source='sitemap_discovery', checked_urls=tried, invalid_urls=invalid))])
+                detail='A broken or missing XML sitemap makes it harder for Google to discover new and changed pages, especially on larger sites.',
+                fix='Validate the declared XML sitemap.' if found_invalid else 'Publish an XML sitemap and reference it from robots.txt.',
+                deduction=70 if found_invalid else 100, evidence=dict(source='sitemap_discovery', checked_urls=tried, invalid_urls=invalid))])
     is_index = root.tag.split('}')[-1] == 'sitemapindex'
     children = _locs(root, 'sitemap') if is_index else []
     urls, inspected = [], []
@@ -87,11 +87,17 @@ def analyze_sitemap(url, html, domain, robots_result=None):
         detail='These are counted entries, not an estimate of the whole site. URL availability and indexing have not been checked.',
         fix=None, deduction=0, evidence=dict(source='sitemap_xml', url=sitemap_url, sampled_children=inspected,
             declared_children=len(children), sampled_url_count=len(unique)))]
+    if not unique:
+        findings.append(dict(rule_id='sitemap_empty', module='sitemap', severity='medium',
+            title='The sitemap contains no URLs', detail='An empty sitemap gives Google nothing to discover.',
+            fix="Populate the sitemap with the site's real pages.", deduction=60,
+            evidence=dict(source='sitemap_xml', url=sitemap_url)))
     if invalid_urls:
         findings.append(dict(rule_id='sitemap_urls', module='sitemap', severity='medium',
             title='Some sitemap entries are not absolute HTTP URLs', detail='Sitemap loc entries must identify absolute URLs.',
-            fix='Correct the affected loc entries.', deduction=20,
+            fix='Correct the affected loc entries.', deduction=30,
             evidence=dict(source='sitemap_xml', url=sitemap_url, count=len(invalid_urls), examples=invalid_urls[:5])))
-    return dict(score=80 if invalid_urls else 100, status='completed', findings=findings, sitemap_url=sitemap_url,
+    score = 40 if not unique else (70 if invalid_urls else 100)
+    return dict(score=score, status='completed', findings=findings, sitemap_url=sitemap_url,
         total_urls=len(unique), is_index=is_index, child_sitemaps=len(children), child_sitemap_urls=children,
         is_sample=is_index, sampled_children=len(inspected), sampled_url_count=len(unique))
