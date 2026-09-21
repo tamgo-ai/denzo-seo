@@ -4,7 +4,7 @@ import math
 METHODOLOGY_VERSION = 'droppin-audit-v3'
 BASE_WEIGHTS = {'technical': 40, 'geo': 10, 'performance': 35, 'sitemap': 5,
                 'robots': 10, 'images': 5, 'content': 5, 'local_seo': 0,
-                'geo_visibility': 15, 'authority': 10,
+                'geo_visibility': 15, 'authority': 10, 'e_e_a_t': 10,
                 'keywords': 0, 'llms': 0, 'ai_citations': 0, 'keyword_research': 0, 'indexation': 0}
 
 

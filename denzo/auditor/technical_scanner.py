@@ -146,6 +146,18 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
             findings.append({"severity":"critical","module":"technical","title":f"Domain mismatch: canonical uses {urlparse(canonical_url).netloc} but current URL is {parsed.netloc}","detail":f"Canonical: {canonical_url}\nCurrent: {url}\nThis is a conflicting signal. Google must choose which to trust. If the sitemap also uses a different domain, the conflict is severe.","fix":"Align canonical domain with sitemap domain. Choose www or non-www and use it consistently everywhere: canonical tags, sitemap, internal links, robots.txt.","impact":"Severe canonical dilution. Google is receiving contradictory signals from multiple sources."})
             score -= 25
 
+    # 3b. HREFLANG / internationalization
+    hreflang_links = soup.find_all('link', hreflang=True)
+    if hreflang_links:
+        langs = sorted(set((l.get('hreflang') or '').lower() for l in hreflang_links if l.get('hreflang')))
+        findings.append({"severity":"info","module":"technical","title":f"Hreflang tags present ({len(hreflang_links)}): {', '.join(langs)}","detail":"Hreflang helps Google serve the correct language/regional version.","fix":None})
+    else:
+        hrefs = [a.get('href','').lower() for a in soup.find_all('a', href=True)]
+        lang_path_hints = set(re.findall(r'/(en|es|fr|de|pt|it|ca)(?:/|$)', ' '.join(hrefs)))
+        if lang_path_hints:
+            findings.append({"severity":"medium","module":"technical","title":"Possible multilingual site missing hreflang","detail":f"Language-version paths detected ({', '.join(sorted(lang_path_hints))}) but no hreflang alternate tags. Google may mix up language versions.","fix":"Add <link rel=\"alternate\" hreflang=\"xx\"> tags for each language version plus a self-referencing canonical."})
+            score -= 10
+
     # ═════════════════════════════════════════════
     # 4. H1 / HEADINGS
     # ═════════════════════════════════════════════
