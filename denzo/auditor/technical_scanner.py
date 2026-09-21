@@ -245,10 +245,10 @@ def scan_technical(url: str, html: str, domain: str, http_headers: dict = None, 
         except (json.JSONDecodeError, AttributeError) as e:
             schema_issues.append(f"Block #{i+1}: invalid JSON — {str(e)[:100]}")
 
-    if len(schema_scripts) == 0:
-        findings.append({"severity":"critical","module":"technical","title":"ZERO structured data — invisible to rich results & AI","detail":"No JSON-LD schema found. The site cannot appear in: Google Local Pack, rich snippets, Knowledge Panel, AI Overviews citations, or voice search results. For a multi-location business, this is devastating.","fix":"Implement: (1) Organization schema on homepage, (2) LocalBusiness schema for EACH location with full NAP + geo coordinates, (3) Service schema for each service, (4) BreadcrumbList, (5) WebSite schema for Sitelinks Searchbox.","impact":"The site may miss out on rich results. Each location missing LocalBusiness schema is invisible in Google Maps search."})
-        score -= 30
-    else:
+    # Structured-data ABSENCE is scored by the dedicated `geo` module, not here —
+    # flagging it in both would double-count the same defect. Here we only
+    # deep-validate schema that IS present (required fields, geo, aggregateRating).
+    if schema_scripts:
         if schema_issues:
             for issue in schema_issues[:5]:
                 findings.append({"severity":"high","module":"technical","title":f"Schema validation issue: {issue}","detail":"Schema is present but incomplete — search engines may not use it for rich results.","fix":"Add the missing required properties. Use Google's Rich Results Test to validate: https://search.google.com/test/rich-results"})

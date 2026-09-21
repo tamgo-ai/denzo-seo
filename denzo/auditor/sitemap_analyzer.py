@@ -82,6 +82,10 @@ def analyze_sitemap(url, html, domain, robots_result=None):
         urls = _locs(root,'url')
     unique = sorted(set(urls))
     invalid_urls = [u for u in unique if urlsplit(u).scheme not in ('http','https') or not urlsplit(u).hostname]
+    cross_domain = bool(
+        urlsplit(sitemap_url).hostname and parsed.hostname
+        and urlsplit(sitemap_url).hostname.lower() != parsed.hostname.lower()
+    )
     findings = [dict(rule_id='sitemap_sample', module='sitemap', severity='info',
         title=f'{len(unique)} distinct URLs read from the sitemap sample',
         detail='These are counted entries, not an estimate of the whole site. URL availability and indexing have not been checked.',
@@ -92,12 +96,18 @@ def analyze_sitemap(url, html, domain, robots_result=None):
             title='The sitemap contains no URLs', detail='An empty sitemap gives Google nothing to discover.',
             fix="Populate the sitemap with the site's real pages.", deduction=60,
             evidence=dict(source='sitemap_xml', url=sitemap_url)))
+    if cross_domain:
+        findings.append(dict(rule_id='sitemap_cross_domain', module='sitemap', severity='medium',
+            title='The sitemap is served from a different domain',
+            detail=f'The sitemap is at {urlsplit(sitemap_url).hostname} but the audited URL is {parsed.hostname}. The audited domain is likely an alias; its canonical domain is {urlsplit(sitemap_url).hostname}.',
+            fix='Audit the canonical domain directly, or serve the sitemap from the audited domain.',
+            deduction=20, evidence=dict(source='sitemap_xml', url=sitemap_url, audited_domain=parsed.hostname, sitemap_domain=urlsplit(sitemap_url).hostname)))
     if invalid_urls:
         findings.append(dict(rule_id='sitemap_urls', module='sitemap', severity='medium',
             title='Some sitemap entries are not absolute HTTP URLs', detail='Sitemap loc entries must identify absolute URLs.',
             fix='Correct the affected loc entries.', deduction=30,
             evidence=dict(source='sitemap_xml', url=sitemap_url, count=len(invalid_urls), examples=invalid_urls[:5])))
-    score = 40 if not unique else (70 if invalid_urls else 100)
+    score = 40 if not unique else (70 if invalid_urls else (80 if cross_domain else 100))
     return dict(score=score, status='completed', findings=findings, sitemap_url=sitemap_url,
         total_urls=len(unique), is_index=is_index, child_sitemaps=len(children), child_sitemap_urls=children,
         is_sample=is_index, sampled_children=len(inspected), sampled_url_count=len(unique))
