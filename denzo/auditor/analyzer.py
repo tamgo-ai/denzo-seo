@@ -57,7 +57,7 @@ class SiteAnalyzer:
             if content_type and not any(t in content_type.lower() for t in ('text/html','application/xhtml+xml')):
                 raise ValueError('Homepage response was not HTML')
             lowered = html.lower()
-            if any(marker in lowered for marker in ('id="challenge-form"', '/cdn-cgi/challenge-platform/', 'cf-chl-widget')):
+            if any(marker in lowered for marker in ('id="challenge-form"', 'cf-chl-widget', 'enable javascript and cookies to continue')):
                 raise ValueError('Homepage is an automated-access challenge')
         except Exception as exc:
             logging.getLogger(__name__).warning('Homepage fetch unavailable (%s): %s', type(exc).__name__, exc)

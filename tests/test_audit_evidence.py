@@ -105,6 +105,20 @@ def test_access_challenge_is_not_scored(monkeypatch):
     assert result['status']=='failed' and result['overall_score'] is None
 
 
+def test_cloudflare_js_detection_script_is_not_a_challenge(monkeypatch):
+    # cmsautorepair.com (WP Engine behind Cloudflare) injects this passive
+    # JS-detection script into every page, even for real browsers. It must NOT
+    # be mistaken for an interactive challenge (analyzer.py only checks the
+    # substrings; the benign "/cdn-cgi/challenge-platform/scripts/jsd/main.js"
+    # was previously a false positive).
+    html = ('<html><head><title>Collision Motor Specialist</title></head><body>'
+            '<script src="/cdn-cgi/challenge-platform/scripts/jsd/main.js"></script>'
+            '<p>Real auto body shop content here.</p></body></html>')
+    monkeypatch.setattr(analyzer,'fetch_html',lambda *a,**k:dict(ok=True,status=200,html=html))
+    result=analyzer.SiteAnalyzer('https://cmsautorepair.com/','cmsautorepair.com').run_full_analysis()
+    assert result['status'] != 'failed'
+
+
 def test_other_crawler_noindex_header_does_not_become_google_indexing_issue():
     result=analyze_onpage('https://example.com/',PAGE,{'X-Robots-Tag':'otherbot: noindex, nofollow'})
     assert result['technical']['score']==100
