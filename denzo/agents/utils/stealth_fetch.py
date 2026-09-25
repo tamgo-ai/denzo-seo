@@ -115,7 +115,10 @@ def _is_cloudflare_block(status: int, html: str) -> bool:
         "cf-browser-verification",
         "Checking if the site connection is secure",
         "cf_chl_opt",
-        "challenge-platform",
+        # NOTE: "challenge-platform" is deliberately NOT a marker. Cloudflare
+        # injects the passive /cdn-cgi/challenge-platform/scripts/jsd/main.js
+        # into every page (even for real browsers), so it matches normal pages
+        # too. The markers above only appear on a real challenge interstitial.
         "Just a moment",
         "Enable JavaScript and cookies to continue",
         "Ray ID",

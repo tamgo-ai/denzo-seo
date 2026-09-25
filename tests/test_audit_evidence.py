@@ -105,6 +105,11 @@ def test_access_challenge_is_not_scored(monkeypatch):
     assert result['status']=='failed' and result['overall_score'] is None
 
 
+def test_challenge_error_message_is_honest_and_actionable():
+    msg = analyzer._describe_fetch_error(ValueError('Homepage is an automated-access challenge'))
+    assert 'challenge' in msg.lower() and 'bot-protection' in msg.lower()
+
+
 def test_cloudflare_js_detection_script_is_not_a_challenge(monkeypatch):
     # cmsautorepair.com (WP Engine behind Cloudflare) injects this passive
     # JS-detection script into every page, even for real browsers. It must NOT

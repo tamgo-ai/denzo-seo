@@ -33,6 +33,8 @@ def _describe_fetch_error(exc):
         return 'The website redirects in a loop (often www ↔ non-www or http ↔ https). Check the server redirect configuration, or try auditing the non-www version.'
     if 'temporarily unavailable or blocking' in msg.lower():
         return 'The website is blocking automated analysis (WAF or bot protection). The site may need to allow the auditor.'
+    if 'automated-access challenge' in msg.lower():
+        return 'The site is showing a bot-protection challenge (Cloudflare/Turnstile) to the auditor. Retry shortly, or check if the site needs to allow the auditor.'
     if 'exceeded audit size limit' in msg.lower():
         return 'The homepage response is too large to analyze.'
     if 'resolve' in msg.lower() or 'nxdomain' in msg.lower() or 'name or service' in msg.lower() or 'gaierror' in msg.lower():
